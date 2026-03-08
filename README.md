@@ -31,11 +31,11 @@ A new feature allows you to view and compare all the loaded stocks at a single g
 *   **Interactive Sorting:** You can click on any column header (like Ticker, ML Alpha, or CAN SLIM) to sort the rows ascending or descending based on that specific metric. Sort arrows indicator which column is active and its direction.
 *   **Responsive Scrolling & Wrapping:** Long column headers smoothly wrap text to maintain a compact design. On narrower screens or when comparing many tickers, the table features a horizontal scrollbar while the **Ticker** column intelligently "freezes" (sticky left) so you always know which stock you are looking at as you scroll across the metrics.
 
-````carousel
+
 ![Table Wrapping & Scrollbar](images/table_wrapping_scrollbar_1772867252209.png)
 <!-- slide -->
 ![Sticky Ticker Column during Scroll](images/sticky_ticker_column_1772867263903.png)
-````
+
 
 ### Phase 6: Raw Data Exploration
 By request, added a new feature that intercepts the `yfinance` raw `info` payload, bypasses the quant engine, and exposes all $\sim$150 data keys to the frontend for direct exploration. 
@@ -57,11 +57,11 @@ By request, added a specialized **Methodology & Glossary** tracking page to serv
 
 The `StrategyGlossary.tsx` code parses the complex definitions into clean Shadcn/UI `<Card>` components, using multi-colored `Lucide-React` iconography, `Badge` chips for high-level strategy targeting (like "High-Pass Filter" vs "Contrarian Indicators"), and mono-spaced `<div className="bg-muted">` wrapping to render the complex financial math formats elegantly in the app's Dark Mode palette.
 
-````carousel
+
 ![Glossary Upper View](images/glossary_view_upper_1772903602978.png)
 <!-- slide -->
 ![XGBoost ML Detailed View](images/glossary_view_lower_xgboost_1772903614275.png)
-````
+
 
 ### Phase 8: Deployment Containerization
 To ensure the application can be seamlessly deployed to any cloud provider (AWS, DigitalOcean, Render, etc.) without dependency hell, the entire stack has been containerized using Docker.
