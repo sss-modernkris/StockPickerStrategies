@@ -8,15 +8,16 @@ import { StrategyCharts } from '@/components/StrategyCharts';
 import { ComparisonTable } from '@/components/ComparisonTable';
 import { RawDataPanel } from '@/components/RawDataPanel';
 import { StrategyGlossary } from '@/components/StrategyGlossary';
+import { TechnicalIndicatorsCard } from '@/components/TechnicalIndicatorsCard';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
-  const [tickers, setTickers] = useState<string[]>(['AAPL', 'NVDA']);
-  const [selectedTicker, setSelectedTicker] = useState<string | null>('AAPL');
+  const [tickers, setTickers] = useState<string[]>(['NVDA', 'GOOG', 'AAPL', 'MSFT', 'AMZN', 'META', 'TSLA', 'PLTR', 'ABBV', 'GHRS', 'RTX', 'MU', 'AMD']);
+  const [selectedTicker, setSelectedTicker] = useState<string | null>('NVDA');
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'raw-data' | 'glossary'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,12 +97,14 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold tracking-tight">
                   {viewMode === 'dashboard' && currentData.symbol}
                   {viewMode === 'table' && 'Comparison Table'}
+                  {viewMode === 'technical' && `${currentData.symbol} Technical Indicators`}
                   {viewMode === 'raw-data' && `${currentData.symbol} Raw Data`}
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
                   {viewMode === 'table' && 'Compare quant metrics across all loaded stocks'}
+                  {viewMode === 'technical' && 'Price action, momentum, moving averages, and volume data'}
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                 </p>
@@ -112,6 +115,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} onClick={() => setViewMode('table')} size="sm" className="rounded-md">
                   <TableProperties className="w-4 h-4 mr-2" /> Comparison
+                </Button>
+                <Button variant={viewMode === 'technical' ? 'secondary' : 'ghost'} onClick={() => setViewMode('technical')} size="sm" className="rounded-md">
+                  <LineChart className="w-4 h-4 mr-2" /> Technicals
                 </Button>
                 <Button variant={viewMode === 'raw-data' ? 'secondary' : 'ghost'} onClick={() => setViewMode('raw-data')} size="sm" className="rounded-md">
                   <Database className="w-4 h-4 mr-2" /> Raw Data
@@ -147,6 +153,12 @@ export default function Dashboard() {
                 <div className="xl:col-span-1 h-[800px] xl:h-auto">
                   <JustificationEngine strategies={currentData.strategies} />
                 </div>
+              </div>
+            )}
+
+            {viewMode === 'technical' && (
+              <div className="mt-2">
+                <TechnicalIndicatorsCard data={currentData.technical_indicators} />
               </div>
             )}
 

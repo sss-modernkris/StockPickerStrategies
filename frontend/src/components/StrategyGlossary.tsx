@@ -9,7 +9,9 @@ import {
     ShieldAlert,
     Zap,
     LineChart,
-    BrainCircuit
+    BrainCircuit,
+    Activity,
+    Gauge
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -96,6 +98,136 @@ export function StrategyGlossary() {
                 { label: "VIX", text: "When VIX is high (>30), fear is high (potential buy). Low (<15), complacency is high (sell)." },
                 { label: "Put/Call Ratio", text: "> 1.0 means buying protection (bearish sentiment), contrarian buy signal." }
             ]
+        },
+        {
+            id: "macd",
+            icon: <Activity className="w-5 h-5 text-teal-500" />,
+            title: "8. MACD (Moving Average Convergence Divergence)",
+            badge: "Momentum Indicator",
+            description: "A versatile trend-following momentum indicator that shows the relationship between two different moving averages of a stock’s price. It is used by traders to identify whether a trend is strengthening, weakening, or about to reverse.",
+            customContent: (
+                <div className="space-y-4 mt-4 text-sm">
+                    <div>
+                        <h4 className="font-semibold text-foreground">1. The Three Components of MACD</h4>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-1 space-y-1">
+                            <li><span className="font-medium text-foreground">The MACD Line:</span> Calculated by subtracting the 26-period EMA from the 12-period EMA.</li>
+                            <li><span className="font-medium text-foreground">The Signal Line:</span> A 9-period EMA of the MACD line itself. Acts as a trigger for buy and sell signals.</li>
+                            <li><span className="font-medium text-foreground">The Histogram:</span> Represents the distance between the MACD line and the Signal line. When bars are above zero and growing, upward momentum is increasing.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">2. How to Read MACD Signals</h4>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-1 space-y-2">
+                            <li>
+                                <span className="font-medium text-foreground">A. Signal Line Crossovers:</span>
+                                <ul className="list-[circle] list-inside ml-4 mt-1 space-y-1">
+                                    <li><span className="font-medium">Bullish:</span> MACD crosses above Signal line (upside momentum).</li>
+                                    <li><span className="font-medium">Bearish:</span> MACD crosses below Signal line (downward momentum).</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">B. Zero Line Crossovers:</span>
+                                <ul className="list-[circle] list-inside ml-4 mt-1 space-y-1">
+                                    <li><span className="font-medium">Bullish:</span> MACD moves from negative to positive (uptrend).</li>
+                                    <li><span className="font-medium">Bearish:</span> MACD moves from positive to negative (downtrend).</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">C. Divergence:</span>
+                                <ul className="list-[circle] list-inside ml-4 mt-1 space-y-1">
+                                    <li><span className="font-medium">Bullish Divergence:</span> Stock makes a lower low, MACD makes a higher low (reversal up).</li>
+                                    <li><span className="font-medium">Bearish Divergence:</span> Stock makes a higher high, MACD makes a lower high (reversal down).</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">3. Application in Stock Analysis</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed">
+                            In a strategy like the Fundamental/Technical model we discussed for $MSFT$, the MACD serves as a &quot;confirmation&quot; tool. For example, if a stock is fundamentally undervalued (like a DCF analysis of $615.23 vs. $410.68), a Bullish MACD Cross provides the technical &quot;green light&quot; that the market is finally beginning to recognize that value and move higher.
+                        </p>
+                    </div>
+                </div>
+            )
+        },
+        {
+            id: "rsi",
+            icon: <Gauge className="w-5 h-5 text-indigo-500" />,
+            title: "9. RSI (Relative Strength Index)",
+            badge: "Momentum Oscillator",
+            description: "A widely used momentum oscillator developed by J. Welles Wilder in 1978. It quantifies the speed and change of price movements on a scale of 0 to 100, helping traders identify when a security is \"stretched\" too far in one direction.",
+            customContent: (
+                <div className="space-y-4 mt-4 text-sm">
+                    <div>
+                        <h4 className="font-semibold text-foreground">1. The Core Logic: How It’s Calculated</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed">
+                            The RSI doesn&apos;t just look at the price; it compares the strength of the &quot;up days&quot; to the &quot;down days&quot; over a specific period (typically 14 days). The calculation follows this two-step process:
+                        </p>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-2 space-y-1">
+                            <li><span className="font-medium text-foreground">Relative Strength (RS):</span> The average gain of &quot;up&quot; periods divided by the average loss of &quot;down&quot; periods during the timeframe.</li>
+                        </ul>
+                        <div className="bg-muted p-2 rounded-md font-mono text-xs my-2 border text-center">
+                            RS = Average Gain / Average Loss
+                        </div>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-2 space-y-1">
+                            <li><span className="font-medium text-foreground">RSI Formula:</span> This ratio is then &quot;indexed&quot; to fit between 0 and 100.</li>
+                        </ul>
+                        <div className="bg-muted p-2 rounded-md font-mono text-xs my-2 border text-center">
+                            RSI = 100 - [ 100 / (1 + RS) ]
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">2. Interpreting the Thresholds</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed">
+                            The primary use of RSI is identifying extreme market conditions:
+                        </p>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-2 space-y-2">
+                            <li>
+                                <span className="font-medium text-foreground">Overbought (&gt;70):</span> Suggests that the asset has experienced a rapid increase in price and may be due for a pullback or reversal. It indicates that buying pressure might be reaching a point of exhaustion.
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">Oversold (&lt;30):</span> Suggests that the asset has been sold heavily and may be due for a rebound. This implies that selling pressure is potentially overextended.
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">The Centerline (50):</span> Often used to identify the general trend. An RSI consistently above 50 indicates a bullish trend, while an RSI below 50 indicates a bearish trend.
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">3. Advanced Signals: Beyond the 70/30 Rule</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed">
+                            Sophisticated traders use RSI for more than just simple overbought/oversold levels:
+                        </p>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-2 space-y-2">
+                            <li>
+                                <span className="font-medium text-foreground">A. RSI Divergence:</span> Divergence occurs when the price moves in the opposite direction of the RSI.
+                                <ul className="list-[circle] list-inside ml-4 mt-1 space-y-1">
+                                    <li><span className="font-medium">Bullish Divergence:</span> Price makes a lower low, but RSI makes a higher low. This suggests that even though the price is falling, the selling momentum is actually weakening.</li>
+                                    <li><span className="font-medium">Bearish Divergence:</span> Price makes a higher high, but RSI makes a lower high. This indicates that the uptrend is losing steam.</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">B. Failure Swings:</span> Wilder considered &quot;Failure Swings&quot; to be the most reliable reversal signals. They are independent of price action and occur entirely within the RSI window.
+                                <ul className="list-[circle] list-inside ml-4 mt-1 space-y-1">
+                                    <li><span className="font-medium">Top Failure Swing:</span> Occurs when RSI goes above 70, drops below a previous swing low (the &quot;fail point&quot;), and then fails to reach a new high above 70 on its next bounce.</li>
+                                    <li><span className="font-medium">Bottom Failure Swing:</span> Occurs when RSI drops below 30, bounces, drops again but stays above 30, and then breaks above its previous swing high.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">4. Important Context: Trending vs. Ranging</h4>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-1 space-y-2">
+                            <li>
+                                <span className="font-medium text-foreground">Ranging Markets:</span> Standard 70/30 levels work best here as the price oscillates between support and resistance.
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">Strong Trends:</span> In a powerful uptrend (like $NVDA$ in 2025), the RSI can stay &quot;overbought&quot; (&gt;70) for weeks while the price continues to climb. Selling purely because the RSI is at 70 during a strong trend is a common mistake; some traders adjust their levels to 80/20 in these environments to filter out noise.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            )
         },
         {
             id: "xgboost",

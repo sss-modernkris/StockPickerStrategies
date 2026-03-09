@@ -42,7 +42,7 @@ export function TickerSidebar({
                     value={newTicker}
                     onChange={(e) => setNewTicker(e.target.value)}
                     className="uppercase bg-background"
-                    maxLength={5}
+                    maxLength={20}
                 />
                 <Button type="submit" size="icon" disabled={tickers.length >= 20 || !newTicker.trim()}>
                     <Plus className="w-4 h-4" />

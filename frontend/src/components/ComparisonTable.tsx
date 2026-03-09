@@ -54,9 +54,24 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             return acc;
         }, {} as Record<string, number>);
 
+        let stratSum = 0;
+        STRATEGY_NAMES.forEach(name => {
+            stratSum += stratMap[name] || 0;
+        });
+        const stratAvg = STRATEGY_NAMES.length > 0 ? stratSum / STRATEGY_NAMES.length : 0;
+
+        const macdHist = data.technical_indicators?.macd_line != null && data.technical_indicators?.macd_signal != null
+            ? data.technical_indicators.macd_line - data.technical_indicators.macd_signal
+            : null;
+
+        const rsi = data.technical_indicators?.rsi_14 ?? null;
+
         return {
             symbol: data.symbol,
             ml_alpha: alphaProb,
+            strat_avg: stratAvg,
+            macd_hist: macdHist,
+            rsi: rsi,
             strats: stratMap,
             original: data
         };
@@ -75,6 +90,15 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'ml_alpha') {
             valA = a.ml_alpha;
             valB = b.ml_alpha;
+        } else if (sortKey === 'strat_avg') {
+            valA = a.strat_avg;
+            valB = b.strat_avg;
+        } else if (sortKey === 'macd_hist') {
+            valA = a.macd_hist ?? -99999;
+            valB = b.macd_hist ?? -99999;
+        } else if (sortKey === 'rsi') {
+            valA = a.rsi ?? -99999;
+            valB = b.rsi ?? -99999;
         } else {
             valA = a.strats[sortKey] || 0;
             valB = b.strats[sortKey] || 0;
@@ -94,7 +118,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         }
     };
 
-    const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    const renderSortIcon = (columnKey: string) => {
         if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-50" />;
         return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />;
     };
@@ -108,13 +132,31 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             className="w-[100px] font-bold cursor-pointer hover:bg-muted bg-card sticky left-0 z-20 shadow-[1px_0_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('ticker')}
                         >
-                            Ticker <SortIcon columnKey="ticker" />
+                            Ticker {renderSortIcon("ticker")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-primary cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
                             onClick={() => handleSort('ml_alpha')}
                         >
-                            ML Alpha <SortIcon columnKey="ml_alpha" />
+                            ML Alpha {renderSortIcon("ml_alpha")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-blue-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            onClick={() => handleSort('strat_avg')}
+                        >
+                            Strat Avg {renderSortIcon("strat_avg")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            onClick={() => handleSort('macd_hist')}
+                        >
+                            MACD Hist {renderSortIcon("macd_hist")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            onClick={() => handleSort('rsi')}
+                        >
+                            RSI {renderSortIcon("rsi")}
                         </TableHead>
                         {STRATEGY_NAMES.map(name => (
                             <TableHead
@@ -122,7 +164,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                 className="text-xs whitespace-normal min-w-[100px] text-center align-bottom cursor-pointer hover:bg-muted/50"
                                 onClick={() => handleSort(name)}
                             >
-                                {name} <SortIcon columnKey={name} />
+                                {name} {renderSortIcon(name)}
                             </TableHead>
                         ))}
                         <TableHead className="w-[150px] text-right font-bold pr-4">6M Trend</TableHead>
@@ -131,7 +173,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 <TableBody>
                     {sortedData.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={STRATEGY_NAMES.length + 3} className="text-center py-10 text-muted-foreground">
+                            <TableCell colSpan={STRATEGY_NAMES.length + 6} className="text-center py-10 text-muted-foreground">
                                 No data loaded yet. Select stocks from the sidebar.
                             </TableCell>
                         </TableRow>
@@ -146,6 +188,23 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className={`${getColorClass(row.ml_alpha)} text-center`}>
                                         {row.ml_alpha.toFixed(1)}%
+                                    </TableCell>
+                                    <TableCell className={`${getColorClass(row.strat_avg)} text-center`}>
+                                        {row.strat_avg.toFixed(1)}%
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
+                                        {row.macd_hist != null ? (
+                                            <span className={row.macd_hist > 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                                                {row.macd_hist > 0 ? '+' : ''}{row.macd_hist.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[80px]">
+                                        {row.rsi != null ? (
+                                            <span className={row.rsi > 70 ? "text-red-500 font-bold" : row.rsi < 30 ? "text-green-500 font-bold" : "text-foreground"}>
+                                                {row.rsi.toFixed(1)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
 
                                     {STRATEGY_NAMES.map(name => {
