@@ -1,0 +1,340 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Loader2, TrendingUp, AlertCircle } from 'lucide-react';
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer
+} from 'recharts';
+import { TickerHistory } from '@/lib/types';
+
+interface NormalizedComparePanelProps {
+    availableTickers: string[];
+}
+
+const PERIODS = [
+    { label: '1M', value: '1mo' },
+    { label: '3M', value: '3mo' },
+    { label: '6M', value: '6mo' },
+    { label: '1Y', value: '1y' },
+    { label: '5Y', value: '5y' }
+];
+
+// Curated colors for standard clear charting
+const CHART_COLORS = [
+    '#3b82f6', // blue-500
+    '#10b981', // emerald-500
+    '#f59e0b', // amber-500
+    '#ef4444', // red-500
+    '#8b5cf6', // violet-500
+    '#ec4899', // pink-500
+    '#06b6d4', // cyan-500
+    '#f97316', // orange-500
+    '#84cc16', // lime-500
+    '#14b8a6', // teal-500
+    '#6366f1', // indigo-500
+    '#d946ef', // fuchsia-500
+    '#eab308'  // yellow-500
+];
+
+export function NormalizedComparePanel({ availableTickers }: NormalizedComparePanelProps) {
+    const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
+    const [period, setPeriod] = useState<string>('1y');
+    const [historyData, setHistoryData] = useState<TickerHistory[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Initialize selected tickers when available tickers change (only if we haven't selected any yet)
+    useEffect(() => {
+        if (selectedTickers.length === 0 && availableTickers.length > 0) {
+            // Select up to 5 tickers by default to avoid clutter
+            setSelectedTickers(availableTickers.slice(0, 5));
+        }
+    }, [availableTickers, selectedTickers.length]);
+
+    // Fetch data when period or selected tickers change
+    useEffect(() => {
+        if (selectedTickers.length === 0) {
+            setHistoryData([]);
+            return;
+        }
+
+        const fetchData = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const tickersParam = selectedTickers.join(',');
+                const res = await fetch(`http://localhost:8080/api/history?tickers=${tickersParam}&period=${period}`);
+
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch history (Status ${res.status})`);
+                }
+
+                const data = await res.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                setHistoryData(data.data);
+            } catch (err: unknown) {
+                console.error("Historical fetch error:", err);
+                const message = err instanceof Error ? err.message : 'An error occurred while fetching historical data.';
+                setError(message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        // Debounce to prevent multiple rapid requests if user is clicking toggles quickly
+        const timeoutId = setTimeout(() => {
+            fetchData();
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [selectedTickers, period]);
+
+    const toggleTicker = (ticker: string) => {
+        setSelectedTickers(prev =>
+            prev.includes(ticker)
+                ? prev.filter(t => t !== ticker)
+                : [...prev, ticker]
+        );
+    };
+
+    // Transform data for Recharts into a normalized format
+    const chartData = useMemo(() => {
+        if (!historyData || historyData.length === 0) return [];
+
+        // 1. Collect all unique dates across all tickers to align them
+        const dateSet = new Set<string>();
+        historyData.forEach(tickerData => {
+            tickerData.history.forEach((point) => dateSet.add(point.date));
+        });
+
+        const sortedDates = Array.from(dateSet).sort();
+
+        // 2. Find the initial price for each ticker to use as the base (100)
+        // We find the earliest valid price.
+        const initialPrices: Record<string, number> = {};
+        historyData.forEach(tickerData => {
+            if (tickerData.history.length > 0) {
+                // Sort by date just in case
+                const sortedHistory = [...tickerData.history].sort((a, b) => a.date.localeCompare(b.date));
+                initialPrices[tickerData.symbol] = sortedHistory[0].close;
+            }
+        });
+
+        // 3. Build the chart array. Each object represents one date and holds the normalized price of each ticker.
+        const formattedData = sortedDates.map(date => {
+            const dataPoint: Record<string, string | number> = { date };
+
+            historyData.forEach(tickerData => {
+                const dayMatch = tickerData.history.find(p => p.date === date);
+                if (dayMatch && initialPrices[tickerData.symbol]) {
+                    // Normalize: (current / initial) * 100
+                    const normalizedValue = (dayMatch.close / initialPrices[tickerData.symbol]) * 100;
+                    // Round to 2 decimals for cleaner tooltips
+                    dataPoint[tickerData.symbol] = Math.round(normalizedValue * 100) / 100;
+                }
+            });
+
+            return dataPoint;
+        });
+
+        return formattedData;
+    }, [historyData]);
+
+    const formatYAxis = (value: number) => {
+        return value.toFixed(0);
+    };
+
+    const CustomTooltip = ({ active, payload, label }: { active?: boolean, payload?: { value: number; color: string; name: string }[], label?: string }) => {
+        if (active && payload && payload.length) {
+            // Sort tooltip items by value desc
+            const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
+
+            return (
+                <div className="bg-background/95 border p-3 rounded-lg shadow-xl backdrop-blur-sm z-50">
+                    <p className="font-semibold mb-2 text-foreground">{label}</p>
+                    <div className="space-y-1">
+                        {sortedPayload.map((entry: { value: number; color: string; name: string }, index: number) => {
+                            const isPositive = entry.value >= 100;
+                            const diff = Math.abs(entry.value - 100).toFixed(2);
+                            return (
+                                <div key={index} className="flex items-center justify-between gap-4 text-sm">
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-2 h-2 rounded-full"
+                                            style={{ backgroundColor: entry.color }}
+                                        />
+                                        <span className="font-medium" style={{ color: entry.color }}>
+                                            {entry.name}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono">{entry.value.toFixed(2)}</span>
+                                        <span className={`text-xs ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                                            {isPositive ? '+' : '-'}{diff}%
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    return (
+        <Card className="col-span-1 shadow-md border-border/40 animate-in fade-in zoom-in-95 duration-300">
+            <CardHeader className="pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <CardTitle className="flex items-center gap-2 text-2xl">
+                            <TrendingUp className="w-6 h-6 text-primary" />
+                            Normalized Performance Matrix
+                        </CardTitle>
+                        <CardDescription className="mt-1 text-base">
+                            Compare relative growth. All stocks start at a baseline of 100.
+                        </CardDescription>
+                    </div>
+
+                    <div className="flex bg-muted/50 p-1.5 rounded-xl border">
+                        {PERIODS.map(p => (
+                            <Button
+                                key={p.value}
+                                variant={period === p.value ? "default" : "ghost"}
+                                size="sm"
+                                onClick={() => setPeriod(p.value)}
+                                className={`rounded-lg px-4 transition-all duration-200 ${period === p.value ? 'shadow-md font-bold scale-105 ring-2 ring-primary/20' : 'font-medium text-muted-foreground hover:text-foreground'}`}
+                            >
+                                {p.label}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="mb-6 flex flex-wrap gap-2">
+                    {availableTickers.map(ticker => {
+                        const isSelected = selectedTickers.includes(ticker);
+                        const tickerIndex = selectedTickers.indexOf(ticker);
+                        const color = isSelected ? CHART_COLORS[tickerIndex % CHART_COLORS.length] : 'transparent';
+
+                        return (
+                            <Button
+                                key={ticker}
+                                variant={isSelected ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => toggleTicker(ticker)}
+                                className={`rounded-full transition-all ${isSelected ? 'opacity-100 hover:opacity-90' : 'opacity-60 hover:opacity-100'}`}
+                                style={isSelected ? { backgroundColor: color, color: '#fff', borderColor: color } : {}}
+                            >
+                                {ticker}
+                            </Button>
+                        );
+                    })}
+                </div>
+
+                <div className="h-[500px] w-full mt-4 border rounded-xl bg-card/50 p-4 relative flex flex-col">
+                    {loading && (
+                        <div className="absolute inset-0 z-10 bg-background/50 backdrop-blur-sm flex items-center justify-center rounded-xl">
+                            <div className="flex flex-col items-center gap-3 text-primary">
+                                <Loader2 className="w-10 h-10 animate-spin" />
+                                <p className="font-medium animate-pulse">Syncing historical market data...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-xl">
+                            <div className="flex flex-col items-center gap-3 text-destructive max-w-md text-center p-6 bg-destructive/10 border border-destructive/20 rounded-xl">
+                                <AlertCircle className="w-10 h-10" />
+                                <p className="font-semibold">{error}</p>
+                                <Button variant="outline" size="sm" onClick={() => setPeriod(period)} className="mt-2">
+                                    Retry
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!loading && chartData.length === 0 && !error && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center text-muted-foreground">
+                            <p>Select at least one ticker to view comparison.</p>
+                        </div>
+                    )}
+
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
+                            <XAxis
+                                dataKey="date"
+                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                                tickMargin={10}
+                                minTickGap={30}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(val) => {
+                                    if (!val) return '';
+                                    const date = new Date(val);
+                                    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().slice(2)}`;
+                                }}
+                            />
+                            <YAxis
+                                domain={['auto', 'auto']}
+                                tickFormatter={formatYAxis}
+                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                                tickMargin={10}
+                                axisLine={false}
+                                tickLine={false}
+                                orientation="right"
+                            />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend
+                                verticalAlign="top"
+                                height={36}
+                                iconType="circle"
+                                wrapperStyle={{ paddingBottom: '20px' }}
+                            />
+                            {/* Horizontal line at 100 reference point */}
+                            {chartData.length > 0 && (
+                                <line
+                                    x1="0"
+                                    y1={0} // Handled dynamically by recharts
+                                    x2="100%"
+                                    y2={0}
+                                    stroke="hsl(var(--muted-foreground))"
+                                    strokeWidth={1}
+                                    strokeDasharray="4 4"
+                                    opacity={0.5}
+                                />
+                            )}
+
+                            {selectedTickers.map((ticker, index) => (
+                                <Line
+                                    key={ticker}
+                                    type="monotone"
+                                    dataKey={ticker}
+                                    stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 6, strokeWidth: 0 }}
+                                    isAnimationActive={true}
+                                />
+                            ))}
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}

@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from backend.models import TickerAnalysis
+from backend.models import TickerAnalysis, HistoryResponse
 from backend.services.strategy_engine import run_all_strategies
+from backend.services.history_client import fetch_batch_history
 
 app = FastAPI(
     title="Strategic Alpha Dashboard API",
@@ -32,3 +33,19 @@ def analyze_ticker(ticker: str) -> TickerAnalysis:
         # If there's an error in fetching, still returning 200 with error property for UI to display nicely
         pass
     return analysis
+
+@app.get("/api/history", response_model=HistoryResponse)
+def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
+    # tickers should be a comma-separated string like "AAPL,MSFT,NVDA"
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    
+    if not ticker_list:
+        raise HTTPException(status_code=400, detail="No valid tickers provided")
+        
+    result = fetch_batch_history(ticker_list, period)
+    
+    if "error" in result and result["error"]:
+        return HistoryResponse(period=period, data=[], error=result["error"])
+        
+    # Validation will happen automatically by Pydantic Model
+    return HistoryResponse(period=period, data=result["data"])

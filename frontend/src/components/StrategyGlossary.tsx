@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
     BookOpen,
     TrendingUp,
@@ -11,10 +12,12 @@ import {
     LineChart,
     BrainCircuit,
     Activity,
-    Gauge
+    Gauge,
+    Search
 } from 'lucide-react';
 
 export function StrategyGlossary() {
+    const [searchQuery, setSearchQuery] = useState('');
     const glossaryItems = [
         {
             id: "can-slim",
@@ -250,7 +253,7 @@ export function StrategyGlossary() {
                         <h4 className="font-semibold text-foreground">2. Target Variable (y)</h4>
                         <div className="bg-muted p-3 rounded-md font-mono text-xs my-2 border">
                             y_i = 1 if R_i {'>'} Median(R) else 0<br />
-                            <span className="text-muted-foreground">// Where R_i is the forward 30-day log return</span>
+                            <span className="text-muted-foreground">{'// Where R_i is the forward 30-day log return'}</span>
                         </div>
                     </div>
                     <div>
@@ -273,53 +276,85 @@ export function StrategyGlossary() {
         }
     ];
 
+    const filteredItems = glossaryItems.filter(item => {
+        const query = searchQuery.toLowerCase();
+        return (
+            item.title.toLowerCase().includes(query) ||
+            item.badge?.toLowerCase().includes(query) ||
+            item.description.toLowerCase().includes(query) ||
+            (item.bullets && item.bullets.some(b => b.label.toLowerCase().includes(query) || b.text.toLowerCase().includes(query))) ||
+            (item.formula && item.formula.toLowerCase().includes(query)) ||
+            (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
+            (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
+            (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query))
+        );
+    });
+
     return (
         <div className="space-y-8 animate-in fade-in pb-12 w-full max-w-5xl mx-auto mt-2">
-            <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Strategy Glossary</h2>
-                <p className="text-muted-foreground">Detailed methodology definitions, formulas, and ML logic driving the Strategic Alpha dashboard.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2 pt-2">
+                    <h2 className="text-3xl font-bold tracking-tight">Strategy Glossary</h2>
+                    <p className="text-muted-foreground">Detailed methodology definitions, formulas, and ML logic driving the Strategic Alpha dashboard.</p>
+                </div>
+                <div className="relative w-full md:w-72">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="Search strategy..."
+                        className="w-full pl-9 bg-background"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {glossaryItems.map((item) => (
-                    <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' ? 'md:col-span-2 shadow-md border-primary/50 bg-primary/5' : 'bg-card'}`}>
-                        <CardHeader className="pb-3 border-b border-border/10">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    {item.icon}
-                                    <CardTitle className="text-lg">{item.title}</CardTitle>
+            {filteredItems.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card/50">
+                    No strategy found matching &quot;{searchQuery}&quot;.
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredItems.map((item) => (
+                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' ? 'md:col-span-2 shadow-md border-primary/50 bg-primary/5' : 'bg-card'}`}>
+                            <CardHeader className="pb-3 border-b border-border/10">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {item.icon}
+                                        <CardTitle className="text-lg">{item.title}</CardTitle>
+                                    </div>
+                                    {item.badge && <Badge variant={item.id === 'xgboost' ? 'default' : 'secondary'}>{item.badge}</Badge>}
                                 </div>
-                                {item.badge && <Badge variant={item.id === 'xgboost' ? 'default' : 'secondary'}>{item.badge}</Badge>}
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-4 flex-grow text-sm space-y-4">
-                            <p className="text-muted-foreground leading-relaxed">{item.description}</p>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-grow text-sm space-y-4">
+                                <p className="text-muted-foreground leading-relaxed">{item.description}</p>
 
-                            {item.formula && (
-                                <div className="bg-muted px-4 py-3 rounded-md border text-center font-mono opacity-90 text-xs text-foreground font-medium tracking-wide">
-                                    {item.formula}
-                                </div>
-                            )}
+                                {item.formula && (
+                                    <div className="bg-muted px-4 py-3 rounded-md border text-center font-mono opacity-90 text-xs text-foreground font-medium tracking-wide">
+                                        {item.formula}
+                                    </div>
+                                )}
 
-                            {item.bullets && item.bullets.length > 0 && (
-                                <ul className="space-y-3">
-                                    {item.bullets.map((bullet, idx) => (
-                                        <li key={idx} className="flex gap-2">
-                                            <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0" />
-                                            <div>
-                                                <span className="font-semibold text-foreground block">{bullet.label}</span>
-                                                <span className="text-muted-foreground block leading-relaxed">{bullet.text}</span>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                                {item.bullets && item.bullets.length > 0 && (
+                                    <ul className="space-y-3">
+                                        {item.bullets.map((bullet, idx) => (
+                                            <li key={idx} className="flex gap-2">
+                                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0" />
+                                                <div>
+                                                    <span className="font-semibold text-foreground block">{bullet.label}</span>
+                                                    <span className="text-muted-foreground block leading-relaxed">{bullet.text}</span>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
 
-                            {item.customContent}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+                                {item.customContent}
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

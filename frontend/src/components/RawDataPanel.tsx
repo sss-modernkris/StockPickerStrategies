@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface RawDataPanelProps {
-    rawData?: Record<string, any>;
+    rawData?: Record<string, unknown>;
 }
 
 export function RawDataPanel({ rawData }: RawDataPanelProps) {
@@ -11,7 +11,7 @@ export function RawDataPanel({ rawData }: RawDataPanelProps) {
     }
 
     // Helper to format values nicely
-    const formatValue = (key: string, value: any) => {
+    const formatValue = (key: string, value: unknown) => {
         if (value === null || value === undefined) return 'N/A';
         if (typeof value === 'boolean') return value ? 'Yes' : 'No';
         if (typeof value === 'number') {
@@ -39,7 +39,7 @@ export function RawDataPanel({ rawData }: RawDataPanelProps) {
             "totalRevenue", "revenueGrowth", "grossMargins", "ebitda", "ebitdaMargins", "operatingMargins", "profitMargins", "returnOnAssets", "returnOnEquity", "freeCashflow", "totalDebt", "debtToEquity"
         ],
         "Trading Information": [
-            "previousClose", "open", "dayLow", "dayHigh", "fiftyTwoWeekLow", "fiftyTwoWeekHigh", "volume", "averageVolume", "beta", "dividendYield", "trailingAnnualDividendRate"
+            "currentPrice", "regularMarketPrice", "previousClose", "open", "dayLow", "dayHigh", "fiftyTwoWeekLow", "fiftyTwoWeekHigh", "volume", "averageVolume", "beta", "dividendYield", "trailingAnnualDividendRate"
         ]
     };
 

@@ -10,6 +10,16 @@ class PricePoint(BaseModel):
     date: str
     close: float
 
+class TickerHistory(BaseModel):
+    symbol: str
+    history: List[PricePoint]
+
+class HistoryResponse(BaseModel):
+    period: str
+    data: List[TickerHistory]
+    error: Optional[str] = None
+
+
 class TechnicalIndicators(BaseModel):
     sma_50: Optional[float] = None
     sma_200: Optional[float] = None

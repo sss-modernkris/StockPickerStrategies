@@ -4,6 +4,16 @@ export interface StrategyResult {
     justifications: string[];
 }
 
+export interface PricePoint {
+    date: string;
+    close: number;
+}
+
+export interface TickerHistory {
+    symbol: string;
+    history: PricePoint[];
+}
+
 export interface TechnicalIndicators {
     sma_50?: number;
     sma_200?: number;
@@ -23,8 +33,8 @@ export interface TickerAnalysis {
     strategies: StrategyResult[];
     alpha_probability?: number;
     top_factor?: string;
-    price_history?: { date: string; close: number }[];
+    price_history?: PricePoint[];
     technical_indicators?: TechnicalIndicators;
-    raw_data?: Record<string, any>;
+    raw_data?: Record<string, unknown>;
     error?: string;
 }

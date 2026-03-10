@@ -9,15 +9,16 @@ import { ComparisonTable } from '@/components/ComparisonTable';
 import { RawDataPanel } from '@/components/RawDataPanel';
 import { StrategyGlossary } from '@/components/StrategyGlossary';
 import { TechnicalIndicatorsCard } from '@/components/TechnicalIndicatorsCard';
+import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>(['NVDA', 'GOOG', 'AAPL', 'MSFT', 'AMZN', 'META', 'TSLA', 'PLTR', 'ABBV', 'GHRS', 'RTX', 'MU', 'AMD']);
   const [selectedTicker, setSelectedTicker] = useState<string | null>('NVDA');
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,8 +37,9 @@ export default function Dashboard() {
         }
         const data: TickerAnalysis = await res.json();
         setAnalysisData(prev => ({ ...prev, [selectedTicker]: data }));
-      } catch (err: any) {
-        setError(err.message || "An unexpected error occurred");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "An unexpected error occurred";
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -97,6 +99,7 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold tracking-tight">
                   {viewMode === 'dashboard' && currentData.symbol}
                   {viewMode === 'table' && 'Comparison Table'}
+                  {viewMode === 'normalized-compare' && 'Relative Performance Analytics'}
                   {viewMode === 'technical' && `${currentData.symbol} Technical Indicators`}
                   {viewMode === 'raw-data' && `${currentData.symbol} Raw Data`}
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
@@ -104,6 +107,7 @@ export default function Dashboard() {
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
                   {viewMode === 'table' && 'Compare quant metrics across all loaded stocks'}
+                  {viewMode === 'normalized-compare' && 'Visualize relative growth on a level playing field, indexing all selected assets to a baseline of 100.'}
                   {viewMode === 'technical' && 'Price action, momentum, moving averages, and volume data'}
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
@@ -115,6 +119,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} onClick={() => setViewMode('table')} size="sm" className="rounded-md">
                   <TableProperties className="w-4 h-4 mr-2" /> Comparison
+                </Button>
+                <Button variant={viewMode === 'normalized-compare' ? 'secondary' : 'ghost'} onClick={() => setViewMode('normalized-compare')} size="sm" className="rounded-md">
+                  <TrendingUp className="w-4 h-4 mr-2" /> Compare Charts
                 </Button>
                 <Button variant={viewMode === 'technical' ? 'secondary' : 'ghost'} onClick={() => setViewMode('technical')} size="sm" className="rounded-md">
                   <LineChart className="w-4 h-4 mr-2" /> Technicals
@@ -131,6 +138,12 @@ export default function Dashboard() {
             {viewMode === 'table' && (
               <div className="h-[800px] mt-2">
                 <ComparisonTable analysisData={analysisData} />
+              </div>
+            )}
+
+            {viewMode === 'normalized-compare' && (
+              <div className="mt-2">
+                <NormalizedComparePanel availableTickers={tickers} />
               </div>
             )}
 
