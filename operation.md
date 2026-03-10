@@ -84,7 +84,7 @@ The **Compare Charts** view provides a normalized, relative performance view of 
 
 The **Technicals** page is dedicated to classical price action, momentum, and volume analysis, providing the underlying technical context to the core fundamental strategies.
 
-![Technicals View](technicals_page_1773113126184.png)
+![Technicals View](images_20260310/technicals_page_1773113126184.png)
 
 ### Key Features:
 *   **Moving Averages:** Tracks standard SMA/EMA bounds (20-Day, 50-Day, 200-Day) to identify immediate trend directions and support/resistance levels.
