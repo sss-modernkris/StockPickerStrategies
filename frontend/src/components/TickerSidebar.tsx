@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Plus, X, Activity } from 'lucide-react';
 
 interface TickerSidebarProps {
@@ -23,7 +23,7 @@ export function TickerSidebar({
 
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newTicker.trim() && tickers.length < 20 && !tickers.includes(newTicker.toUpperCase())) {
+        if (newTicker.trim() && tickers.length < 100 && !tickers.includes(newTicker.toUpperCase())) {
             onAddTicker(newTicker.toUpperCase());
             setNewTicker('');
         }
@@ -44,12 +44,12 @@ export function TickerSidebar({
                     className="uppercase bg-background"
                     maxLength={20}
                 />
-                <Button type="submit" size="icon" disabled={tickers.length >= 20 || !newTicker.trim()}>
+                <Button type="submit" size="icon" disabled={tickers.length >= 100 || !newTicker.trim()}>
                     <Plus className="w-4 h-4" />
                 </Button>
             </form>
 
-            <ScrollArea className="flex-1 p-2">
+            <div className="flex-1 p-2 overflow-y-auto min-h-0">
                 <div className="space-y-1">
                     {tickers.map(ticker => (
                         <div
@@ -73,13 +73,13 @@ export function TickerSidebar({
                     ))}
                     {tickers.length === 0 && (
                         <div className="p-4 text-center text-sm text-muted-foreground">
-                            No tickers added. Add up to 20 to begin analysis.
+                            No tickers added. Add up to 100 to begin analysis.
                         </div>
                     )}
                 </div>
-            </ScrollArea>
+            </div>
             <div className="p-4 border-t text-xs text-muted-foreground text-center">
-                {tickers.length} / 20 Selected
+                {tickers.length} / 100 Selected
             </div>
         </div>
     );

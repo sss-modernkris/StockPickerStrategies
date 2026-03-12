@@ -15,12 +15,33 @@ import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, Tr
 import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
-  const [tickers, setTickers] = useState<string[]>(['NVDA', 'GOOG', 'AAPL', 'MSFT', 'AMZN', 'META', 'TSLA', 'PLTR', 'ABBV', 'GHRS', 'RTX', 'MU', 'AMD']);
-  const [selectedTicker, setSelectedTicker] = useState<string | null>('NVDA');
+  const [tickers, setTickers] = useState<string[]>([]);
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
   const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch initial portfolio tickers
+  useEffect(() => {
+    const fetchPortfolio = async () => {
+      try {
+        const res = await fetch(`http://localhost:8080/api/portfolio`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tickers && data.tickers.length > 0) {
+            // Take up to 100 unique tickers
+            const uniqueTickers = Array.from(new Set(data.tickers as string[])).slice(0, 100);
+            setTickers(uniqueTickers);
+            setSelectedTicker(uniqueTickers[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch portfolio tickers", err);
+      }
+    };
+    fetchPortfolio();
+  }, []);
 
   // Fetch analysis when selected ticker changes or is newly added
   useEffect(() => {

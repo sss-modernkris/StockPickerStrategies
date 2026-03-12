@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from backend.models import TickerAnalysis, HistoryResponse
 from backend.services.strategy_engine import run_all_strategies
 from backend.services.history_client import fetch_batch_history
+import csv
+import os
 
 app = FastAPI(
     title="Strategic Alpha Dashboard API",
@@ -25,6 +27,22 @@ class HealthCheck(BaseModel):
 @app.get("/health")
 def health_check() -> HealthCheck:
     return HealthCheck(status="ok")
+
+@app.get("/api/portfolio")
+def get_portfolio_tickers():
+    tickers = []
+    # portfolio.csv is at the root level, one directory up from backend/
+    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "portfolio.csv")
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, mode='r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'Symbol' in row and row['Symbol'].strip():
+                        tickers.append(row['Symbol'].strip())
+        return {"tickers": tickers}
+    except Exception as e:
+        return {"tickers": [], "error": str(e)}
 
 @app.get("/api/analyze/{ticker}", response_model=TickerAnalysis)
 def analyze_ticker(ticker: str) -> TickerAnalysis:

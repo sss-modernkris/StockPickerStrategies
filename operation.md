@@ -1,3 +1,4 @@
+
 # Strategic Alpha Dashboard: Operation Guide
 
 The Strategic Alpha Dashboard is a comprehensive, full-stack Next.js and FastAPI application designed to provide in-depth quantitative analysis and machine-learning-driven stock evaluations.
@@ -90,3 +91,4 @@ The **Technicals** page is dedicated to classical price action, momentum, and vo
 *   **Moving Averages:** Tracks standard SMA/EMA bounds (20-Day, 50-Day, 200-Day) to identify immediate trend directions and support/resistance levels.
 *   **Momentum Oscillators:** Features RSI (Relative Strength Index) tracking and MACD (Moving Average Convergence Divergence) histograms to measure price movement speed and overbought/oversold conditions.
 *   **Volatility & Volume:** Computes standard deviation Bollinger Bands alongside the latest trading volume versus the average 20-day volume, signaling trend viability.
+
