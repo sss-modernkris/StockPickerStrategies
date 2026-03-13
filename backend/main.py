@@ -52,6 +52,20 @@ def analyze_ticker(ticker: str) -> TickerAnalysis:
         pass
     return analysis
 
+@app.get("/api/analyze-batch")
+def analyze_batch(tickers: str) -> dict[str, TickerAnalysis]:
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    results = {}
+    
+    if not ticker_list:
+        raise HTTPException(status_code=400, detail="No valid tickers provided")
+        
+    for ticker in ticker_list:
+        analysis = run_all_strategies(ticker)
+        results[ticker] = analysis
+        
+    return results
+
 @app.get("/api/history", response_model=HistoryResponse)
 def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
     # tickers should be a comma-separated string like "AAPL,MSFT,NVDA"

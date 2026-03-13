@@ -22,7 +22,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch initial portfolio tickers
+  // Lifted state for Compare Charts to persist across tab changes
+  const [compareSelectedTickers, setCompareSelectedTickers] = useState<string[]>([]);
+  const [comparePeriod, setComparePeriod] = useState<string>('1y');
+
+  // 1. Fetch initial portfolio tickers on mount
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
@@ -43,31 +47,38 @@ export default function Dashboard() {
     fetchPortfolio();
   }, []);
 
-  // Fetch analysis when selected ticker changes or is newly added
+  // 2. Fetch all analysis data in a single batch as soon as tickers are loaded
   useEffect(() => {
-    if (!selectedTicker) return;
-    if (analysisData[selectedTicker]) return; // Already fetched
+    // Only run if we have tickers and haven't fetched them yet
+    const unfetchedTickers = tickers.filter(t => !analysisData[t]);
+    if (unfetchedTickers.length === 0) return;
 
-    const fetchAnalysis = async () => {
+    const fetchBatchAnalysis = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`http://localhost:8080/api/analyze/${selectedTicker}`);
+        const tickersParam = unfetchedTickers.join(',');
+        const res = await fetch(`http://localhost:8080/api/analyze-batch?tickers=${tickersParam}`);
         if (!res.ok) {
-          throw new Error('Failed to fetch from backend');
+          throw new Error(`Failed to batch fetch from backend (Status ${res.status})`);
         }
-        const data: TickerAnalysis = await res.json();
-        setAnalysisData(prev => ({ ...prev, [selectedTicker]: data }));
+
+        const data: Record<string, TickerAnalysis> = await res.json();
+
+        // Merge the new batch data into our existing dictionary
+        setAnalysisData(prev => ({ ...prev, ...data }));
+
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "An unexpected error occurred";
+        console.error("Batch fetch error:", err);
+        const message = err instanceof Error ? err.message : "An unexpected error occurred during batch fetch.";
         setError(message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAnalysis();
-  }, [selectedTicker]);
+    fetchBatchAnalysis();
+  }, [tickers]);
 
   const handleAddTicker = (ticker: string) => {
     if (!tickers.includes(ticker)) {
@@ -111,7 +122,8 @@ export default function Dashboard() {
         ) : loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-primary">
             <Loader2 className="w-12 h-12 animate-spin" />
-            <p className="font-medium animate-pulse">Running Quant Models for {selectedTicker}...</p>
+            <p className="font-medium animate-pulse">Running Batch Quant Models for {tickers.length} stocks...</p>
+            <p className="text-sm text-muted-foreground">This performs deep calculations and may take up to 30 seconds.</p>
           </div>
         ) : currentData ? (
           <div className="max-w-7xl mx-auto space-y-6">
@@ -164,7 +176,13 @@ export default function Dashboard() {
 
             {viewMode === 'normalized-compare' && (
               <div className="mt-2">
-                <NormalizedComparePanel availableTickers={tickers} />
+                <NormalizedComparePanel
+                  availableTickers={tickers}
+                  selectedTickers={compareSelectedTickers}
+                  onSelectTickers={setCompareSelectedTickers}
+                  period={comparePeriod}
+                  onPeriodChange={setComparePeriod}
+                />
               </div>
             )}
 

@@ -16,6 +16,10 @@ import { TickerHistory } from '@/lib/types';
 
 interface NormalizedComparePanelProps {
     availableTickers: string[];
+    selectedTickers: string[];
+    onSelectTickers: (tickers: string[]) => void;
+    period: string;
+    onPeriodChange: (period: string) => void;
 }
 
 const PERIODS = [
@@ -43,9 +47,7 @@ const CHART_COLORS = [
     '#eab308'  // yellow-500
 ];
 
-export function NormalizedComparePanel({ availableTickers }: NormalizedComparePanelProps) {
-    const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
-    const [period, setPeriod] = useState<string>('1y');
+export function NormalizedComparePanel({ availableTickers, selectedTickers, onSelectTickers, period, onPeriodChange }: NormalizedComparePanelProps) {
     const [historyData, setHistoryData] = useState<TickerHistory[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export function NormalizedComparePanel({ availableTickers }: NormalizedComparePa
     useEffect(() => {
         if (selectedTickers.length === 0 && availableTickers.length > 0) {
             // Select up to 5 tickers by default to avoid clutter
-            setSelectedTickers(availableTickers.slice(0, 5));
+            onSelectTickers(availableTickers.slice(0, 5));
         }
     }, [availableTickers, selectedTickers.length]);
 
@@ -101,10 +103,10 @@ export function NormalizedComparePanel({ availableTickers }: NormalizedComparePa
     }, [selectedTickers, period]);
 
     const toggleTicker = (ticker: string) => {
-        setSelectedTickers(prev =>
-            prev.includes(ticker)
-                ? prev.filter(t => t !== ticker)
-                : [...prev, ticker]
+        onSelectTickers(
+            selectedTickers.includes(ticker)
+                ? selectedTickers.filter(t => t !== ticker)
+                : [...selectedTickers, ticker]
         );
     };
 
@@ -214,7 +216,7 @@ export function NormalizedComparePanel({ availableTickers }: NormalizedComparePa
                                 key={p.value}
                                 variant={period === p.value ? "default" : "ghost"}
                                 size="sm"
-                                onClick={() => setPeriod(p.value)}
+                                onClick={() => onPeriodChange(p.value)}
                                 className={`rounded-lg px-4 transition-all duration-200 ${period === p.value ? 'shadow-md font-bold scale-105 ring-2 ring-primary/20' : 'font-medium text-muted-foreground hover:text-foreground'}`}
                             >
                                 {p.label}
@@ -260,7 +262,7 @@ export function NormalizedComparePanel({ availableTickers }: NormalizedComparePa
                             <div className="flex flex-col items-center gap-3 text-destructive max-w-md text-center p-6 bg-destructive/10 border border-destructive/20 rounded-xl">
                                 <AlertCircle className="w-10 h-10" />
                                 <p className="font-semibold">{error}</p>
-                                <Button variant="outline" size="sm" onClick={() => setPeriod(period)} className="mt-2">
+                                <Button variant="outline" size="sm" onClick={() => onPeriodChange(period)} className="mt-2">
                                     Retry
                                 </Button>
                             </div>
