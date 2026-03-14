@@ -104,11 +104,51 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
     # Extract recent price history for frontend charts (e.g. last 6 months)
     price_history = []
     if data.get("history") is not None and not data["history"].empty:
-        hist = data["history"].tail(126) # ~6 months
+        history_df = data["history"].copy()
+        closes = history_df["Close"]
+        
+        # Precompute the requested historical series arrays
+        history_df["sma_9"] = closes.rolling(window=9).mean()
+        history_df["sma_12"] = closes.rolling(window=12).mean()
+        history_df["sma_26"] = closes.rolling(window=26).mean()
+        history_df["sma_50"] = closes.rolling(window=50).mean()
+        history_df["sma_200"] = closes.rolling(window=200).mean()
+        
+        delta = closes.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        history_df["rsi_14"] = 100 - (100 / (1 + rs))
+        
+        exp1 = closes.ewm(span=12, adjust=False).mean()
+        exp2 = closes.ewm(span=26, adjust=False).mean()
+        macd = exp1 - exp2
+        macd_signal = macd.ewm(span=9, adjust=False).mean()
+        macd_hist = macd - macd_signal
+        
+        history_df["macd"] = macd
+        history_df["macd_signal"] = macd_signal
+        history_df["macd_hist"] = macd_hist
+        
+        # Capture the last 126 days (~6 months)
+        hist = history_df.tail(126) 
+        
         for date, row in hist.iterrows():
+            def safe_float(val):
+                return float(val) if pd.notna(val) else None
+                
             price_history.append({
                 "date": date.strftime("%Y-%m-%d"),
-                "close": float(row["Close"])
+                "close": float(row["Close"]),
+                "macd": safe_float(row.get("macd")),
+                "macd_signal": safe_float(row.get("macd_signal")),
+                "macd_hist": safe_float(row.get("macd_hist")),
+                "sma_9": safe_float(row.get("sma_9")),
+                "sma_12": safe_float(row.get("sma_12")),
+                "sma_26": safe_float(row.get("sma_26")),
+                "sma_50": safe_float(row.get("sma_50")),
+                "sma_200": safe_float(row.get("sma_200")),
+                "rsi_14": safe_float(row.get("rsi_14")),
             })
 
     return TickerAnalysis(

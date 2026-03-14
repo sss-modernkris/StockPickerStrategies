@@ -7,6 +7,15 @@ export interface StrategyResult {
 export interface PricePoint {
     date: string;
     close: number;
+    macd?: number | null;
+    macd_signal?: number | null;
+    macd_hist?: number | null;
+    sma_9?: number | null;
+    sma_12?: number | null;
+    sma_26?: number | null;
+    sma_50?: number | null;
+    sma_200?: number | null;
+    rsi_14?: number | null;
 }
 
 export interface TickerHistory {

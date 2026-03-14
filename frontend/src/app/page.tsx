@@ -10,15 +10,16 @@ import { RawDataPanel } from '@/components/RawDataPanel';
 import { StrategyGlossary } from '@/components/StrategyGlossary';
 import { TechnicalIndicatorsCard } from '@/components/TechnicalIndicatorsCard';
 import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
+import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +135,7 @@ export default function Dashboard() {
                   {viewMode === 'table' && 'Comparison Table'}
                   {viewMode === 'normalized-compare' && 'Relative Performance Analytics'}
                   {viewMode === 'technical' && `${currentData.symbol} Technical Indicators`}
+                  {viewMode === 'advanced-charts' && `${currentData.symbol} Advanced Charts`}
                   {viewMode === 'raw-data' && `${currentData.symbol} Raw Data`}
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
                 </h1>
@@ -142,6 +144,7 @@ export default function Dashboard() {
                   {viewMode === 'table' && 'Compare quant metrics across all loaded stocks'}
                   {viewMode === 'normalized-compare' && 'Visualize relative growth on a level playing field, indexing all selected assets to a baseline of 100.'}
                   {viewMode === 'technical' && 'Price action, momentum, moving averages, and volume data'}
+                  {viewMode === 'advanced-charts' && 'Deep dive into MACD, Relative Strength, and trend alignment across varying moving averages.'}
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                 </p>
@@ -158,6 +161,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'technical' ? 'secondary' : 'ghost'} onClick={() => setViewMode('technical')} size="sm" className="rounded-md">
                   <LineChart className="w-4 h-4 mr-2" /> Technicals
+                </Button>
+                <Button variant={viewMode === 'advanced-charts' ? 'secondary' : 'ghost'} onClick={() => setViewMode('advanced-charts')} size="sm" className="rounded-md">
+                  <BarChart2 className="w-4 h-4 mr-2" /> Adv. Charts
                 </Button>
                 <Button variant={viewMode === 'raw-data' ? 'secondary' : 'ghost'} onClick={() => setViewMode('raw-data')} size="sm" className="rounded-md">
                   <Database className="w-4 h-4 mr-2" /> Raw Data
@@ -211,6 +217,12 @@ export default function Dashboard() {
             {viewMode === 'technical' && (
               <div className="mt-2">
                 <TechnicalIndicatorsCard data={currentData.technical_indicators} />
+              </div>
+            )}
+
+            {viewMode === 'advanced-charts' && (
+              <div className="mt-2">
+                <AdvancedChartsPanel data={currentData.price_history || []} symbol={currentData.symbol} />
               </div>
             )}
 

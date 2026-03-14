@@ -9,11 +9,18 @@ class StrategyResult(BaseModel):
 class PricePoint(BaseModel):
     date: str
     close: float
-
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
+    macd_hist: Optional[float] = None
+    sma_9: Optional[float] = None
+    sma_12: Optional[float] = None
+    sma_26: Optional[float] = None
+    sma_50: Optional[float] = None
+    sma_200: Optional[float] = None
+    rsi_14: Optional[float] = None
 class TickerHistory(BaseModel):
     symbol: str
     history: List[PricePoint]
-
 class HistoryResponse(BaseModel):
     period: str
     data: List[TickerHistory]
