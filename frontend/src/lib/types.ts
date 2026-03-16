@@ -16,6 +16,9 @@ export interface PricePoint {
     sma_50?: number | null;
     sma_200?: number | null;
     rsi_14?: number | null;
+    bb_upper?: number | null;
+    bb_lower?: number | null;
+    bb_middle?: number | null;
 }
 
 export interface TickerHistory {

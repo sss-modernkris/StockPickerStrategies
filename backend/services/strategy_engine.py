@@ -130,6 +130,13 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
         history_df["macd_signal"] = macd_signal
         history_df["macd_hist"] = macd_hist
         
+        
+        # Bollinger Bands
+        history_df["bb_middle"] = closes.rolling(window=20).mean()
+        std_20 = closes.rolling(window=20).std()
+        history_df["bb_upper"] = history_df["bb_middle"] + (std_20 * 2)
+        history_df["bb_lower"] = history_df["bb_middle"] - (std_20 * 2)
+        
         # Capture the last 126 days (~6 months)
         hist = history_df.tail(126) 
         
@@ -149,6 +156,9 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
                 "sma_50": safe_float(row.get("sma_50")),
                 "sma_200": safe_float(row.get("sma_200")),
                 "rsi_14": safe_float(row.get("rsi_14")),
+                "bb_upper": safe_float(row.get("bb_upper")),
+                "bb_lower": safe_float(row.get("bb_lower")),
+                "bb_middle": safe_float(row.get("bb_middle")),
             })
 
     return TickerAnalysis(

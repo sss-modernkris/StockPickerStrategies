@@ -18,6 +18,9 @@ class PricePoint(BaseModel):
     sma_50: Optional[float] = None
     sma_200: Optional[float] = None
     rsi_14: Optional[float] = None
+    bb_upper: Optional[float] = None
+    bb_lower: Optional[float] = None
+    bb_middle: Optional[float] = None
 class TickerHistory(BaseModel):
     symbol: str
     history: List[PricePoint]

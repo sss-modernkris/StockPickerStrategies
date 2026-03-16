@@ -60,7 +60,7 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                         <TrendingUp className="w-5 h-5 text-primary" />
                         {symbol} Price Action & Moving Averages
                     </CardTitle>
-                    <CardDescription>Daily Close with SMA (9, 12, 26, 50, 200)</CardDescription>
+                    <CardDescription>Daily Close with SMAs and Bollinger Bands</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[400px] w-full mt-4 border rounded-xl bg-card/50 p-4">
@@ -78,6 +78,10 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                                 <Line type="monotone" dataKey="sma_26" name="SMA 26" stroke="#8b5cf6" strokeWidth={1.5} dot={false} />
                                 <Line type="monotone" dataKey="sma_50" name="SMA 50" stroke="#f59e0b" strokeWidth={2} dot={false} />
                                 <Line type="monotone" dataKey="sma_200" name="SMA 200" stroke="#ef4444" strokeWidth={2} dot={false} />
+                                
+                                <Line type="monotone" dataKey="bb_upper" name="BB Upper" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
+                                <Line type="monotone" dataKey="bb_lower" name="BB Lower" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
+                                <Line type="monotone" dataKey="bb_middle" name="SMA 20 (BB)" stroke="#6b7280" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
