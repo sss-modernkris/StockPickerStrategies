@@ -74,7 +74,7 @@ export function StrategyCharts({ priceHistory, symbol }: StrategyChartsProps) {
                                 borderRadius: '8px',
                                 color: 'hsl(var(--foreground))'
                             }}
-                            formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
+                            formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Price']}
                             labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px' }}
                         />
                         <Area

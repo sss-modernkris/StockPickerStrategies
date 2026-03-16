@@ -1,5 +1,4 @@
-# Use official Python lightweight image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
@@ -10,17 +9,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies
 # Adding no-cache-dir reduces image size
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the backend code
-COPY . .
+# Copy the rest of the backend code into a backend/ directory in the container
+COPY backend/ ./backend/
+
+# Copy the portfolio CSV from the root into the root of the app
+COPY portfolio.csv .
 
 # Expose port
 EXPOSE 8080
 
-# Command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Command to run the application using module path
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]

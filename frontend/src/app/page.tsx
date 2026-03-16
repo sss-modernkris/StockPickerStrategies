@@ -188,6 +188,7 @@ export default function Dashboard() {
                   onSelectTickers={setCompareSelectedTickers}
                   period={comparePeriod}
                   onPeriodChange={setComparePeriod}
+                  analysisData={analysisData}
                 />
               </div>
             )}

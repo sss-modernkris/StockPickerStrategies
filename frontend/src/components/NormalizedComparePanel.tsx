@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, AlertCircle } from 'lucide-react';
+import { Loader2, TrendingUp, AlertCircle, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import {
     LineChart,
     Line,
@@ -12,7 +12,15 @@ import {
     Legend,
     ResponsiveContainer
 } from 'recharts';
-import { TickerHistory } from '@/lib/types';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { TickerHistory, TickerAnalysis } from '@/lib/types';
 
 interface NormalizedComparePanelProps {
     availableTickers: string[];
@@ -20,6 +28,7 @@ interface NormalizedComparePanelProps {
     onSelectTickers: (tickers: string[]) => void;
     period: string;
     onPeriodChange: (period: string) => void;
+    analysisData: Record<string, TickerAnalysis>;
 }
 
 const PERIODS = [
@@ -47,10 +56,11 @@ const CHART_COLORS = [
     '#eab308'  // yellow-500
 ];
 
-export function NormalizedComparePanel({ availableTickers, selectedTickers, onSelectTickers, period, onPeriodChange }: NormalizedComparePanelProps) {
+export function NormalizedComparePanel({ availableTickers, selectedTickers, onSelectTickers, period, onPeriodChange, analysisData }: NormalizedComparePanelProps) {
     const [historyData, setHistoryData] = useState<TickerHistory[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
     // Initialize selected tickers when available tickers change (only if we haven't selected any yet)
     useEffect(() => {
@@ -109,6 +119,99 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 : [...selectedTickers, ticker]
         );
     };
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'desc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+            direction = 'asc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const SortIcon = (columnKey: string) => {
+        if (!sortConfig || sortConfig.key !== columnKey) {
+            return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30 group-hover:opacity-100" />;
+        }
+        return sortConfig.direction === 'asc' ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />;
+    };
+
+    const computedTableData = useMemo(() => {
+        const rowData = selectedTickers.map(ticker => {
+            const tData = analysisData[ticker];
+
+            // Default raw numerical values for sorting (null if missing)
+            let mlAlpha: number | null = null;
+            let stratAvg: number | null = null;
+            let macdHist: number | null = null;
+            let rsi: number | null = null;
+
+            // Formatted string representations for UI
+            let mlAlphaStr = 'N/A';
+            let stratAvgStr = 'N/A';
+            let macdHistStr = 'N/A';
+            let rsiStr = 'N/A';
+
+            if (tData) {
+                if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
+                    mlAlpha = tData.alpha_probability;
+                    mlAlphaStr = `${(mlAlpha * 100).toFixed(1)}%`;
+                }
+
+                if (tData.strategies && tData.strategies.length > 0) {
+                    const sum = tData.strategies.reduce((acc, strat) => acc + strat.match_percentage, 0);
+                    stratAvg = sum / tData.strategies.length;
+                    stratAvgStr = `${stratAvg.toFixed(1)}%`;
+                }
+
+                if (tData.price_history && tData.price_history.length > 0) {
+                    const latestPoint = tData.price_history[tData.price_history.length - 1];
+                    if (latestPoint.macd_hist !== undefined && latestPoint.macd_hist !== null) {
+                        macdHist = latestPoint.macd_hist;
+                        macdHistStr = macdHist.toFixed(2);
+                    }
+                    if (latestPoint.rsi_14 !== undefined && latestPoint.rsi_14 !== null) {
+                        rsi = latestPoint.rsi_14;
+                        rsiStr = rsi.toFixed(2);
+                    }
+                }
+            }
+
+            return {
+                ticker,
+                mlAlpha,
+                mlAlphaStr,
+                stratAvg,
+                stratAvgStr,
+                macdHist,
+                macdHistStr,
+                rsi,
+                rsiStr
+            };
+        });
+
+        if (sortConfig !== null) {
+            rowData.sort((a, b) => {
+                const aValue = a[sortConfig.key as keyof typeof a];
+                const bValue = b[sortConfig.key as keyof typeof b];
+
+                // Handle nulls (push them to bottom relatively)
+                if (aValue === null && bValue === null) return 0;
+                if (aValue === null) return sortConfig.direction === 'asc' ? 1 : -1;
+                if (bValue === null) return sortConfig.direction === 'asc' ? -1 : 1;
+
+                // Compare values
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return rowData;
+    }, [selectedTickers, analysisData, sortConfig]);
 
     // Transform data for Recharts into a normalized format
     const chartData = useMemo(() => {
@@ -336,6 +439,69 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
+
+                {/* Compare Data Table */}
+                {selectedTickers.length > 0 && (
+                    <div className="mt-8 border rounded-xl bg-card overflow-hidden shadow-sm">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="font-semibold w-[120px]">
+                                        <Button variant="ghost" onClick={() => handleSort('ticker')} className="px-0 hover:bg-transparent -ml-2 h-8 font-semibold">
+                                            Ticker
+                                            {SortIcon('ticker')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('mlAlpha')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            ML Alpha Proba
+                                            {SortIcon('mlAlpha')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('stratAvg')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Strategy Avg
+                                            {SortIcon('stratAvg')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('macdHist')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            MACD Hist
+                                            {SortIcon('macdHist')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('rsi')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            RSI (14)
+                                            {SortIcon('rsi')}
+                                        </Button>
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {computedTableData.map((row) => (
+                                    <TableRow key={row.ticker}>
+                                        <TableCell className="font-bold flex items-center gap-2">
+                                            <div
+                                                className="w-2.5 h-2.5 rounded-full"
+                                                style={{ backgroundColor: CHART_COLORS[selectedTickers.indexOf(row.ticker) % CHART_COLORS.length] }}
+                                            />
+                                            {row.ticker}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">{row.mlAlphaStr}</TableCell>
+                                        <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
+                                        <TableCell className={`text-right font-mono ${row.macdHist !== null && row.macdHist > 0 ? 'text-emerald-500' : row.macdHist !== null && row.macdHist < 0 ? 'text-red-500' : ''}`}>
+                                            {row.macdHistStr}
+                                        </TableCell>
+                                        <TableCell className={`text-right font-mono ${row.rsi !== null && row.rsi > 70 ? 'text-red-500' : row.rsi !== null && row.rsi < 30 ? 'text-emerald-500' : ''}`}>
+                                            {row.rsiStr}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
