@@ -143,12 +143,14 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let mlAlpha: number | null = null;
             let stratAvg: number | null = null;
             let macdHist: number | null = null;
+            let macdRel: number | null = null;
             let rsi: number | null = null;
 
             // Formatted string representations for UI
             let mlAlphaStr = 'N/A';
             let stratAvgStr = 'N/A';
             let macdHistStr = 'N/A';
+            let macdRelStr = 'N/A';
             let rsiStr = 'N/A';
 
             if (tData) {
@@ -169,6 +171,10 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         macdHist = latestPoint.macd_hist;
                         macdHistStr = macdHist.toFixed(2);
                     }
+                    if (latestPoint.macd_signal !== undefined && latestPoint.macd_signal !== null && latestPoint.macd_signal !== 0 && macdHist !== null) {
+                        macdRel = macdHist / latestPoint.macd_signal;
+                        macdRelStr = macdRel.toFixed(3);
+                    }
                     if (latestPoint.rsi_14 !== undefined && latestPoint.rsi_14 !== null) {
                         rsi = latestPoint.rsi_14;
                         rsiStr = rsi.toFixed(2);
@@ -184,6 +190,8 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 stratAvgStr,
                 macdHist,
                 macdHistStr,
+                macdRel,
+                macdRelStr,
                 rsi,
                 rsiStr
             };
@@ -488,6 +496,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('macdRel')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            MACD Rel
+                                            {SortIcon('macdRel')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('rsi')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             RSI (14)
                                             {SortIcon('rsi')}
@@ -509,6 +523,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
                                         <TableCell className={`text-right font-mono ${row.macdHist !== null && row.macdHist > 0 ? 'text-emerald-500' : row.macdHist !== null && row.macdHist < 0 ? 'text-red-500' : ''}`}>
                                             {row.macdHistStr}
+                                        </TableCell>
+                                        <TableCell className={`text-right font-mono ${row.macdRel !== null && row.macdRel > 0 ? 'text-emerald-500 font-bold' : row.macdRel !== null && row.macdRel < 0 ? 'text-red-400 font-bold' : ''}`}>
+                                            {row.macdRelStr}
                                         </TableCell>
                                         <TableCell className={`text-right font-mono ${row.rsi !== null && row.rsi > 70 ? 'text-red-500' : row.rsi !== null && row.rsi < 30 ? 'text-emerald-500' : ''}`}>
                                             {row.rsiStr}

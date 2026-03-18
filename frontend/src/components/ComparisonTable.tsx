@@ -60,8 +60,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         });
         const stratAvg = STRATEGY_NAMES.length > 0 ? stratSum / STRATEGY_NAMES.length : 0;
 
-        const macdHist = data.technical_indicators?.macd_line != null && data.technical_indicators?.macd_signal != null
-            ? data.technical_indicators.macd_line - data.technical_indicators.macd_signal
+        const macdSignal = data.technical_indicators?.macd_signal ?? null;
+        const macdHist = data.technical_indicators?.macd_line != null && macdSignal != null
+            ? data.technical_indicators.macd_line - macdSignal
+            : null;
+
+        const macdRel = macdHist != null && macdSignal != null && macdSignal !== 0
+            ? macdHist / macdSignal
             : null;
 
         const rsi = data.technical_indicators?.rsi_14 ?? null;
@@ -71,6 +76,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             ml_alpha: alphaProb,
             strat_avg: stratAvg,
             macd_hist: macdHist,
+            macd_rel: macdRel,
             rsi: rsi,
             strats: stratMap,
             original: data
@@ -96,6 +102,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'macd_hist') {
             valA = a.macd_hist ?? -99999;
             valB = b.macd_hist ?? -99999;
+        } else if (sortKey === 'macd_rel') {
+            valA = a.macd_rel ?? -99999;
+            valB = b.macd_rel ?? -99999;
         } else if (sortKey === 'rsi') {
             valA = a.rsi ?? -99999;
             valB = b.rsi ?? -99999;
@@ -153,6 +162,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             MACD Hist {renderSortIcon("macd_hist")}
                         </TableHead>
                         <TableHead
+                            className="font-bold text-emerald-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            onClick={() => handleSort('macd_rel')}
+                        >
+                            MACD Rel {renderSortIcon("macd_rel")}
+                        </TableHead>
+                        <TableHead
                             className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
                             onClick={() => handleSort('rsi')}
                         >
@@ -196,6 +211,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                         {row.macd_hist != null ? (
                                             <span className={row.macd_hist > 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
                                                 {row.macd_hist > 0 ? '+' : ''}{row.macd_hist.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
+                                        {row.macd_rel != null ? (
+                                            <span className={row.macd_rel > 0 ? "text-emerald-500 font-bold" : "text-red-400 font-bold"}>
+                                                {row.macd_rel > 0 ? '+' : ''}{row.macd_rel.toFixed(3)}
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
