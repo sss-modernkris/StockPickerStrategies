@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from backend.models import TickerAnalysis, HistoryResponse
-from backend.services.strategy_engine import run_all_strategies
-from backend.services.history_client import fetch_batch_history
+from models import TickerAnalysis, HistoryResponse
+from services.strategy_engine import run_all_strategies
+from services.history_client import fetch_batch_history
 import csv
 import os
 

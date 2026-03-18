@@ -82,7 +82,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             setError(null);
             try {
                 const tickersParam = selectedTickers.join(',');
-                const res = await fetch(`http://localhost:8080/api/history?tickers=${tickersParam}&period=${period}`);
+                const res = await fetch(`http://localhost:8001/api/history?tickers=${tickersParam}&period=${period}`);
 
                 if (!res.ok) {
                     throw new Error(`Failed to fetch history (Status ${res.status})`);
@@ -299,6 +299,15 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
         return null;
     };
 
+    // Stable color hash for tickers
+    const getTickerColor = (ticker: string) => {
+        let hash = 0;
+        for (let i = 0; i < ticker.length; i++) {
+            hash = ticker.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return CHART_COLORS[Math.abs(hash) % CHART_COLORS.length];
+    };
+
     return (
         <Card className="col-span-1 shadow-md border-border/40 animate-in fade-in zoom-in-95 duration-300">
             <CardHeader className="pb-4">
@@ -332,8 +341,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 <div className="mb-6 flex flex-wrap gap-2">
                     {availableTickers.map(ticker => {
                         const isSelected = selectedTickers.includes(ticker);
-                        const tickerIndex = selectedTickers.indexOf(ticker);
-                        const color = isSelected ? CHART_COLORS[tickerIndex % CHART_COLORS.length] : 'transparent';
+                        const color = isSelected ? getTickerColor(ticker) : 'transparent';
 
                         return (
                             <Button
@@ -409,6 +417,15 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                 height={36}
                                 iconType="circle"
                                 wrapperStyle={{ paddingBottom: '20px' }}
+                                // @ts-expect-error Recharts types incorrectly omit payload
+                                payload={
+                                    selectedTickers.map((ticker) => ({
+                                        id: ticker,
+                                        type: 'circle' as const,
+                                        value: ticker,
+                                        color: getTickerColor(ticker)
+                                    }))
+                                }
                             />
                             {/* Horizontal line at 100 reference point */}
                             {chartData.length > 0 && (
@@ -424,12 +441,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                 />
                             )}
 
-                            {selectedTickers.map((ticker, index) => (
+                            {selectedTickers.map((ticker) => (
                                 <Line
                                     key={ticker}
                                     type="monotone"
                                     dataKey={ticker}
-                                    stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                                    stroke={getTickerColor(ticker)}
                                     strokeWidth={2}
                                     dot={false}
                                     activeDot={{ r: 6, strokeWidth: 0 }}
@@ -484,7 +501,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         <TableCell className="font-bold flex items-center gap-2">
                                             <div
                                                 className="w-2.5 h-2.5 rounded-full"
-                                                style={{ backgroundColor: CHART_COLORS[selectedTickers.indexOf(row.ticker) % CHART_COLORS.length] }}
+                                                style={{ backgroundColor: getTickerColor(row.ticker) }}
                                             />
                                             {row.ticker}
                                         </TableCell>

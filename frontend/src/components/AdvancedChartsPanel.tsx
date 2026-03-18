@@ -9,6 +9,39 @@ interface AdvancedChartsPanelProps {
     symbol: string;
 }
 
+// Format tooltip numbers cleanly
+const formatValue = (val: number | undefined | null) => {
+    if (val === undefined || val === null) return 'N/A';
+    return val.toFixed(2);
+};
+
+const CustomTooltip = ({ active, payload, label }: { active?: boolean, payload?: { color: string; name: string; value: number }[], label?: string }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-background/95 border p-3 rounded-lg shadow-xl backdrop-blur-sm z-50">
+                <p className="font-semibold mb-2 text-foreground">{label}</p>
+                <div className="space-y-1">
+                    {payload.map((entry: { color: string; name: string; value: number }, index: number) => (
+                        <div key={index} className="flex items-center justify-between gap-4 text-sm">
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: entry.color }}
+                                />
+                                <span className="font-medium" style={{ color: entry.color }}>
+                                    {entry.name}
+                                </span>
+                            </div>
+                            <span className="font-mono">{formatValue(entry.value)}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) {
     if (!data || data.length === 0) {
         return (
@@ -22,33 +55,6 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
     const formatValue = (val: number | undefined | null) => {
         if (val === undefined || val === null) return 'N/A';
         return val.toFixed(2);
-    };
-
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-background/95 border p-3 rounded-lg shadow-xl backdrop-blur-sm z-50">
-                    <p className="font-semibold mb-2 text-foreground">{label}</p>
-                    <div className="space-y-1">
-                        {payload.map((entry: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between gap-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <div
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ backgroundColor: entry.color }}
-                                    />
-                                    <span className="font-medium" style={{ color: entry.color }}>
-                                        {entry.name}
-                                    </span>
-                                </div>
-                                <span className="font-mono">{formatValue(entry.value)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-        return null;
     };
 
     return (

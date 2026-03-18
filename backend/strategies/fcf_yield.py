@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from backend.models import StrategyResult
+from models import StrategyResult
 
 def evaluate_fcf_yield(data: Dict[str, Any]) -> StrategyResult:
     """

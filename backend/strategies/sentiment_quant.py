@@ -1,6 +1,6 @@
 from typing import Dict, Any
 import numpy as np
-from backend.models import StrategyResult
+from models import StrategyResult
 
 def evaluate_sentiment(data: Dict[str, Any]) -> StrategyResult:
     """

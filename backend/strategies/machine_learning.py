@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import TimeSeriesSplit
 from xgboost import XGBClassifier
-from backend.models import StrategyResult
+from models import StrategyResult
 
 def evaluate_ml_engine(data: Dict[str, Any]) -> Tuple[StrategyResult, float, str]:
     """

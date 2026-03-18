@@ -1,18 +1,18 @@
 from typing import Dict, Any
 import pandas as pd
-from backend.models import TickerAnalysis, StrategyResult, TechnicalIndicators
-from backend.services.finance_client import fetch_ticker_data
+from models import TickerAnalysis, StrategyResult, TechnicalIndicators
+from services.finance_client import fetch_ticker_data
 
-from backend.strategies.can_slim import evaluate_can_slim
-from backend.strategies.fcf_yield import evaluate_fcf_yield
-from backend.strategies.garp import evaluate_garp
-from backend.strategies.low_vol_quality import evaluate_low_vol
-from backend.strategies.pure_growth import evaluate_pure_growth
-from backend.strategies.fundamental_technical import evaluate_fund_tech
-from backend.strategies.sentiment_quant import evaluate_sentiment
-from backend.strategies.earnings_momentum import evaluate_earnings_mom
-from backend.strategies.dividend_aristocrat import evaluate_dividend
-from backend.strategies.machine_learning import evaluate_ml_engine
+from strategies.can_slim import evaluate_can_slim
+from strategies.fcf_yield import evaluate_fcf_yield
+from strategies.garp import evaluate_garp
+from strategies.low_vol_quality import evaluate_low_vol
+from strategies.pure_growth import evaluate_pure_growth
+from strategies.fundamental_technical import evaluate_fund_tech
+from strategies.sentiment_quant import evaluate_sentiment
+from strategies.earnings_momentum import evaluate_earnings_mom
+from strategies.dividend_aristocrat import evaluate_dividend
+from strategies.machine_learning import evaluate_ml_engine
 
 def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
     history = data.get("history")

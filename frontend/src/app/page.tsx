@@ -31,7 +31,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/portfolio`);
+        const res = await fetch(`http://localhost:8001/api/portfolio`);
         if (res.ok) {
           const data = await res.json();
           if (data.tickers && data.tickers.length > 0) {
@@ -59,7 +59,7 @@ export default function Dashboard() {
       setError(null);
       try {
         const tickersParam = unfetchedTickers.join(',');
-        const res = await fetch(`http://localhost:8080/api/analyze-batch?tickers=${tickersParam}`);
+        const res = await fetch(`http://localhost:8001/api/analyze-batch?tickers=${tickersParam}`);
         if (!res.ok) {
           throw new Error(`Failed to batch fetch from backend (Status ${res.status})`);
         }
@@ -79,7 +79,7 @@ export default function Dashboard() {
     };
 
     fetchBatchAnalysis();
-  }, [tickers]);
+  }, [tickers, analysisData]);
 
   const handleAddTicker = (ticker: string) => {
     if (!tickers.includes(ticker)) {
@@ -94,9 +94,18 @@ export default function Dashboard() {
     if (selectedTicker === ticker) {
       setSelectedTicker(newTickers.length > 0 ? newTickers[0] : null);
     }
+    // Also remove from compare charts if present
+    setCompareSelectedTickers(prev => prev.filter(t => t !== ticker));
   };
 
   const currentData = selectedTicker ? analysisData[selectedTicker] : null;
+
+  const filteredAnalysisData = Object.keys(analysisData)
+    .filter(ticker => tickers.includes(ticker))
+    .reduce((obj, ticker) => {
+      obj[ticker] = analysisData[ticker];
+      return obj;
+    }, {} as Record<string, TickerAnalysis>);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -176,7 +185,7 @@ export default function Dashboard() {
 
             {viewMode === 'table' && (
               <div className="h-[800px] mt-2">
-                <ComparisonTable analysisData={analysisData} />
+                <ComparisonTable analysisData={filteredAnalysisData} />
               </div>
             )}
 

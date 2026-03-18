@@ -1,7 +1,7 @@
 from typing import Dict, Any
 import numpy as np
 import pandas as pd
-from backend.models import StrategyResult
+from models import StrategyResult
 
 def calculate_rsi(data: pd.Series, window=14) -> float:
     delta = data.diff()
