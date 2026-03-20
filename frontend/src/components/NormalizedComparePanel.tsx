@@ -32,6 +32,8 @@ interface NormalizedComparePanelProps {
 }
 
 const PERIODS = [
+    { label: '1W', value: '1wk' },
+    { label: '2W', value: '2wk' },
     { label: '1M', value: '1mo' },
     { label: '3M', value: '3mo' },
     { label: '6M', value: '6mo' },
