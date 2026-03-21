@@ -83,14 +83,15 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         }
 
         let isTopPick = false;
-        if (alphaProb > 60 && stratAvg > 60 && macdRel != null && Math.abs(macdRel) < 0.2 && slopeMacdRel != null && slopeMacdRel < 0) {
+        if (alphaProb > 40 && stratAvg > 50 && macdHist != null && macdHist < 0 && macdRel != null && macdRel > 0 && macdRel < 0.2 && slopeMacdRel != null && slopeMacdRel < 0) {
             isTopPick = true;
         }
 
         let rankScore = 0;
-        if (alphaProb > 60) rankScore++;
-        if (stratAvg > 60) rankScore++;
-        if (macdRel != null && Math.abs(macdRel) < 0.2) rankScore++;
+        if (alphaProb > 40) rankScore++;
+        if (stratAvg > 50) rankScore++;
+        if (macdHist != null && macdHist < 0) rankScore++;
+        if (macdRel != null && macdRel > 0 && macdRel < 0.2) rankScore++;
         if (slopeMacdRel != null && slopeMacdRel < 0) rankScore++;
 
         const rsi = data.technical_indicators?.rsi_14 ?? null;
@@ -275,7 +276,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[90px]">
                                         <div className={`px-2 py-1 mx-auto max-w-[80px] rounded text-xs font-bold ${row.isTopPick ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-muted-foreground'}`}>
-                                            {row.isTopPick ? '⭐ Pick' : `${row.ranking}/4`}
+                                            {row.isTopPick ? '⭐ Pick' : `${row.ranking}/5`}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[80px]">
