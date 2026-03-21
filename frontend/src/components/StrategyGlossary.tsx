@@ -273,6 +273,33 @@ export function StrategyGlossary() {
                     </div>
                 </div>
             )
+        },
+        {
+            id: "ranking-logic",
+            icon: <Activity className="w-5 h-5 text-amber-500" />,
+            title: "10. Multi-Factor Ranking Logic",
+            badge: "Composite Scoring",
+            description: "A proprietary screener used in the Comparison Dashboard to systematically rank assets out of 5 points based on converging momentum, fundamentals, and quantitative ML overlays.",
+            customContent: (
+                <div className="space-y-4 mt-4">
+                    <div>
+                        <h4 className="font-semibold text-foreground">1. The 5-Point Criteria</h4>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-1 space-y-2 text-sm">
+                            <li><span className="font-medium text-foreground">ML Alpha {">"} 40%:</span> The XGBoost model must see at least a 40% probability of market outperformance.</li>
+                            <li><span className="font-medium text-foreground">Strat Avg {">"} 50%:</span> The asset must pass at least half of the traditional fundamental and technical strategy filters.</li>
+                            <li><span className="font-medium text-foreground">MACD Histogram {"<"} 0:</span> The MACD line must be below the signal line, implying the asset is technically oversold or in a dip.</li>
+                            <li><span className="font-medium text-foreground">0 {"<"} MACD Rel {"<"} 0.2:</span> The MACD relative distance must be strictly positive but below 0.2, capturing tight threshold boundaries.</li>
+                            <li><span className="font-medium text-foreground">MACD Rel Slope {"<"} 0:</span> The recent slope of the MACD Relative curve must be negative, confirming convergence.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">2. Highlighting System (<span className="text-amber-500">⭐ Pick</span>)</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed text-sm">
+                            When an asset simultaneously fulfills all five strict conditions above, it receives a perfect 5/5 score. The Comparison tab instantly flags these rare, high-conviction setups with a custom "⭐ Pick" badge.
+                        </p>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -286,7 +313,8 @@ export function StrategyGlossary() {
             (item.formula && item.formula.toLowerCase().includes(query)) ||
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
-            (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query))
+            (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
+            (item.id === 'ranking-logic' && "Multi-Factor Ranking Logic Composite Scoring Comparison Dashboard ⭐ Pick".toLowerCase().includes(query))
         );
     });
 
