@@ -30,6 +30,7 @@ interface PortfolioSummary {
   current_cash: number;
   invested_capital: number;
   total_equity: number;
+  total_profit: number;
   holdings: Holding[];
   transactions: Transaction[];
 }
@@ -52,6 +53,40 @@ export function PaperStudyPanel() {
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [transactionType, setTransactionType] = useState<'Buy' | 'Sell' | 'Deposit' | 'Withdraw'>('Buy');
+  const [tickerError, setTickerError] = useState<string | null>(null);
+  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
+
+  useEffect(() => {
+    const fetchPrice = async () => {
+      if (!ticker || transactionType === 'Deposit' || transactionType === 'Withdraw') {
+        setTickerError(null);
+        return;
+      }
+      setIsFetchingPrice(true);
+      setTickerError(null);
+      try {
+        const res = await fetch(`http://localhost:8001/api/price/${ticker}`);
+        if (!res.ok) {
+          throw new Error('Invalid ticker');
+        }
+        const data = await res.json();
+        setPrice(data.price.toString());
+      } catch (err: any) {
+        setTickerError(`Ticker '${ticker}' not found or invalid.`);
+        setPrice('');
+      } finally {
+        setIsFetchingPrice(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (ticker) {
+        fetchPrice();
+      }
+    }, 600);
+
+    return () => clearTimeout(timeoutId);
+  }, [ticker, transactionType]);
 
   const fetchPortfolio = async () => {
     try {
@@ -84,6 +119,11 @@ export function PaperStudyPanel() {
     
     if ((!tick && transactionType !== 'Deposit' && transactionType !== 'Withdraw') || isNaN(q) || isNaN(p) || q <= 0 || p <= 0) {
       setError('Please provide valid positive numbers for quantity and price, and a ticker.');
+      return;
+    }
+    
+    if (tickerError) {
+      setError('Please fix the ticker error before submitting.');
       return;
     }
 
@@ -133,7 +173,7 @@ export function PaperStudyPanel() {
     <div className="space-y-6">
       
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cash Available</CardTitle>
@@ -166,6 +206,19 @@ export function PaperStudyPanel() {
             <p className="text-xs text-muted-foreground">Cash + Invested Capital</p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${portfolio && portfolio.total_profit < 0 ? 'text-destructive' : (portfolio && portfolio.total_profit > 0 ? 'text-emerald-500' : '')}`}>
+              {portfolio ? (portfolio.total_profit > 0 ? '+' : '') + formatMoney(portfolio.total_profit) : '--'}
+            </div>
+            <p className="text-xs text-muted-foreground">Equity vs Net Deposits</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -187,6 +240,7 @@ export function PaperStudyPanel() {
                 disabled={transactionType === 'Deposit' || transactionType === 'Withdraw'}
                 required={transactionType === 'Buy' || transactionType === 'Sell'}
               />
+              {tickerError && <p className="text-xs text-destructive absolute mt-1">{tickerError}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Action</label>
@@ -217,6 +271,7 @@ export function PaperStudyPanel() {
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 {transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'Amount ($)' : 'Current Price ($)'}
+                {isFetchingPrice && <span className="ml-2 text-xs text-muted-foreground animate-pulse">Fetching...</span>}
               </label>
               <Input 
                 type="number" 

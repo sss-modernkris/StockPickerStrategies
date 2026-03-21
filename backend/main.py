@@ -88,11 +88,25 @@ import os
 import yfinance as yf
 from models import TransactionModel, TransactionResponse, PortfolioSummaryResponse, HoldingModel
 
+@app.get("/api/price/{ticker}")
+def get_ticker_price(ticker: str):
+    if not ticker or ticker.upper() == 'CASH':
+        raise HTTPException(status_code=400, detail="Invalid ticker")
+    try:
+        t = yf.Ticker(ticker.upper())
+        info = t.fast_info
+        if not hasattr(info, 'last_price') or info.last_price is None:
+            raise ValueError("Invalid price")
+        return {"price": round(info.last_price, 2)}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found or invalid.")
+
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
 def get_paper_study():
     file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
     transactions = []
     current_cash = 100000.0
+    total_cash_deposited = 100000.0
     holdings_dict = {}
     
     if os.path.exists(file_path):
@@ -147,7 +161,12 @@ def get_paper_study():
 
                     # Determine action based on quantity and ticker
                     if t == 'CASH':
-                        action = 'Deposit' if tc < 0 else 'Withdraw'
+                        if tc < 0:
+                            action = 'Deposit'
+                            total_cash_deposited += abs(tc)
+                        else:
+                            action = 'Withdraw'
+                            total_cash_deposited -= tc
                     else:
                         action = 'Buy' if q > 0 else 'Sell'
                         
@@ -203,6 +222,7 @@ def get_paper_study():
            ))
            
     total_equity = current_cash + invested_capital
+    total_profit = total_equity - total_cash_deposited
     
     # Sort holdings and transactions
     holdings_list.sort(key=lambda x: x.unrealized_pnl, reverse=True)
@@ -212,6 +232,7 @@ def get_paper_study():
         current_cash=current_cash,
         invested_capital=invested_capital,
         total_equity=total_equity,
+        total_profit=total_profit,
         holdings=holdings_list,
         transactions=transactions
     )
