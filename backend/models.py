@@ -52,3 +52,36 @@ class TickerAnalysis(BaseModel):
     technical_indicators: Optional[TechnicalIndicators] = None
     raw_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+
+class TransactionModel(BaseModel):
+    ticker: str
+    quantity: float
+    price: float
+    total_cost: float
+    transaction_type: str
+
+class TransactionResponse(BaseModel):
+    date: str
+    ticker: str
+    quantity: float
+    price: float
+    total_cost: float
+    current_close_price: Optional[float] = None
+    total_current_value: Optional[float] = None
+    cash_balance: Optional[float] = None
+    action: Optional[str] = None
+
+class HoldingModel(BaseModel):
+    ticker: str
+    total_quantity: float
+    avg_buy_price: float
+    current_price: float
+    total_value: float
+    unrealized_pnl: float
+
+class PortfolioSummaryResponse(BaseModel):
+    current_cash: float
+    invested_capital: float
+    total_equity: float
+    holdings: List[HoldingModel]
+    transactions: List[TransactionResponse]

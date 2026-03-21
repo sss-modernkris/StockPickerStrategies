@@ -11,15 +11,16 @@ import { StrategyGlossary } from '@/components/StrategyGlossary';
 import { TechnicalIndicatorsCard } from '@/components/TechnicalIndicatorsCard';
 import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
 import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
+import { PaperStudyPanel } from '@/components/PaperStudyPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2 } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,6 +148,7 @@ export default function Dashboard() {
                   {viewMode === 'advanced-charts' && `${currentData.symbol} Advanced Charts`}
                   {viewMode === 'raw-data' && `${currentData.symbol} Raw Data`}
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
+                  {viewMode === 'paper-study' && 'Paper Trading Log'}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
@@ -156,6 +158,7 @@ export default function Dashboard() {
                   {viewMode === 'advanced-charts' && 'Deep dive into MACD, Relative Strength, and trend alignment across varying moving averages.'}
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
+                  {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
                 </p>
               </div>
               <div className="flex bg-muted/50 p-1 rounded-lg border">
@@ -179,6 +182,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'glossary' ? 'secondary' : 'ghost'} onClick={() => setViewMode('glossary')} size="sm" className="rounded-md">
                   <BookOpen className="w-4 h-4 mr-2" /> Glossary
+                </Button>
+                <Button variant={viewMode === 'paper-study' ? 'secondary' : 'ghost'} onClick={() => setViewMode('paper-study')} size="sm" className="rounded-md">
+                  <ClipboardList className="w-4 h-4 mr-2" /> Paper Study
                 </Button>
               </div>
             </div>
@@ -250,6 +256,12 @@ export default function Dashboard() {
 
             {viewMode === 'glossary' && (
               <StrategyGlossary />
+            )}
+
+            {viewMode === 'paper-study' && (
+              <div className="mt-2">
+                <PaperStudyPanel />
+              </div>
             )}
           </div>
         ) : null}
