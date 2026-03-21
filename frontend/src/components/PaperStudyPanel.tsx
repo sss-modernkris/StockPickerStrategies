@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DollarSign, Briefcase, TrendingUp } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Holding {
   ticker: string;
@@ -56,7 +57,7 @@ export function PaperStudyPanel() {
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8001/api/paper-study');
+      const res = await fetch(`${API_BASE_URL}/api/paper-study`);
       if (!res.ok) throw new Error('Failed to fetch portfolio data');
       const data = await res.json();
       setPortfolio(data);
@@ -99,7 +100,7 @@ export function PaperStudyPanel() {
     }
 
     try {
-      const res = await fetch('http://localhost:8001/api/paper-study', {
+      const res = await fetch(`${API_BASE_URL}/api/paper-study`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

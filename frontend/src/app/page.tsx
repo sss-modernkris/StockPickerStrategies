@@ -15,6 +15,7 @@ import { PaperStudyPanel } from '@/components/PaperStudyPanel';
 import { TickerAnalysis } from '@/lib/types';
 import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
@@ -32,7 +33,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-        const res = await fetch(`http://localhost:8001/api/portfolio`);
+        const res = await fetch(`${API_BASE_URL}/api/portfolio`);
         if (res.ok) {
           const data = await res.json();
           if (data.tickers && data.tickers.length > 0) {
@@ -60,7 +61,7 @@ export default function Dashboard() {
       setError(null);
       try {
         const tickersParam = unfetchedTickers.join(',');
-        const res = await fetch(`http://localhost:8001/api/analyze-batch?tickers=${tickersParam}`);
+        const res = await fetch(`${API_BASE_URL}/api/analyze-batch?tickers=${tickersParam}`);
         if (!res.ok) {
           throw new Error(`Failed to batch fetch from backend (Status ${res.status})`);
         }

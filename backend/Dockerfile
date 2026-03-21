@@ -16,7 +16,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the backend code into a backend/ directory in the container
-COPY backend/ ./backend/
+COPY backend/ ./
 
 # Copy the portfolio CSV from the root into the root of the app
 COPY portfolio.csv .
@@ -25,4 +25,4 @@ COPY portfolio.csv .
 EXPOSE 8080
 
 # Command to run the application using module path
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
