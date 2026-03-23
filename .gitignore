@@ -27,3 +27,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+
+# local dev files
+_data/
+_config/

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from models import TickerAnalysis, HistoryResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
+from services.ib_client import IBClient
 import csv
 import os
 
@@ -27,6 +28,67 @@ class HealthCheck(BaseModel):
 @app.get("/health")
 def health_check() -> HealthCheck:
     return HealthCheck(status="ok")
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LogRequest(BaseModel):
+    level: str
+    message: str
+    data: dict | list | str | int | float | bool | None = None
+
+@app.post("/api/logs")
+def post_logs(log: LogRequest):
+    prefix = f"[FRONTEND {log.level.upper()}]"
+    if log.data:
+        print(f"{prefix} {log.message} - {log.data}")
+    else:
+        print(f"{prefix} {log.message}")
+    return {"status": "ok"}
+
+class IBDataResponse(BaseModel):
+    unrealized_pnl: float
+    realized_pnl: float
+    buying_power: float
+    cash_available: float
+    invested_capital: float
+    total_equity: float
+
+ib_control = IBClient()
+
+@app.get("/api/ib/config")
+def get_ib_config():
+    username = os.getenv("IB_USERNAME")
+    password = os.getenv("IB_PASSWORD")
+    print("IB Username: ", username)
+    print("IB Password: ", password)
+    res = {
+        "is_configured": bool(username and password),
+        "is_connected": ib_control.is_connected()
+    }
+    print("IB Config: ", res)
+    return res
+
+@app.post("/api/ib/login")
+def ib_login(credentials: LoginRequest):
+    # In a real scenario, we might use the credentials to start a gateway 
+    # or authenticate against a service. For now, we connect to the local API.
+    print("Attempting to login to IB at " + credentials.username + "/api/ib/login")
+    success, error_msg = ib_control.connect()
+    if success:
+        return {"status": "success", "message": "Logged into Interactive Brokers"}
+    else:
+        # For development/demo, if it fails, we provide the actual error or a generic one.
+        raise HTTPException(status_code=500, detail=f"Failed to connect to IB Gateway/TWS: {error_msg}. Ensure it is running and API is enabled.")
+
+@app.get("/api/ib/data", response_model=IBDataResponse)
+def get_ib_data():
+    data = ib_control.get_portfolio_summary()
+    if data:
+        return data
+    else:
+        raise HTTPException(status_code=400, detail="Not connected to Interactive Brokers")
 
 @app.get("/api/portfolio")
 def get_portfolio_tickers():
@@ -286,6 +348,14 @@ def add_paper_study_transaction(tx: TransactionModel):
         else:
             total_val = quantity * curr_price
     
+    # If IB is connected, attempt to place a real order for BUY/SELL
+    ib_msg = ""
+    if ib_control.is_connected() and tx_type in ['buy', 'sell']:
+        success, msg = ib_control.place_order(ticker, tx_type.upper(), abs(tx.quantity), tx.price)
+        if not success:
+            raise HTTPException(status_code=500, detail=f"IB Order Failed: {msg}")
+        ib_msg = f" (IB Order: {msg})"
+
     try:
         with open(file_path, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -293,6 +363,6 @@ def add_paper_study_transaction(tx: TransactionModel):
                 writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             
             writer.writerow([current_date, ticker, quantity, tx.price, total_cost, curr_price, total_val, new_cash])
-        return {"status": "success", "message": "Transaction added successfully"}
+        return {"status": "success", "message": f"Transaction added successfully{ib_msg}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
