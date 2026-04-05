@@ -15,8 +15,8 @@ services:
       - PORT=8080
       - IB_GATEWAY_HOST=ib-gateway
       - IB_GATEWAY_PORT=4002
-      - IB_USERNAME=${IB_USERNAME:-}
-      - IB_PASSWORD=${IB_PASSWORD:-}
+      - IB_USERNAME=${IB_USERNAME:-username}
+      - IB_PASSWORD=${IB_PASSWORD:-password}
     restart: always
 
   frontend:
@@ -44,8 +44,8 @@ services:
       context: ./ib-gateway
       dockerfile: Dockerfile
     environment:
-      TWS_USERID: ${IB_USERNAME:-}
-      TWS_PASSWORD: ${IB_PASSWORD:-}
+      TWS_USERID: ${IB_USERNAME:-username}
+      TWS_PASSWORD: ${IB_PASSWORD:-password}
       TRADING_MODE: ${TRADING_MODE:-paper}
       READ_ONLY_API: ${READ_ONLY:-no}
       VNC_SERVER_PASSWORD: ${VNC_SERVER_PASSWORD:-password}

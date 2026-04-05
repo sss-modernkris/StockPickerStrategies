@@ -93,10 +93,21 @@ def get_ib_data():
 @app.get("/api/portfolio")
 def get_portfolio_tickers():
     tickers = []
-    # portfolio.csv is at the root level, one directory up from backend/
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "portfolio.csv")
+    # In Docker, the file is in the same directory as main.py (/app)
+    # In local dev, it's one directory up
+    file_paths = [
+        os.path.join(os.getcwd(), "portfolio.csv"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "portfolio.csv")
+    ]
+    
+    file_path = None
+    for path in file_paths:
+        if os.path.exists(path):
+            file_path = path
+            break
+            
     try:
-        if os.path.exists(file_path):
+        if file_path:
             with open(file_path, mode='r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
@@ -152,7 +163,13 @@ from models import TransactionModel, TransactionResponse, PortfolioSummaryRespon
 
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
 def get_paper_study():
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
+    # Search in both app root and current dir
+    file_paths = [
+        os.path.join(os.getcwd(), "PaperStudy.csv"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
+    ]
+    file_path = next((p for p in file_paths if os.path.exists(p)), file_paths[0])
+    
     transactions = []
     current_cash = 100000.0
     holdings_dict = {}
@@ -286,7 +303,12 @@ def get_paper_study():
 
 @app.post("/api/paper-study")
 def add_paper_study_transaction(tx: TransactionModel):
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
+    # Search in both app root and current dir
+    file_paths = [
+        os.path.join(os.getcwd(), "PaperStudy.csv"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
+    ]
+    file_path = next((p for p in file_paths if os.path.exists(p)), file_paths[0])
     write_header = not os.path.exists(file_path)
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
