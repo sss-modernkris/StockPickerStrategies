@@ -124,3 +124,43 @@ class IBClient:
         except Exception as e:
             logger.error(f"Failed to place order: {str(e)}")
             return False, str(e)
+
+    def get_orders(self):
+        """
+        Retrieves recent orders/trades from IB.
+        """
+        if not self.is_connected():
+            return []
+            
+        try:
+            # ib.trades() returns Trade objects which include Order and OrderStatus
+            trades = self.ib.trades()
+            orders_data = []
+            
+            for t in trades:
+                # Get the most recent timestamp from logs if available
+                last_time = ""
+                if t.log:
+                    # Sort logs by time just in case, though usually they are in order
+                    last_time = str(t.log[-1].time)
+                
+                orders_data.append({
+                    "order_id": t.order.orderId,
+                    "account": t.order.account or "N/A",
+                    "ticker": t.contract.symbol,
+                    "action": t.order.action,
+                    "total_quantity": t.order.totalQuantity,
+                    "filled": t.orderStatus.filled,
+                    "remaining": t.orderStatus.remaining,
+                    "status": t.orderStatus.status,
+                    "price": t.order.lmtPrice if t.order.orderType == 'LMT' else (t.order.auxPrice or 0.0),
+                    "avg_fill_price": t.orderStatus.avgFillPrice,
+                    "last_update": last_time
+                })
+            
+            # Sort by last_update or order_id descending
+            orders_data.sort(key=lambda x: x['order_id'], reverse=True)
+            return orders_data
+        except Exception as e:
+            logger.error(f"Failed to fetch IB orders: {str(e)}")
+            return []

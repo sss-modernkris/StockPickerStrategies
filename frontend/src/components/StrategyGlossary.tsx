@@ -273,6 +273,19 @@ export function StrategyGlossary() {
                     </div>
                 </div>
             )
+        },
+        {
+            id: "willy-vwap",
+            icon: <Activity className="w-5 h-5 text-orange-500" />,
+            title: "10. WillyAlgo Dynamic Swing VWAP",
+            badge: "Dynamic Anchoring",
+            description: "A specialized volume-weighted average price (VWAP) that automatically re-anchors to market structure swing pivots (pivots highs and lows).",
+            formula: "VWAP = Sum(Price * Volume) / Sum(Volume) [Resets at Swing High/Low]",
+            bullets: [
+                { label: "Pivot Logic", text: "Identifies swing points using a rolling window of 5 periods. A pivot high is a point higher than 5 points before and after it." },
+                { label: "Bullish Signal", text: "The strategy returns a 100% match if the current price is trading above the most recent Swing VWAP, indicating positive momentum relative to the volume-fair-value of the recent swing." },
+                { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." }
+            ]
         }
     ];
 
@@ -286,7 +299,8 @@ export function StrategyGlossary() {
             (item.formula && item.formula.toLowerCase().includes(query)) ||
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
-            (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query))
+            (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
+            (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query))
         );
     });
 

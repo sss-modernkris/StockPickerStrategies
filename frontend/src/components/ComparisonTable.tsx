@@ -41,6 +41,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         "Sentiment/Quant",
         "Earnings Momentum",
         "Dividend Value",
+        "WillyAlgo Indicator",
     ];
 
     // Map to flat structure for easier sorting

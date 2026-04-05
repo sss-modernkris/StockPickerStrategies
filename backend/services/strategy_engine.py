@@ -13,6 +13,7 @@ from strategies.sentiment_quant import evaluate_sentiment
 from strategies.earnings_momentum import evaluate_earnings_mom
 from strategies.dividend_aristocrat import evaluate_dividend
 from strategies.machine_learning import evaluate_ml_engine
+from strategies.willy_algo import evaluate_willy_algo, calculate_willy_vwap
 
 def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
     history = data.get("history")
@@ -57,6 +58,10 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
         volume = int(volume_series.iloc[-1])
         volume_avg_20 = float(volume_series.rolling(window=20).mean().iloc[-1])
         
+        # WillyAlgo VWAP
+        willy_vwap_series = calculate_willy_vwap(history)
+        willy_vwap = willy_vwap_series.iloc[-1]
+        
         return TechnicalIndicators(
             sma_50=float(sma_50) if pd.notna(sma_50) else None,
             sma_200=float(sma_200) if pd.notna(sma_200) else None,
@@ -68,7 +73,8 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
             bollinger_middle=float(boll_middle) if pd.notna(boll_middle) else None,
             bollinger_lower=float(boll_lower) if pd.notna(boll_lower) else None,
             volume=volume if pd.notna(volume) else None,
-            volume_avg_20=float(volume_avg_20) if pd.notna(volume_avg_20) else None
+            volume_avg_20=float(volume_avg_20) if pd.notna(volume_avg_20) else None,
+            willy_vwap=float(willy_vwap) if pd.notna(willy_vwap) else None
         )
     except Exception as e:
         print(f"Error calculating technical indicators: {e}")
@@ -96,6 +102,7 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
     results.append(evaluate_sentiment(data))
     results.append(evaluate_earnings_mom(data))
     results.append(evaluate_dividend(data))
+    results.append(evaluate_willy_algo(data))
     
     # ML Engine is special as it returns additional fields
     ml_result, alpha_prob, top_factor = evaluate_ml_engine(data)
@@ -136,6 +143,7 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
         std_20 = closes.rolling(window=20).std()
         history_df["bb_upper"] = history_df["bb_middle"] + (std_20 * 2)
         history_df["bb_lower"] = history_df["bb_middle"] - (std_20 * 2)
+        history_df["willy_vwap"] = calculate_willy_vwap(history_df)
         
         # Capture the last 126 days (~6 months)
         hist = history_df.tail(126) 
@@ -159,6 +167,7 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
                 "bb_upper": safe_float(row.get("bb_upper")),
                 "bb_lower": safe_float(row.get("bb_lower")),
                 "bb_middle": safe_float(row.get("bb_middle")),
+                "willy_vwap": safe_float(row.get("willy_vwap")),
             })
 
     return TickerAnalysis(

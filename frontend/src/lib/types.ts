@@ -19,6 +19,7 @@ export interface PricePoint {
     bb_upper?: number | null;
     bb_lower?: number | null;
     bb_middle?: number | null;
+    willy_vwap?: number | null;
 }
 
 export interface TickerHistory {
@@ -38,6 +39,7 @@ export interface TechnicalIndicators {
     bollinger_lower?: number;
     volume?: number;
     volume_avg_20?: number;
+    willy_vwap?: number;
 }
 
 export interface TickerAnalysis {

@@ -76,6 +76,14 @@ export function TechnicalIndicatorsCard({ data }: Props) {
                 { label: "Latest Volume", value: formatVol(data.volume) },
                 { label: "20-Day Avg Volume", value: formatVol(data.volume_avg_20) },
             ]
+        },
+        {
+            title: "WillyAlgo Dynamic VWAP",
+            icon: <Activity className="w-5 h-5 text-orange-500" />,
+            desc: "A volume-weighted average price that anchors to market structure swing points.",
+            metrics: [
+                { label: "Swing VWAP", value: formatNum(data.willy_vwap) },
+            ]
         }
     ];
 

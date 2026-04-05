@@ -88,6 +88,7 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                                 <Line type="monotone" dataKey="bb_upper" name="BB Upper" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
                                 <Line type="monotone" dataKey="bb_lower" name="BB Lower" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
                                 <Line type="monotone" dataKey="bb_middle" name="SMA 20 (BB)" stroke="#6b7280" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
+                                <Line type="monotone" dataKey="willy_vwap" name="Willy VWAP" stroke="#f97316" strokeWidth={2} dot={false} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>

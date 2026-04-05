@@ -28,12 +28,27 @@ interface Transaction {
   action: string;
 }
 
+interface IBOrder {
+  order_id: number;
+  account: string;
+  ticker: string;
+  action: string;
+  total_quantity: number;
+  filled: number;
+  remaining: number;
+  status: string;
+  price: number;
+  avg_fill_price: number;
+  last_update: string;
+}
+
 interface PortfolioSummary {
   current_cash: number;
   invested_capital: number;
   total_equity: number;
   holdings: Holding[];
   transactions: Transaction[];
+  ib_orders?: IBOrder[];
 }
 
 const formatMoney = (val: number | null | undefined) => {
@@ -431,12 +446,11 @@ export function PaperStudyPanel() {
               </label>
               <Input
                 type="number"
-                step="0.01"
-                min="0.01"
                 placeholder={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'e.g. 5000' : 'e.g. 150.50'}
                 value={price}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
                 required
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <Button type="submit" className="w-full">Submit</Button>
@@ -487,14 +501,78 @@ export function PaperStudyPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction Ledger</CardTitle>
-          <CardDescription>Historical log of all simulated events.</CardDescription>
+          <CardTitle>Interactive Brokers Order History</CardTitle>
+          <CardDescription>Real-time order status and execution details from your IB account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!portfolio || !portfolio.ib_orders || portfolio.ib_orders.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">
+              {ibConfig?.is_connected ? "No recent IB orders found." : "Connect to Interactive Brokers to view real-time order history."}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Timestamp</TableHead>
+                    <TableHead>Ticker</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead className="text-right">Quantity (Filled/Remain)</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead className="text-right">Order ID</TableHead>
+                    <TableHead>Account</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {portfolio.ib_orders.map((ord) => (
+                    <TableRow key={ord.order_id}>
+                      <TableCell className="text-xs whitespace-nowrap">{ord.last_update || "Pending..."}</TableCell>
+                      <TableCell className="font-bold">{ord.ticker}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                          ord.status === 'Filled' ? 'bg-emerald-500/10 text-emerald-500' : 
+                          ord.status === 'Cancelled' ? 'bg-destructive/10 text-destructive' : 
+                          'bg-blue-500/10 text-blue-500'
+                        }`}>
+                          {ord.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${ord.action === 'BUY' ? 'text-indigo-500' : 'text-orange-500'}`}>
+                          {ord.action}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-medium text-emerald-500">{ord.filled}</span>
+                        <span className="text-muted-foreground text-xs"> / {ord.remaining}</span>
+                        <div className="text-[10px] text-muted-foreground">Total: {ord.total_quantity}</div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {ord.avg_fill_price > 0 ? formatMoney(ord.avg_fill_price) : formatMoney(ord.price)}
+                        {ord.avg_fill_price > 0 && <div className="text-[10px] text-muted-foreground">Fill Price</div>}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">{ord.order_id}</TableCell>
+                      <TableCell className="text-xs">{ord.account}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Simulated Transaction Ledger</CardTitle>
+          <CardDescription>Historical log of simulated events and cash movements.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading && !portfolio ? (
             <div className="text-center py-8 text-muted-foreground animate-pulse">Loading ledger...</div>
           ) : !portfolio || portfolio.transactions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">No transactions found.</div>
+            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">No simulated transactions found.</div>
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -512,7 +590,7 @@ export function PaperStudyPanel() {
                 <TableBody>
                   {portfolio.transactions.map((tx, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="text-muted-foreground">{tx.date}</TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{tx.date}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${tx.action === 'Buy' ? 'bg-indigo-500/10 text-indigo-500' : tx.action === 'Sell' ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                           {tx.action}

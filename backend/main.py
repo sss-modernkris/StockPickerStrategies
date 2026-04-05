@@ -270,12 +270,18 @@ def get_paper_study():
     holdings_list.sort(key=lambda x: x.unrealized_pnl, reverse=True)
     transactions.reverse() # show latest first in history
 
+    # Fetch real IB orders if connected
+    ib_orders = []
+    if ib_control.is_connected():
+        ib_orders = ib_control.get_orders()
+
     return PortfolioSummaryResponse(
         current_cash=current_cash,
         invested_capital=invested_capital,
         total_equity=total_equity,
         holdings=holdings_list,
-        transactions=transactions
+        transactions=transactions,
+        ib_orders=ib_orders
     )
 
 @app.post("/api/paper-study")
