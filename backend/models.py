@@ -36,8 +36,10 @@ class TechnicalIndicators(BaseModel):
     sma_200: Optional[float] = None
     ema_20: Optional[float] = None
     rsi_14: Optional[float] = None
+    rsi_slope: Optional[float] = None
     macd_line: Optional[float] = None
     macd_signal: Optional[float] = None
+    macd_slope: Optional[float] = None
     bollinger_upper: Optional[float] = None
     bollinger_middle: Optional[float] = None
     bollinger_lower: Optional[float] = None

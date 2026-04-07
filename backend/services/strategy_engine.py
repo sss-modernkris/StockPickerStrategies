@@ -36,7 +36,9 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
-        rsi_14 = (100 - (100 / (1 + rs))).iloc[-1]
+        rsi_series = 100 - (100 / (1 + rs))
+        rsi_14 = rsi_series.iloc[-1]
+        rsi_slope = rsi_series.diff().iloc[-1]
         
         # MACD
         exp1 = closes.ewm(span=12, adjust=False).mean()
@@ -45,6 +47,7 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
         signal_series = macd_series.ewm(span=9, adjust=False).mean()
         macd_line = macd_series.iloc[-1]
         macd_signal = signal_series.iloc[-1]
+        macd_slope = macd_series.diff().iloc[-1]
         
         # Bollinger Bands (20-day SMA +/- 2 std dev)
         sma_20 = closes.rolling(window=20).mean()
@@ -67,8 +70,10 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
             sma_200=float(sma_200) if pd.notna(sma_200) else None,
             ema_20=float(ema_20) if pd.notna(ema_20) else None,
             rsi_14=float(rsi_14) if pd.notna(rsi_14) else None,
+            rsi_slope=float(rsi_slope) if pd.notna(rsi_slope) else None,
             macd_line=float(macd_line) if pd.notna(macd_line) else None,
             macd_signal=float(macd_signal) if pd.notna(macd_signal) else None,
+            macd_slope=float(macd_slope) if pd.notna(macd_slope) else None,
             bollinger_upper=float(boll_upper) if pd.notna(boll_upper) else None,
             bollinger_middle=float(boll_middle) if pd.notna(boll_middle) else None,
             bollinger_lower=float(boll_lower) if pd.notna(boll_lower) else None,

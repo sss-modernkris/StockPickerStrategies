@@ -14,6 +14,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Standardize data paths relative to this script
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PORTFOLIO_CSV = os.path.join(BASE_DIR, "portfolio.csv")
+PAPER_STUDY_CSV = os.path.join(BASE_DIR, "PaperStudy.csv")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "*"],
@@ -93,26 +98,15 @@ def get_ib_data():
 @app.get("/api/portfolio")
 def get_portfolio_tickers():
     tickers = []
-    # In Docker, the file is in the same directory as main.py (/app)
-    # In local dev, it's one directory up
-    file_paths = [
-        os.path.join(os.getcwd(), "portfolio.csv"),
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "portfolio.csv")
-    ]
-    
-    file_path = None
-    for path in file_paths:
-        if os.path.exists(path):
-            file_path = path
-            break
-            
     try:
-        if file_path:
-            with open(file_path, mode='r', encoding='utf-8') as f:
+        if os.path.exists(PORTFOLIO_CSV):
+            with open(PORTFOLIO_CSV, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if 'Symbol' in row and row['Symbol'].strip():
-                        tickers.append(row['Symbol'].strip())
+                    # Clean up header/keys in case they have spaces or BOM issues
+                    clean_row = {k.strip() if k else k: v for k, v in row.items()}
+                    if 'Symbol' in clean_row and clean_row['Symbol'].strip():
+                        tickers.append(clean_row['Symbol'].strip())
         return {"tickers": tickers}
     except Exception as e:
         return {"tickers": [], "error": str(e)}
@@ -163,19 +157,12 @@ from models import TransactionModel, TransactionResponse, PortfolioSummaryRespon
 
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
 def get_paper_study():
-    # Search in both app root and current dir
-    file_paths = [
-        os.path.join(os.getcwd(), "PaperStudy.csv"),
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
-    ]
-    file_path = next((p for p in file_paths if os.path.exists(p)), file_paths[0])
-    
     transactions = []
     current_cash = 100000.0
     holdings_dict = {}
     
-    if os.path.exists(file_path):
-        with open(file_path, mode='r', encoding='utf-8') as f:
+    if os.path.exists(PAPER_STUDY_CSV):
+        with open(PAPER_STUDY_CSV, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             
@@ -258,8 +245,10 @@ def get_paper_study():
                 except ValueError:
                     pass
                     
+                    pass
+                    
         # Synchronously write the CSV update so it stores the new schema and up to date values 
-        with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+        with open(PAPER_STUDY_CSV, mode='w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             writer.writerows(updated_rows)
@@ -303,19 +292,13 @@ def get_paper_study():
 
 @app.post("/api/paper-study")
 def add_paper_study_transaction(tx: TransactionModel):
-    # Search in both app root and current dir
-    file_paths = [
-        os.path.join(os.getcwd(), "PaperStudy.csv"),
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
-    ]
-    file_path = next((p for p in file_paths if os.path.exists(p)), file_paths[0])
-    write_header = not os.path.exists(file_path)
+    write_header = not os.path.exists(PAPER_STUDY_CSV)
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     current_cash = 100000.0
     holdings = {}
-    if os.path.exists(file_path):
-        with open(file_path, mode='r', encoding='utf-8') as f:
+    if os.path.exists(PAPER_STUDY_CSV):
+        with open(PAPER_STUDY_CSV, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 t = row.get('Ticker', '').strip().upper()
@@ -385,7 +368,7 @@ def add_paper_study_transaction(tx: TransactionModel):
         ib_msg = f" (IB Order: {msg})"
 
     try:
-        with open(file_path, mode='a', newline='', encoding='utf-8') as f:
+        with open(PAPER_STUDY_CSV, mode='a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             if write_header:
                 writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])

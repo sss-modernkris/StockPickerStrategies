@@ -286,6 +286,22 @@ export function StrategyGlossary() {
                 { label: "Bullish Signal", text: "The strategy returns a 100% match if the current price is trading above the most recent Swing VWAP, indicating positive momentum relative to the volume-fair-value of the recent swing." },
                 { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." }
             ]
+        },
+        {
+            id: "ranking-score",
+            icon: <Gauge className="w-5 h-5 text-amber-500" />,
+            title: "Composite Ranking Score",
+            badge: "Dashboard Metric",
+            description: "A custom 7-point ranking score used on the Comparison page to quickly identify stocks that meet a specific confluence of momentum, technical, and quantitative criteria.",
+            bullets: [
+                { label: "WillyAlgo > 50%", text: "Requires the WillyAlgo Indicator match percentage to be greater than 50%." },
+                { label: "RSI > 30", text: "Ensures the stock is not in a deeply oversold structural collapse." },
+                { label: "RSI Slope > 0", text: "Requires positive short-term momentum (the RSI indicator is currently rising)." },
+                { label: "MACD Hist < 0.1", text: "Focuses on early momentum shifts or contained histogram expansion." },
+                { label: "MACD Hist > 0", text: "Requires the MACD histogram to be positive (bullish momentum)." },
+                { label: "MACD Slope > 0", text: "Requires the MACD line itself to have a positive, rising trajectory." },
+                { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." }
+            ]
         }
     ];
 
@@ -300,7 +316,8 @@ export function StrategyGlossary() {
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
-            (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query))
+            (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query)) ||
+            (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query))
         );
     });
 

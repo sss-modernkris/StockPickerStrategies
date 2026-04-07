@@ -32,8 +32,10 @@ export interface TechnicalIndicators {
     sma_200?: number;
     ema_20?: number;
     rsi_14?: number;
+    rsi_slope?: number;
     macd_line?: number;
     macd_signal?: number;
+    macd_slope?: number;
     bollinger_upper?: number;
     bollinger_middle?: number;
     bollinger_lower?: number;

@@ -32,6 +32,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     };
 
     const STRATEGY_NAMES = [
+        "WillyAlgo Indicator",
         "CAN SLIM",
         "FCF Yield",
         "GARP",
@@ -41,7 +42,6 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         "Sentiment/Quant",
         "Earnings Momentum",
         "Dividend Value",
-        "WillyAlgo Indicator",
     ];
 
     // Map to flat structure for easier sorting
@@ -70,15 +70,31 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             ? macdHist / macdSignal
             : null;
 
+        const macdSlope = data.technical_indicators?.macd_slope ?? null;
+
         const rsi = data.technical_indicators?.rsi_14 ?? null;
+        const rsiSlope = data.technical_indicators?.rsi_slope ?? null;
+
+        const willyScore = stratMap['WillyAlgo Indicator'] || 0;
+        let ranking = 0;
+        if (willyScore > 50) ranking++;
+        if (rsi !== null && rsi > 30) ranking++;
+        if (rsiSlope !== null && rsiSlope > 0) ranking++;
+        if (macdHist !== null && macdHist < 0.1) ranking++;
+        if (macdHist !== null && macdHist > 0) ranking++;
+        if (macdSlope !== null && macdSlope > 0) ranking++;
+        if (stratAvg > 50) ranking++;
 
         return {
             symbol: data.symbol,
             ml_alpha: alphaProb,
             strat_avg: stratAvg,
+            ranking: ranking,
             macd_hist: macdHist,
+            macd_slope: macdSlope,
             macd_rel: macdRel,
             rsi: rsi,
+            rsi_slope: rsiSlope,
             strats: stratMap,
             original: data
         };
@@ -100,15 +116,24 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'strat_avg') {
             valA = a.strat_avg;
             valB = b.strat_avg;
+        } else if (sortKey === 'ranking') {
+            valA = a.ranking;
+            valB = b.ranking;
         } else if (sortKey === 'macd_hist') {
             valA = a.macd_hist ?? -99999;
             valB = b.macd_hist ?? -99999;
+        } else if (sortKey === 'macd_slope') {
+            valA = a.macd_slope ?? -99999;
+            valB = b.macd_slope ?? -99999;
         } else if (sortKey === 'macd_rel') {
             valA = a.macd_rel ?? -99999;
             valB = b.macd_rel ?? -99999;
         } else if (sortKey === 'rsi') {
             valA = a.rsi ?? -99999;
             valB = b.rsi ?? -99999;
+        } else if (sortKey === 'rsi_slope') {
+            valA = a.rsi_slope ?? -99999;
+            valB = b.rsi_slope ?? -99999;
         } else {
             valA = a.strats[sortKey] || 0;
             valB = b.strats[sortKey] || 0;
@@ -157,10 +182,22 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             Strat Avg {renderSortIcon("strat_avg")}
                         </TableHead>
                         <TableHead
+                            className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            onClick={() => handleSort('ranking')}
+                        >
+                            Ranking {renderSortIcon("ranking")}
+                        </TableHead>
+                        <TableHead
                             className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
                             onClick={() => handleSort('macd_hist')}
                         >
                             MACD Hist {renderSortIcon("macd_hist")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            onClick={() => handleSort('macd_slope')}
+                        >
+                            MACD Slope {renderSortIcon("macd_slope")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-emerald-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
@@ -173,6 +210,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             onClick={() => handleSort('rsi')}
                         >
                             RSI {renderSortIcon("rsi")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            onClick={() => handleSort('rsi_slope')}
+                        >
+                            RSI Slope {renderSortIcon("rsi_slope")}
                         </TableHead>
                         {STRATEGY_NAMES.map(name => (
                             <TableHead
@@ -208,10 +251,20 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     <TableCell className={`${getColorClass(row.strat_avg)} text-center`}>
                                         {row.strat_avg.toFixed(1)}%
                                     </TableCell>
+                                    <TableCell className="text-center font-bold text-amber-500">
+                                        {row.ranking}/7
+                                    </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[90px]">
                                         {row.macd_hist != null ? (
                                             <span className={row.macd_hist > 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
                                                 {row.macd_hist > 0 ? '+' : ''}{row.macd_hist.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
+                                        {row.macd_slope != null ? (
+                                            <span className={row.macd_slope > 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                                                {row.macd_slope > 0 ? '+' : ''}{row.macd_slope.toFixed(3)}
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
@@ -226,6 +279,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                         {row.rsi != null ? (
                                             <span className={row.rsi > 70 ? "text-red-500 font-bold" : row.rsi < 30 ? "text-green-500 font-bold" : "text-foreground"}>
                                                 {row.rsi.toFixed(1)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[80px]">
+                                        {row.rsi_slope != null ? (
+                                            <span className={row.rsi_slope > 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                                                {row.rsi_slope > 0 ? '+' : ''}{row.rsi_slope.toFixed(2)}
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
