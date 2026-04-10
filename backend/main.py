@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
+from typing import List
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
@@ -15,9 +17,14 @@ app = FastAPI(
 )
 
 # Standardize data paths relative to this script
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PORTFOLIO_CSV = os.path.join(BASE_DIR, "portfolio.csv")
 PAPER_STUDY_CSV = os.path.join(BASE_DIR, "PaperStudy.csv")
+
+print(f"Base Directory: {BASE_DIR}")
+print(f"Portfolio CSV: {PORTFOLIO_CSV}")
+print(f"Paper Study CSV: {PAPER_STUDY_CSV}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,6 +66,8 @@ class IBDataResponse(BaseModel):
     cash_available: float
     invested_capital: float
     total_equity: float
+    holdings: List[HoldingModel]
+    orders: List[IBOrderModel]
 
 ib_control = IBClient()
 
@@ -149,11 +158,7 @@ def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
     # Validation will happen automatically by Pydantic Model
     return HistoryResponse(period=period, data=result["data"])
 
-from datetime import datetime
-import csv
-import os
 import yfinance as yf
-from models import TransactionModel, TransactionResponse, PortfolioSummaryResponse, HoldingModel
 
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
 def get_paper_study():

@@ -60,15 +60,13 @@ class IBClient:
 
     def get_portfolio_summary(self):
         """
-        Retrieves Dashboard information from IB.
+        Retrieves Dashboard information from IB including summary, positions, and orders.
         """
         if not self.is_connected():
             return None
         
         # Refresh account values
-        print("Refreshing account values from IB")
         acc_values = self.ib.accountValues()
-        print("Account values: ", acc_values)
         
         summary = {
             "unrealized_pnl": 0.0,
@@ -76,11 +74,12 @@ class IBClient:
             "buying_power": 0.0,
             "cash_available": 0.0,
             "invested_capital": 0.0,
-            "total_equity": 0.0
+            "total_equity": 0.0,
+            "holdings": [],
+            "orders": []
         }
         
         for v in acc_values:
-            # Mapping tags to our dashboard fields
             if v.tag == 'UnrealizedPnL':
                 summary["unrealized_pnl"] = float(v.value)
             elif v.tag == 'RealizedPnL':
@@ -93,6 +92,24 @@ class IBClient:
                 summary["total_equity"] = float(v.value)
             elif v.tag == 'StockMarketValue':
                 summary["invested_capital"] = float(v.value)
+        
+        # Add Positions
+        try:
+            portfolio = self.ib.portfolio()
+            for p in portfolio:
+                summary["holdings"].append({
+                    "ticker": p.contract.symbol,
+                    "total_quantity": p.position,
+                    "avg_buy_price": p.averageCost,
+                    "current_price": p.marketPrice,
+                    "total_value": p.marketValue,
+                    "unrealized_pnl": p.unrealizedPNL
+                })
+        except Exception as e:
+            logger.error(f"Failed to fetch IB positions: {str(e)}")
+
+        # Add Orders
+        summary["orders"] = self.get_orders()
                 
         return summary
 

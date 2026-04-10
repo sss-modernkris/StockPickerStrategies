@@ -159,60 +159,60 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     };
 
     return (
-        <div className="w-full h-full bg-card text-card-foreground border rounded-lg shadow-sm">
-            <Table>
-                <TableHeader>
+        <div className="w-full h-full bg-card text-card-foreground border rounded-lg shadow-sm overflow-auto relative">
+            <table className="w-full caption-bottom text-sm border-separate border-spacing-0">
+                <TableHeader className="sticky top-0 z-30 bg-card">
                     <TableRow>
                         <TableHead
-                            className="w-[100px] font-bold cursor-pointer hover:bg-muted bg-card sticky left-0 z-20 shadow-[1px_0_0_0_hsl(var(--border))]"
+                            className="w-[100px] font-bold cursor-pointer hover:bg-muted bg-card sticky left-0 top-0 z-50 shadow-[0_1px_0_0_hsl(var(--border)),1px_0_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('ticker')}
                         >
                             Ticker {renderSortIcon("ticker")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-primary cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            className="font-bold text-primary cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('ml_alpha')}
                         >
                             ML Alpha {renderSortIcon("ml_alpha")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-blue-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            className="font-bold text-blue-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('strat_avg')}
                         >
                             Strat Avg {renderSortIcon("strat_avg")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('ranking')}
                         >
                             Ranking {renderSortIcon("ranking")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('macd_hist')}
                         >
                             MACD Hist {renderSortIcon("macd_hist")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('macd_slope')}
                         >
                             MACD Slope {renderSortIcon("macd_slope")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-emerald-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            className="font-bold text-emerald-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('macd_rel')}
                         >
                             MACD Rel {renderSortIcon("macd_rel")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('rsi')}
                         >
                             RSI {renderSortIcon("rsi")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('rsi_slope')}
                         >
                             RSI Slope {renderSortIcon("rsi_slope")}
@@ -220,13 +220,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         {STRATEGY_NAMES.map(name => (
                             <TableHead
                                 key={name}
-                                className="text-xs whitespace-normal min-w-[100px] text-center align-bottom cursor-pointer hover:bg-muted/50"
+                                className="text-xs whitespace-normal min-w-[100px] text-center align-bottom cursor-pointer hover:bg-muted/50 sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                                 onClick={() => handleSort(name)}
                             >
                                 {name} {renderSortIcon(name)}
                             </TableHead>
                         ))}
-                        <TableHead className="w-[150px] text-right font-bold pr-4">6M Trend</TableHead>
+                        <TableHead className="w-[150px] text-right font-bold pr-4 sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">6M Trend</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -325,7 +325,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         })
                     )}
                 </TableBody>
-            </Table>
+            </table>
         </div>
     );
 }

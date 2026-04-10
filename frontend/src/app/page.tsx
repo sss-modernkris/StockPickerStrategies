@@ -12,8 +12,9 @@ import { TechnicalIndicatorsCard } from '@/components/TechnicalIndicatorsCard';
 import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
 import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
 import { PaperStudyPanel } from '@/components/PaperStudyPanel';
+import { BrokersPanel } from '@/components/BrokersPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -21,7 +22,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -150,6 +151,7 @@ export default function Dashboard() {
                   {viewMode === 'raw-data' && `${currentData.symbol} Raw Data`}
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
                   {viewMode === 'paper-study' && 'Paper Trading Log'}
+                  {viewMode === 'brokers' && 'Broker Management'}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
@@ -160,6 +162,7 @@ export default function Dashboard() {
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                   {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
+                  {viewMode === 'brokers' && 'Manage Interactive Brokers connection and view real-time portfolio data'}
                 </p>
               </div>
               <div className="flex bg-muted/50 p-1 rounded-lg border">
@@ -186,6 +189,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'paper-study' ? 'secondary' : 'ghost'} onClick={() => setViewMode('paper-study')} size="sm" className="rounded-md">
                   <ClipboardList className="w-4 h-4 mr-2" /> Paper Study
+                </Button>
+                <Button variant={viewMode === 'brokers' ? 'secondary' : 'ghost'} onClick={() => setViewMode('brokers')} size="sm" className="rounded-md">
+                  <Landmark className="w-4 h-4 mr-2" /> Brokers
                 </Button>
               </div>
             </div>
@@ -262,6 +268,12 @@ export default function Dashboard() {
             {viewMode === 'paper-study' && (
               <div className="mt-2">
                 <PaperStudyPanel />
+              </div>
+            )}
+
+            {viewMode === 'brokers' && (
+              <div className="mt-2">
+                <BrokersPanel />
               </div>
             )}
           </div>

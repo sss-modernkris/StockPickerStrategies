@@ -3,53 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign, Briefcase, TrendingUp, Lock, RefreshCcw, Unlock, Database } from 'lucide-react';
+import { DollarSign, Briefcase, TrendingUp } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { logger } from '@/lib/logger';
-
-interface Holding {
-  ticker: string;
-  total_quantity: number;
-  avg_buy_price: number;
-  current_price: number;
-  total_value: number;
-  unrealized_pnl: number;
-}
-
-interface Transaction {
-  date: string;
-  ticker: string;
-  quantity: number;
-  price: number;
-  total_cost: number;
-  current_close_price: number | null;
-  total_current_value: number | null;
-  cash_balance: number;
-  action: string;
-}
-
-interface IBOrder {
-  order_id: number;
-  account: string;
-  ticker: string;
-  action: string;
-  total_quantity: number;
-  filled: number;
-  remaining: number;
-  status: string;
-  price: number;
-  avg_fill_price: number;
-  last_update: string;
-}
-
-interface PortfolioSummary {
-  current_cash: number;
-  invested_capital: number;
-  total_equity: number;
-  holdings: Holding[];
-  transactions: Transaction[];
-  ib_orders?: IBOrder[];
-}
+import { PortfolioSummary } from '@/lib/types';
 
 const formatMoney = (val: number | null | undefined) => {
   if (val == null) return '--';
@@ -70,87 +27,6 @@ export function PaperStudyPanel() {
   const [price, setPrice] = useState('');
   const [transactionType, setTransactionType] = useState<'Buy' | 'Sell' | 'Deposit' | 'Withdraw'>('Buy');
 
-  // IB Integration State
-  const [ibConfig, setIbConfig] = useState<{ is_configured: boolean; is_connected: boolean } | null>(null);
-  const [ibData, setIbData] = useState<any>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [ibUsername, setIbUsername] = useState('');
-  const [ibPassword, setIbPassword] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
-
-  const checkIbConfig = async () => {
-    try {
-      logger.info("Checking IB config from " + API_BASE_URL + "/api/ib/config");
-      const res = await fetch(`${API_BASE_URL}/api/ib/config`);
-      if (res.ok) {
-        const data = await res.json();
-        logger.info("IB config data: ", data);
-        setIbConfig(data);
-        if (data.is_connected) {
-          logger.info("IB is connected, fetching data...");
-          fetchIbData();
-        } else if (data.is_configured) {
-          // If env vars are set, attempt login automatically
-          logger.info("IB is configured but not connected, attempting login...");
-          handleIbLogin("", "");
-        }
-      }
-    } catch (err) {
-      logger.error("Failed to check IB config", err);
-    }
-  };
-
-  const handleIbLogin = async (username?: string, password?: string) => {
-    try {
-      setLoginLoading(true);
-      setModalError(null);
-      setError(null);
-      logger.info("Attempting to login to IB at " + API_BASE_URL + "/api/ib/login");
-      const res = await fetch(`${API_BASE_URL}/api/ib/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: username || "",
-          password: password || ""
-        })
-      });
-
-      if (res.ok) {
-        setIbConfig((prev: { is_configured: boolean; is_connected: boolean } | null) =>
-          prev ? { ...prev, is_connected: true } : { is_configured: true, is_connected: true }
-        );
-        setShowLoginModal(false);
-        fetchIbData();
-        setSuccessMsg("Successfully connected to Interactive Brokers!");
-      } else {
-        const errData = await res.json();
-        const msg = errData.detail || "Failed to login to Interactive Brokers.";
-        setModalError(msg);
-        setError(msg);
-      }
-    } catch (err) {
-      const msg = "An error occurred during IB login.";
-      setModalError(msg);
-      setError(msg);
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const fetchIbData = async () => {
-    try {
-      logger.info("Fetching IB data from " + API_BASE_URL + "/api/ib/data");
-      const res = await fetch(`${API_BASE_URL}/api/ib/data`);
-      if (res.ok) {
-        const data = await res.json();
-        setIbData(data);
-      }
-    } catch (err) {
-      logger.error("Failed to fetch IB data", err);
-    }
-  };
-
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
@@ -170,7 +46,6 @@ export function PaperStudyPanel() {
 
   useEffect(() => {
     fetchPortfolio();
-    checkIbConfig();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -241,10 +116,10 @@ export function PaperStudyPanel() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {ibData ? formatMoney(ibData.cash_available) : (portfolio ? formatMoney(portfolio.current_cash) : '--')}
+              {portfolio ? formatMoney(portfolio.current_cash) : '--'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {ibData ? "Real-time IB Balance" : "Simulated Ready to deploy"}
+              Simulated Ready to deploy
             </p>
           </CardContent>
         </Card>
@@ -256,10 +131,10 @@ export function PaperStudyPanel() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {ibData ? formatMoney(ibData.invested_capital) : (portfolio ? formatMoney(portfolio.invested_capital) : '--')}
+              {portfolio ? formatMoney(portfolio.invested_capital) : '--'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {ibData ? "IB Market Value" : "Total Market Value of Stocks"}
+              Total Market Value of Stocks
             </p>
           </CardContent>
         </Card>
@@ -271,128 +146,14 @@ export function PaperStudyPanel() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {ibData ? formatMoney(ibData.total_equity) : (portfolio ? formatMoney(portfolio.total_equity) : '--')}
+              {portfolio ? formatMoney(portfolio.total_equity) : '--'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {ibData ? "IB Account Net Liquidation" : "Cash + Invested Capital"}
+              Cash + Invested Capital
             </p>
           </CardContent>
         </Card>
       </div>
-
-      {ibData && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-emerald-500/5 border-emerald-500/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold text-emerald-600 uppercase">Unrealized P&L</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-xl font-bold ${ibData.unrealized_pnl >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-                {formatMoney(ibData.unrealized_pnl)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-blue-500/5 border-blue-500/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold text-blue-600 uppercase">Realized P&L</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-xl font-bold ${ibData.realized_pnl >= 0 ? 'text-blue-600' : 'text-destructive'}`}>
-                {formatMoney(ibData.realized_pnl)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-indigo-500/5 border-indigo-500/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold text-indigo-600 uppercase">Buying Power</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold text-indigo-600">
-                {formatMoney(ibData.buying_power)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Button
-            variant={ibConfig?.is_connected ? "secondary" : "default"}
-            disabled={ibConfig?.is_connected || loginLoading}
-            onClick={() => setShowLoginModal(true)}
-            className="flex items-center gap-2"
-          >
-            {ibConfig?.is_connected ? (
-              <>
-                <Unlock className="w-4 h-4 text-emerald-500" />
-                Connected to IB
-              </>
-            ) : (
-              <>
-                <Lock className="w-4 h-4" />
-                Login to Interactive Brokers
-              </>
-            )}
-          </Button>
-          {ibConfig?.is_connected && (
-            <Button variant="ghost" size="sm" onClick={fetchIbData} className="text-xs text-muted-foreground flex items-center gap-1">
-              <RefreshCcw className="w-3 h-3" /> Sync Dashboard
-            </Button>
-          )}
-        </div>
-
-        {ibConfig?.is_configured && ibConfig?.is_connected && (
-          <div className="text-xs text-emerald-500 font-medium flex items-center gap-1">
-            <Database className="w-3 h-3" /> Auto-login active via environment variables
-          </div>
-        )}
-      </div>
-
-      {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <CardHeader>
-              <CardTitle>Interactive Brokers Login</CardTitle>
-              <CardDescription>Enter your TWS/Gateway credentials to link your dashboard.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {modalError && (
-                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-md font-medium">
-                  {modalError}
-                </div>
-              )}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Username</label>
-                <Input
-                  placeholder="IB Username"
-                  value={ibUsername}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIbUsername(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
-                <Input
-                  type="password"
-                  placeholder="IB Password"
-                  value={ibPassword}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIbPassword(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <Button variant="ghost" onClick={() => setShowLoginModal(false)}>Cancel</Button>
-                <Button
-                  onClick={() => handleIbLogin(ibUsername, ibPassword)}
-                  disabled={loginLoading || !ibUsername || !ibPassword}
-                  className="px-8"
-                >
-                  {loginLoading ? "Connecting..." : "Login"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       <Card>
         <CardHeader>
@@ -490,70 +251,6 @@ export function PaperStudyPanel() {
                       <TableCell className={`text-right font-bold ${h.unrealized_pnl < 0 ? 'text-destructive' : 'text-emerald-500'}`}>
                         {h.unrealized_pnl > 0 ? '+' : ''}{formatMoney(h.unrealized_pnl)}
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Interactive Brokers Order History</CardTitle>
-          <CardDescription>Real-time order status and execution details from your IB account.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!portfolio || !portfolio.ib_orders || portfolio.ib_orders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">
-              {ibConfig?.is_connected ? "No recent IB orders found." : "Connect to Interactive Brokers to view real-time order history."}
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date & Timestamp</TableHead>
-                    <TableHead>Ticker</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead className="text-right">Quantity (Filled/Remain)</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                    <TableHead className="text-right">Order ID</TableHead>
-                    <TableHead>Account</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {portfolio.ib_orders.map((ord) => (
-                    <TableRow key={ord.order_id}>
-                      <TableCell className="text-xs whitespace-nowrap">{ord.last_update || "Pending..."}</TableCell>
-                      <TableCell className="font-bold">{ord.ticker}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                          ord.status === 'Filled' ? 'bg-emerald-500/10 text-emerald-500' : 
-                          ord.status === 'Cancelled' ? 'bg-destructive/10 text-destructive' : 
-                          'bg-blue-500/10 text-blue-500'
-                        }`}>
-                          {ord.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${ord.action === 'BUY' ? 'text-indigo-500' : 'text-orange-500'}`}>
-                          {ord.action}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="font-medium text-emerald-500">{ord.filled}</span>
-                        <span className="text-muted-foreground text-xs"> / {ord.remaining}</span>
-                        <div className="text-[10px] text-muted-foreground">Total: {ord.total_quantity}</div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {ord.avg_fill_price > 0 ? formatMoney(ord.avg_fill_price) : formatMoney(ord.price)}
-                        {ord.avg_fill_price > 0 && <div className="text-[10px] text-muted-foreground">Fill Price</div>}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">{ord.order_id}</TableCell>
-                      <TableCell className="text-xs">{ord.account}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
