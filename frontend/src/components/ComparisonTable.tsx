@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 import { TickerAnalysis } from '@/lib/types';
 import {
     Table,
@@ -8,8 +9,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
-import { ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2 } from 'lucide-react';
 
 interface ComparisonTableProps {
     analysisData: Record<string, TickerAnalysis>;
@@ -21,6 +23,8 @@ type SortDirection = 'asc' | 'desc';
 export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [sortKey, setSortKey] = useState<SortKey | null>(null);
     const [sortDir, setSortDir] = useState<SortDirection>('desc');
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportSuccess, setExportSuccess] = useState(false);
 
     const dataList = Object.values(analysisData);
 
@@ -75,6 +79,21 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         const rsi = data.technical_indicators?.rsi_14 ?? null;
         const rsiSlope = data.technical_indicators?.rsi_slope ?? null;
 
+        const priceHistory = data.price_history;
+        const currentPrice = priceHistory && priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].close : null;
+        const prevPrice = priceHistory && priceHistory.length > 1 ? priceHistory[priceHistory.length - 2].close : null;
+        
+        let closeSlopeRaw = null;
+        let closeSlopeStr: '+' | '-' | '0' | 'N/A' = 'N/A';
+        if (currentPrice !== null && prevPrice !== null) {
+            closeSlopeRaw = currentPrice - prevPrice;
+            if (closeSlopeRaw > 0) closeSlopeStr = '+';
+            else if (closeSlopeRaw < 0) closeSlopeStr = '-';
+            else closeSlopeStr = '0';
+        }
+
+        const willyVwap = data.technical_indicators?.willy_vwap ?? null;
+
         const willyScore = stratMap['WillyAlgo Indicator'] || 0;
         let ranking = 0;
         if (willyScore > 50) ranking++;
@@ -84,12 +103,22 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         if (macdHist !== null && macdHist > 0) ranking++;
         if (macdSlope !== null && macdSlope > 0) ranking++;
         if (stratAvg > 50) ranking++;
+        if (closeSlopeRaw !== null && closeSlopeRaw > 0) ranking++;
+
+        let rec = "N/A";
+        if (currentPrice !== null && willyVwap !== null && closeSlopeRaw !== null) {
+            rec = (currentPrice > willyVwap && closeSlopeRaw > 0) ? 'Hold' : 'Sell';
+        }
 
         return {
             symbol: data.symbol,
             ml_alpha: alphaProb,
             strat_avg: stratAvg,
             ranking: ranking,
+            rec: rec,
+            close_price: currentPrice,
+            close_slope: closeSlopeStr,
+            close_slope_raw: closeSlopeRaw,
             macd_hist: macdHist,
             macd_slope: macdSlope,
             macd_rel: macdRel,
@@ -119,6 +148,15 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'ranking') {
             valA = a.ranking;
             valB = b.ranking;
+        } else if (sortKey === 'rec') {
+            valA = a.rec;
+            valB = b.rec;
+        } else if (sortKey === 'close_price') {
+            valA = a.close_price ?? -99999;
+            valB = b.close_price ?? -99999;
+        } else if (sortKey === 'close_slope') {
+            valA = a.close_slope_raw ?? -99999;
+            valB = b.close_slope_raw ?? -99999;
         } else if (sortKey === 'macd_hist') {
             valA = a.macd_hist ?? -99999;
             valB = b.macd_hist ?? -99999;
@@ -158,10 +196,72 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />;
     };
 
+    const handleExportCsv = async () => {
+        setIsExporting(true);
+        const headers = [
+            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Close Price", "Close Slope",
+            "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
+        ];
+
+        const rows = sortedData.map(row => {
+            const r = [
+                row.symbol,
+                row.ml_alpha.toFixed(1),
+                row.strat_avg.toFixed(1),
+                row.ranking,
+                row.rec,
+                row.close_price !== null ? row.close_price.toFixed(2) : "N/A",
+                row.close_slope,
+                row.macd_hist !== null ? row.macd_hist.toFixed(2) : "N/A",
+                row.macd_slope !== null ? row.macd_slope.toFixed(2) : "N/A",
+                row.macd_rel !== null ? row.macd_rel.toFixed(2) : "N/A",
+                row.rsi !== null ? row.rsi.toFixed(2) : "N/A",
+                row.rsi_slope !== null ? row.rsi_slope.toFixed(2) : "N/A",
+                ...STRATEGY_NAMES.map(name => row.strats[name]?.toFixed(1) || "0.0")
+            ];
+            return r.map(v => `"${v}"`).join(",");
+        });
+
+        const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n");
+        const date = new Date();
+        const dateStamp = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+        const fileName = `CompTable_${dateStamp}.csv`;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/save_csv`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filename: fileName, content: csvContent })
+            });
+
+            if (response.ok) {
+                setExportSuccess(true);
+                setTimeout(() => setExportSuccess(false), 3000);
+            }
+        } catch (error) {
+            console.error("Failed to save CSV:", error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
-        <div className="w-full h-full bg-card text-card-foreground border rounded-lg shadow-sm">
-            <Table>
-                <TableHeader>
+        <div className="flex flex-col gap-3 w-full h-full">
+            <div className="flex justify-end pr-2">
+                <Button 
+                    onClick={handleExportCsv} 
+                    variant={exportSuccess ? "default" : "outline"} 
+                    size="sm" 
+                    className={`gap-2 h-8 text-xs font-medium transition-all ${exportSuccess ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' : ''}`}
+                    disabled={isExporting}
+                >
+                    {exportSuccess ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />} 
+                    {isExporting ? "Saving..." : exportSuccess ? "Saved to Project Folder!" : "Export CSV"}
+                </Button>
+            </div>
+            <div className="w-full h-full bg-card text-card-foreground border rounded-lg shadow-sm">
+                <Table>
+                    <TableHeader>
                     <TableRow>
                         <TableHead
                             className="w-[100px] font-bold cursor-pointer hover:bg-muted bg-card sticky left-0 z-20 shadow-[1px_0_0_0_hsl(var(--border))]"
@@ -186,6 +286,24 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             onClick={() => handleSort('ranking')}
                         >
                             Ranking {renderSortIcon("ranking")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-fuchsia-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            onClick={() => handleSort('rec')}
+                        >
+                            Rec {renderSortIcon("rec")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-cyan-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            onClick={() => handleSort('close_price')}
+                        >
+                            Close Price {renderSortIcon("close_price")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-cyan-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
+                            onClick={() => handleSort('close_slope')}
+                        >
+                            Close Slope {renderSortIcon("close_slope")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
@@ -252,7 +370,24 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                         {row.strat_avg.toFixed(1)}%
                                     </TableCell>
                                     <TableCell className="text-center font-bold text-amber-500">
-                                        {row.ranking}/7
+                                        {row.ranking}/8
+                                    </TableCell>
+                                    <TableCell className={`text-center font-bold ${row.rec === 'Hold' ? 'text-green-500' : row.rec === 'Sell' ? 'text-red-500' : 'text-muted-foreground'}`}>
+                                        {row.rec}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
+                                        {row.close_price != null ? (
+                                            <span className="text-foreground font-semibold">
+                                                ${row.close_price.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-xl max-w-[90px]">
+                                        {row.close_slope !== 'N/A' ? (
+                                            <span className={row.close_slope === '+' ? "text-green-500 font-bold" : row.close_slope === '-' ? "text-red-500 font-bold" : "text-foreground font-bold"}>
+                                                {row.close_slope}
+                                            </span>
+                                        ) : <span className="text-muted-foreground text-sm">N/A</span>}
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[90px]">
                                         {row.macd_hist != null ? (
@@ -325,7 +460,8 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         })
                     )}
                 </TableBody>
-            </Table>
+                </Table>
+            </div>
         </div>
     );
 }

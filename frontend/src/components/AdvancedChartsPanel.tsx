@@ -53,6 +53,8 @@ const PLOT_CONFIG = [
     { key: 'bb_lower', name: 'BB Lower', color: '#9ca3af', strokeWidth: 1, dash: '3 3', opacity: 0.7 },
     { key: 'bb_middle', name: 'SMA 20 (BB)', color: '#6b7280', strokeWidth: 1, dash: '3 3', opacity: 0.7 },
     { key: 'willy_vwap', name: 'Willy VWAP', color: '#f97316', strokeWidth: 2, dash: undefined, opacity: 1 },
+    { key: 'vwap_upper', name: 'VWAP Upper (ATR)', color: '#fdba74', strokeWidth: 1.5, dash: '4 4', opacity: 0.8 },
+    { key: 'vwap_lower', name: 'VWAP Lower (ATR)', color: '#fdba74', strokeWidth: 1.5, dash: '4 4', opacity: 0.8 },
 ];
 
 export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) {

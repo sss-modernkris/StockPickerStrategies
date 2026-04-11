@@ -20,6 +20,8 @@ export interface PricePoint {
     bb_lower?: number | null;
     bb_middle?: number | null;
     willy_vwap?: number | null;
+    vwap_upper?: number | null;
+    vwap_lower?: number | null;
 }
 
 export interface TickerHistory {

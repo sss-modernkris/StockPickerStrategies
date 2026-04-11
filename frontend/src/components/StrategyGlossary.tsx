@@ -13,7 +13,8 @@ import {
     BrainCircuit,
     Activity,
     Gauge,
-    Search
+    Search,
+    Target
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -292,7 +293,7 @@ export function StrategyGlossary() {
             icon: <Gauge className="w-5 h-5 text-amber-500" />,
             title: "Composite Ranking Score",
             badge: "Dashboard Metric",
-            description: "A custom 7-point ranking score used on the Comparison page to quickly identify stocks that meet a specific confluence of momentum, technical, and quantitative criteria.",
+            description: "A custom 8-point ranking score used on the Comparison page to quickly identify stocks that meet a specific confluence of momentum, technical, and quantitative criteria.",
             bullets: [
                 { label: "WillyAlgo > 50%", text: "Requires the WillyAlgo Indicator match percentage to be greater than 50%." },
                 { label: "RSI > 30", text: "Ensures the stock is not in a deeply oversold structural collapse." },
@@ -300,7 +301,20 @@ export function StrategyGlossary() {
                 { label: "MACD Hist < 0.1", text: "Focuses on early momentum shifts or contained histogram expansion." },
                 { label: "MACD Hist > 0", text: "Requires the MACD histogram to be positive (bullish momentum)." },
                 { label: "MACD Slope > 0", text: "Requires the MACD line itself to have a positive, rising trajectory." },
-                { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." }
+                { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." },
+                { label: "Close Price Slope > 0", text: "Requires the stock to have positive 1-day momentum (the most recent change in closing price must be positive)." }
+            ]
+        },
+        {
+            id: "rec-signal",
+            icon: <Target className="w-5 h-5 text-fuchsia-500" />,
+            title: "Recommendation (Rec) Signal",
+            badge: "Dashboard Metric",
+            description: "A categorical signal (Hold / Sell) displayed on the Comparison page. It evaluates whether a stock is currently maintaining structural support and exhibiting positive recent momentum.",
+            bullets: [
+                { label: "Current Price > Willy VWAP", text: "Requires the stock's most recent closing price to be strictly greater than the Willy Volume Weighted Average Price. This acts as a baseline check for underlying trend support." },
+                { label: "Close Price Slope > 0", text: "Requires the most recent 1-day change in the closing price to be positive (+), ensuring short-term upward momentum." },
+                { label: "Logic Outcome", text: "If both conditions are met, the recommendation is 'Hold'. If either condition fails, the recommendation is 'Sell'." }
             ]
         }
     ];

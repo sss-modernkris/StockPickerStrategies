@@ -52,6 +52,21 @@ def post_logs(log: LogRequest):
         print(f"{prefix} {log.message}")
     return {"status": "ok"}
 
+class SaveCsvRequest(BaseModel):
+    filename: str
+    content: str
+
+@app.post("/api/save_csv")
+def save_csv(req: SaveCsvRequest):
+    try:
+        safe_filename = os.path.basename(req.filename)
+        filepath = os.path.join(BASE_DIR, safe_filename)
+        with open(filepath, "w", encoding="utf-8", newline="") as f:
+            f.write(req.content)
+        return {"status": "success", "message": f"Successfully saved to {filepath}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class IBDataResponse(BaseModel):
     unrealized_pnl: float
     realized_pnl: float

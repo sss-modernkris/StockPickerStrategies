@@ -22,6 +22,8 @@ class PricePoint(BaseModel):
     bb_lower: Optional[float] = None
     bb_middle: Optional[float] = None
     willy_vwap: Optional[float] = None
+    vwap_upper: Optional[float] = None
+    vwap_lower: Optional[float] = None
 class TickerHistory(BaseModel):
     symbol: str
     history: List[PricePoint]

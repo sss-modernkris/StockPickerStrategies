@@ -150,6 +150,16 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
         history_df["bb_lower"] = history_df["bb_middle"] - (std_20 * 2)
         history_df["willy_vwap"] = calculate_willy_vwap(history_df)
         
+        # VWAP ATR Bands (Multiplier 2.0)
+        high_low = history_df['High'] - history_df['Low']
+        high_close = (history_df['High'] - closes.shift()).abs()
+        low_close = (history_df['Low'] - closes.shift()).abs()
+        tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+        atr_14 = tr.rolling(window=14).mean()
+        
+        history_df["vwap_upper"] = history_df["willy_vwap"] + (atr_14 * 2.0)
+        history_df["vwap_lower"] = history_df["willy_vwap"] - (atr_14 * 2.0)
+        
         # Capture the last 126 days (~6 months)
         hist = history_df.tail(126) 
         
@@ -173,6 +183,8 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
                 "bb_lower": safe_float(row.get("bb_lower")),
                 "bb_middle": safe_float(row.get("bb_middle")),
                 "willy_vwap": safe_float(row.get("willy_vwap")),
+                "vwap_upper": safe_float(row.get("vwap_upper")),
+                "vwap_lower": safe_float(row.get("vwap_lower")),
             })
 
     return TickerAnalysis(
