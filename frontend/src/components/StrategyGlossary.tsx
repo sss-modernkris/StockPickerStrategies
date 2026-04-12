@@ -13,8 +13,7 @@ import {
     BrainCircuit,
     Activity,
     Gauge,
-    Search,
-    Target
+    Search
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -285,7 +284,8 @@ export function StrategyGlossary() {
             bullets: [
                 { label: "Pivot Logic", text: "Identifies swing points using a rolling window of 5 periods. A pivot high is a point higher than 5 points before and after it." },
                 { label: "Bullish Signal", text: "The strategy returns a 100% match if the current price is trading above the most recent Swing VWAP, indicating positive momentum relative to the volume-fair-value of the recent swing." },
-                { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." }
+                { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." },
+                { label: "ATR Volatility Bands", text: "Includes Upper and Lower exhaustion bands calculated using a 14-day ATR with a 2.0 multiplier applied to the VWAP baseline. These identify volatility-adjusted extreme levels." }
             ]
         },
         {
@@ -302,19 +302,7 @@ export function StrategyGlossary() {
                 { label: "MACD Hist > 0", text: "Requires the MACD histogram to be positive (bullish momentum)." },
                 { label: "MACD Slope > 0", text: "Requires the MACD line itself to have a positive, rising trajectory." },
                 { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." },
-                { label: "Close Price Slope > 0", text: "Requires the stock to have positive 1-day momentum (the most recent change in closing price must be positive)." }
-            ]
-        },
-        {
-            id: "rec-signal",
-            icon: <Target className="w-5 h-5 text-fuchsia-500" />,
-            title: "Recommendation (Rec) Signal",
-            badge: "Dashboard Metric",
-            description: "A categorical signal (Hold / Sell) displayed on the Comparison page. It evaluates whether a stock is currently maintaining structural support and exhibiting positive recent momentum.",
-            bullets: [
-                { label: "Current Price > Willy VWAP", text: "Requires the stock's most recent closing price to be strictly greater than the Willy Volume Weighted Average Price. This acts as a baseline check for underlying trend support." },
-                { label: "Close Price Slope > 0", text: "Requires the most recent 1-day change in the closing price to be positive (+), ensuring short-term upward momentum." },
-                { label: "Logic Outcome", text: "If both conditions are met, the recommendation is 'Hold'. If either condition fails, the recommendation is 'Sell'." }
+                { label: "Close Slope > 0", text: "Requires the short-term price trend (last 2 days) to be positive." }
             ]
         }
     ];

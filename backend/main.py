@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
+from typing import List
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
@@ -15,9 +17,13 @@ app = FastAPI(
 )
 
 # Standardize data paths relative to this script
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORTFOLIO_CSV = os.path.join(BASE_DIR, "portfolio.csv")
-PAPER_STUDY_CSV = os.path.join(BASE_DIR, "PaperStudy.csv")
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+PORTFOLIO_CSV = os.path.join(os.path.dirname(BACKEND_DIR), "portfolio.csv")
+PAPER_STUDY_CSV = os.path.join(os.path.dirname(BACKEND_DIR), "PaperStudy.csv")
+
+print(f"Backend Directory: {BACKEND_DIR}")
+print(f"Portfolio CSV: {PORTFOLIO_CSV}")
+print(f"Paper Study CSV: {PAPER_STUDY_CSV}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,6 +80,8 @@ class IBDataResponse(BaseModel):
     cash_available: float
     invested_capital: float
     total_equity: float
+    holdings: List[HoldingModel]
+    orders: List[IBOrderModel]
 
 ib_control = IBClient()
 
@@ -111,17 +119,27 @@ def get_ib_data():
         raise HTTPException(status_code=400, detail="Not connected to Interactive Brokers")
 
 @app.get("/api/portfolio")
-def get_portfolio_tickers():
+def get_portfolio_tickers(filename: str = "portfolio.csv"):
+    # Security: prevent path traversal
+    safe_filename = os.path.basename(filename)
+    if safe_filename != filename:
+         raise HTTPException(status_code=400, detail="Invalid filename format. Path traversal is not allowed.")
+    
+    # Path relative to project root (one level up from backend/)
+    file_path = os.path.join(os.path.dirname(BACKEND_DIR), safe_filename)
+    
     tickers = []
     try:
-        if os.path.exists(PORTFOLIO_CSV):
-            with open(PORTFOLIO_CSV, mode='r', encoding='utf-8-sig') as f:
+        if os.path.exists(file_path):
+            with open(file_path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     # Clean up header/keys in case they have spaces or BOM issues
                     clean_row = {k.strip() if k else k: v for k, v in row.items()}
                     if 'Symbol' in clean_row and clean_row['Symbol'].strip():
                         tickers.append(clean_row['Symbol'].strip())
+        else:
+            raise HTTPException(status_code=404, detail=f"File {safe_filename} not found in project directory.")
         return {"tickers": tickers}
     except Exception as e:
         return {"tickers": [], "error": str(e)}
@@ -164,11 +182,16 @@ def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
     # Validation will happen automatically by Pydantic Model
     return HistoryResponse(period=period, data=result["data"])
 
-from datetime import datetime
-import csv
-import os
+@app.get("/api/price/{ticker}")
+def get_current_price(ticker: str):
+    try:
+        t = yf.Ticker(ticker.upper())
+        price = t.fast_info.last_price
+        return {"price": price}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="Ticker not found or price unavailable")
+
 import yfinance as yf
-from models import TransactionModel, TransactionResponse, PortfolioSummaryResponse, HoldingModel
 
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
 def get_paper_study():

@@ -20,6 +20,7 @@ COPY backend/ ./
 
 # Copy the portfolio CSV from the root into the root of the app
 COPY portfolio.csv .
+COPY PaperStudy.csv .
 
 # Expose port
 EXPOSE 8080
