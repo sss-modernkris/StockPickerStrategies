@@ -12,41 +12,58 @@ import { TechnicalIndicatorsCard } from '@/components/TechnicalIndicatorsCard';
 import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
 import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
 import { PaperStudyPanel } from '@/components/PaperStudyPanel';
+import { BrokersPanel } from '@/components/BrokersPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Lifted state for Compare Charts to persist across tab changes
   const [compareSelectedTickers, setCompareSelectedTickers] = useState<string[]>([]);
   const [comparePeriod, setComparePeriod] = useState<string>('1y');
+  const [portfolioFilename, setPortfolioFilename] = useState<string>('portfolio.csv');
+
+  const loadPortfolioTickers = async (filename: string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/portfolio?filename=${filename}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.tickers) {
+          const uniqueTickers = Array.from(new Set(data.tickers as string[])).slice(0, 100);
+          setTickers(uniqueTickers);
+          if (uniqueTickers.length > 0) {
+            setSelectedTicker(uniqueTickers[0]);
+          } else {
+            setSelectedTicker(null);
+          }
+          setPortfolioFilename(filename);
+          localStorage.setItem('ag_portfolio_filename', filename);
+        }
+      } else {
+        const errData = await res.json();
+        setError(`Failed to load portfolio ${filename}: ${errData.detail || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error("Failed to fetch portfolio tickers", err);
+      setError("Network error while loading portfolio.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 1. Fetch initial portfolio tickers on mount
   useEffect(() => {
-    const fetchPortfolio = async () => {
-      try {
-        const res = await fetch(`http://localhost:8001/api/portfolio`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.tickers && data.tickers.length > 0) {
-            // Take up to 100 unique tickers
-            const uniqueTickers = Array.from(new Set(data.tickers as string[])).slice(0, 100);
-            setTickers(uniqueTickers);
-            setSelectedTicker(uniqueTickers[0]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch portfolio tickers", err);
-      }
-    };
-    fetchPortfolio();
+    const savedFilename = localStorage.getItem('ag_portfolio_filename') || 'portfolio.csv';
+    loadPortfolioTickers(savedFilename);
   }, []);
 
   // 2. Fetch all analysis data in a single batch as soon as tickers are loaded
@@ -60,7 +77,7 @@ export default function Dashboard() {
       setError(null);
       try {
         const tickersParam = unfetchedTickers.join(',');
-        const res = await fetch(`http://localhost:8001/api/analyze-batch?tickers=${tickersParam}`);
+        const res = await fetch(`${API_BASE_URL}/api/analyze-batch?tickers=${tickersParam}`);
         if (!res.ok) {
           throw new Error(`Failed to batch fetch from backend (Status ${res.status})`);
         }
@@ -116,6 +133,8 @@ export default function Dashboard() {
         onAddTicker={handleAddTicker}
         onRemoveTicker={handleRemoveTicker}
         onSelectTicker={setSelectedTicker}
+        portfolioFilename={portfolioFilename}
+        onLoadPortfolio={loadPortfolioTickers}
       />
 
       <main className="flex-1 p-6 overflow-y-auto w-full">
@@ -149,6 +168,7 @@ export default function Dashboard() {
                   {viewMode === 'raw-data' && `${currentData.symbol} Raw Data`}
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
                   {viewMode === 'paper-study' && 'Paper Trading Log'}
+                  {viewMode === 'brokers' && 'Broker Management'}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
@@ -159,6 +179,7 @@ export default function Dashboard() {
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                   {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
+                  {viewMode === 'brokers' && 'Manage Interactive Brokers connection and view real-time portfolio data'}
                 </p>
               </div>
               <div className="flex bg-muted/50 p-1 rounded-lg border">
@@ -185,6 +206,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'paper-study' ? 'secondary' : 'ghost'} onClick={() => setViewMode('paper-study')} size="sm" className="rounded-md">
                   <ClipboardList className="w-4 h-4 mr-2" /> Paper Study
+                </Button>
+                <Button variant={viewMode === 'brokers' ? 'secondary' : 'ghost'} onClick={() => setViewMode('brokers')} size="sm" className="rounded-md">
+                  <Landmark className="w-4 h-4 mr-2" /> Brokers
                 </Button>
               </div>
             </div>
@@ -261,6 +285,12 @@ export default function Dashboard() {
             {viewMode === 'paper-study' && (
               <div className="mt-2">
                 <PaperStudyPanel />
+              </div>
+            )}
+
+            {viewMode === 'brokers' && (
+              <div className="mt-2">
+                <BrokersPanel />
               </div>
             )}
           </div>

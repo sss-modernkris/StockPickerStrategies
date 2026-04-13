@@ -19,6 +19,9 @@ export interface PricePoint {
     bb_upper?: number | null;
     bb_lower?: number | null;
     bb_middle?: number | null;
+    vwap_upper?: number | null;
+    vwap_lower?: number | null;
+    willy_vwap?: number | null;
 }
 
 export interface TickerHistory {
@@ -31,13 +34,16 @@ export interface TechnicalIndicators {
     sma_200?: number;
     ema_20?: number;
     rsi_14?: number;
+    rsi_slope?: number;
     macd_line?: number;
     macd_signal?: number;
+    macd_slope?: number;
     bollinger_upper?: number;
     bollinger_middle?: number;
     bollinger_lower?: number;
     volume?: number;
     volume_avg_20?: number;
+    willy_vwap?: number;
 }
 
 export interface TickerAnalysis {
@@ -49,4 +55,57 @@ export interface TickerAnalysis {
     technical_indicators?: TechnicalIndicators;
     raw_data?: Record<string, unknown>;
     error?: string;
+}
+export interface Holding {
+  ticker: string;
+  total_quantity: number;
+  avg_buy_price: number;
+  current_price: number;
+  total_value: number;
+  unrealized_pnl: number;
+}
+
+export interface Transaction {
+  date: string;
+  ticker: string;
+  quantity: number;
+  price: number;
+  total_cost: number;
+  current_close_price: number | null;
+  total_current_value: number | null;
+  cash_balance: number;
+  action: string;
+}
+
+export interface IBOrder {
+  order_id: number;
+  account: string;
+  ticker: string;
+  action: string;
+  total_quantity: number;
+  filled: number;
+  remaining: number;
+  status: string;
+  price: number;
+  avg_fill_price: number;
+  last_update: string;
+}
+
+export interface PortfolioSummary {
+  current_cash: number;
+  invested_capital: number;
+  total_equity: number;
+  holdings: Holding[];
+  transactions: Transaction[];
+  ib_orders?: IBOrder[];
+}
+export interface IBData {
+  cash_available: number;
+  invested_capital: number;
+  total_equity: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  buying_power: number;
+  holdings: Holding[];
+  orders: IBOrder[];
 }

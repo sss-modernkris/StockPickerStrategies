@@ -21,6 +21,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { TickerHistory, TickerAnalysis } from '@/lib/types';
+import { API_BASE_URL } from '@/lib/api';
 
 interface NormalizedComparePanelProps {
     availableTickers: string[];
@@ -84,7 +85,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             setError(null);
             try {
                 const tickersParam = selectedTickers.join(',');
-                const res = await fetch(`http://localhost:8001/api/history?tickers=${tickersParam}&period=${period}`);
+                const res = await fetch(`${API_BASE_URL}/api/history?tickers=${tickersParam}&period=${period}`);
 
                 if (!res.ok) {
                     throw new Error(`Failed to fetch history (Status ${res.status})`);

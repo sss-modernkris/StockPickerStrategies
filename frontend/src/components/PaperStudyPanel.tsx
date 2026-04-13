@@ -37,7 +37,7 @@ interface PortfolioSummary {
 
 const formatMoney = (val: number | null | undefined) => {
   if (val == null) return '--';
-  return val < 0 
+  return val < 0
     ? `-$${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
@@ -91,13 +91,14 @@ export function PaperStudyPanel() {
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8001/api/paper-study');
+      logger.info("Fetching portfolio data from " + API_BASE_URL + "/api/paper-study");
+      const res = await fetch(`${API_BASE_URL}/api/paper-study`);
       if (!res.ok) throw new Error('Failed to fetch portfolio data');
       const data = await res.json();
       setPortfolio(data);
       setError(null);
     } catch (err) {
-      console.error(err);
+      logger.error("Failed to fetch portfolio", err);
       setError('Could not load portfolio data.');
     } finally {
       setLoading(false);
@@ -116,7 +117,7 @@ export function PaperStudyPanel() {
     const q = transactionType === 'Deposit' || transactionType === 'Withdraw' ? 1 : parseFloat(quantity);
     const p = parseFloat(price);
     const tick = transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'CASH' : ticker.toUpperCase();
-    
+
     if ((!tick && transactionType !== 'Deposit' && transactionType !== 'Withdraw') || isNaN(q) || isNaN(p) || q <= 0 || p <= 0) {
       setError('Please provide valid positive numbers for quantity and price, and a ticker.');
       return;
@@ -130,16 +131,16 @@ export function PaperStudyPanel() {
     const totalCost = q * p;
     // Client-side quick validation
     if (transactionType === 'Buy' && portfolio && totalCost > portfolio.current_cash) {
-       setError(`Insufficient funds. This trade requires ${formatMoney(totalCost)} but you only have ${formatMoney(portfolio.current_cash)} available.`);
-       return;
+      setError(`Insufficient funds. This trade requires ${formatMoney(totalCost)} but you only have ${formatMoney(portfolio.current_cash)} available.`);
+      return;
     }
     if (transactionType === 'Withdraw' && portfolio && p > portfolio.current_cash) {
-       setError(`Insufficient funds for withdrawal. You only have ${formatMoney(portfolio.current_cash)} available.`);
-       return;
+      setError(`Insufficient funds for withdrawal. You only have ${formatMoney(portfolio.current_cash)} available.`);
+      return;
     }
 
     try {
-      const res = await fetch('http://localhost:8001/api/paper-study', {
+      const res = await fetch(`${API_BASE_URL}/api/paper-study`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,17 +162,19 @@ export function PaperStudyPanel() {
       setQuantity('');
       setPrice('');
       setTransactionType('Buy');
-      
+
       fetchPortfolio();
     } catch (err: any) {
-      console.error(err);
+      logger.error("Failed to save transaction", err);
       setError(err.message || 'An error occurred while saving the transaction.');
     }
   };
 
+  const totalUnrealizedPnl = portfolio?.holdings.reduce((sum, h) => sum + h.unrealized_pnl, 0) || 0;
+
   return (
     <div className="space-y-6">
-      
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -180,19 +183,27 @@ export function PaperStudyPanel() {
             <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{portfolio ? formatMoney(portfolio.current_cash) : '--'}</div>
-            <p className="text-xs text-muted-foreground">Ready to deploy</p>
+            <div className="text-2xl font-bold">
+              {portfolio ? formatMoney(portfolio.current_cash) : '--'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Simulated Ready to deploy
+            </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Invested Capital</CardTitle>
             <Briefcase className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{portfolio ? formatMoney(portfolio.invested_capital) : '--'}</div>
-            <p className="text-xs text-muted-foreground">Total Market Value of Stocks</p>
+            <div className="text-2xl font-bold">
+              {portfolio ? formatMoney(portfolio.invested_capital) : '--'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total Market Value of Stocks
+            </p>
           </CardContent>
         </Card>
 
@@ -202,8 +213,29 @@ export function PaperStudyPanel() {
             <TrendingUp className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{portfolio ? formatMoney(portfolio.total_equity) : '--'}</div>
-            <p className="text-xs text-muted-foreground">Cash + Invested Capital</p>
+            <div className="text-2xl font-bold">
+              {portfolio ? formatMoney(portfolio.total_equity) : '--'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cash + Invested Capital
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unrealized P&L</CardTitle>
+            <div className={`text-xs font-bold ${totalUnrealizedPnl >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+              {totalUnrealizedPnl >= 0 ? 'Positive' : 'Negative'}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totalUnrealizedPnl >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+               {formatMoney(totalUnrealizedPnl)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total Paper Profit/Loss
+            </p>
           </CardContent>
         </Card>
 
@@ -229,14 +261,15 @@ export function PaperStudyPanel() {
         <CardContent>
           {error && <div className="text-destructive mb-4 text-sm font-medium">{error}</div>}
           {successMsg && <div className="text-emerald-500 mb-4 text-sm font-medium">{successMsg}</div>}
-          
+
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
             <div className="space-y-2">
               <label className="text-sm font-medium">Ticker Symbol</label>
-              <Input 
-                placeholder="e.g. AAPL" 
-                value={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'CASH' : ticker} 
-                onChange={(e) => setTicker(e.target.value.toUpperCase())} 
+              <Input
+                placeholder="e.g. AAPL"
+                value={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'CASH' : ticker}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTicker(e.target.value.toUpperCase())}
+                onBlur={() => fetchCurrentPrice(ticker)}
                 disabled={transactionType === 'Deposit' || transactionType === 'Withdraw'}
                 required={transactionType === 'Buy' || transactionType === 'Sell'}
               />
@@ -244,10 +277,18 @@ export function PaperStudyPanel() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Action</label>
-              <select 
+              <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={transactionType}
-                onChange={(e) => setTransactionType(e.target.value as 'Buy' | 'Sell' | 'Deposit' | 'Withdraw')}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const newType = e.target.value as 'Buy' | 'Sell' | 'Deposit' | 'Withdraw';
+                  setTransactionType(newType);
+                  if (newType === 'Deposit' || newType === 'Withdraw') {
+                    setTicker('CASH');
+                  } else if (ticker === 'CASH') {
+                    setTicker('');
+                  }
+                }}
               >
                 <option value="Buy">Buy</option>
                 <option value="Sell">Sell</option>
@@ -257,13 +298,13 @@ export function PaperStudyPanel() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Quantity (Shares)</label>
-              <Input 
-                type="number" 
+              <Input
+                type="number"
                 step="0.01"
                 min="0.01"
-                placeholder="e.g. 10" 
-                value={transactionType === 'Deposit' || transactionType === 'Withdraw' ? '1' : quantity} 
-                onChange={(e) => setQuantity(e.target.value)} 
+                placeholder="e.g. 10"
+                value={transactionType === 'Deposit' || transactionType === 'Withdraw' ? '1' : quantity}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuantity(e.target.value)}
                 disabled={transactionType === 'Deposit' || transactionType === 'Withdraw'}
                 required={transactionType === 'Buy' || transactionType === 'Sell'}
               />
@@ -273,15 +314,21 @@ export function PaperStudyPanel() {
                 {transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'Amount ($)' : 'Current Price ($)'}
                 {isFetchingPrice && <span className="ml-2 text-xs text-muted-foreground animate-pulse">Fetching...</span>}
               </label>
-              <Input 
-                type="number" 
-                step="0.01"
-                min="0.01"
-                placeholder={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'e.g. 5000' : 'e.g. 150.50'} 
-                value={price} 
-                onChange={(e) => setPrice(e.target.value)} 
-                required
-              />
+              <div className="relative">
+                <Input
+                  type="number"
+                  placeholder={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'e.g. 5000' : 'e.g. 150.50'}
+                  value={price}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
+                  required
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                {isFetchingPrice && (
+                  <div className="absolute right-3 top-2.5 animate-spin">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                  </div>
+                )}
+              </div>
             </div>
             <Button type="submit" className="w-full">Submit</Button>
           </form>
@@ -295,9 +342,9 @@ export function PaperStudyPanel() {
         </CardHeader>
         <CardContent>
           {!portfolio || portfolio.holdings.length === 0 ? (
-             <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">No active holdings. Start by buying some shares.</div>
+            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">No active holdings. Start by buying some shares.</div>
           ) : (
-             <div className="rounded-md border">
+            <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -331,14 +378,14 @@ export function PaperStudyPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction Ledger</CardTitle>
-          <CardDescription>Historical log of all simulated events.</CardDescription>
+          <CardTitle>Simulated Transaction Ledger</CardTitle>
+          <CardDescription>Historical log of simulated events and cash movements.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading && !portfolio ? (
             <div className="text-center py-8 text-muted-foreground animate-pulse">Loading ledger...</div>
           ) : !portfolio || portfolio.transactions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">No transactions found.</div>
+            <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card border-dashed">No simulated transactions found.</div>
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -356,10 +403,10 @@ export function PaperStudyPanel() {
                 <TableBody>
                   {portfolio.transactions.map((tx, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="text-muted-foreground">{tx.date}</TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{tx.date}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${tx.action === 'Buy' ? 'bg-indigo-500/10 text-indigo-500' : tx.action === 'Sell' ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                         {tx.action}
+                          {tx.action}
                         </span>
                       </TableCell>
                       <TableCell className="font-medium">{tx.ticker}</TableCell>

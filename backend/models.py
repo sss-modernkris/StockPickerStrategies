@@ -21,6 +21,9 @@ class PricePoint(BaseModel):
     bb_upper: Optional[float] = None
     bb_lower: Optional[float] = None
     bb_middle: Optional[float] = None
+    vwap_upper: Optional[float] = None
+    vwap_lower: Optional[float] = None
+    willy_vwap: Optional[float] = None
 class TickerHistory(BaseModel):
     symbol: str
     history: List[PricePoint]
@@ -35,13 +38,16 @@ class TechnicalIndicators(BaseModel):
     sma_200: Optional[float] = None
     ema_20: Optional[float] = None
     rsi_14: Optional[float] = None
+    rsi_slope: Optional[float] = None
     macd_line: Optional[float] = None
     macd_signal: Optional[float] = None
+    macd_slope: Optional[float] = None
     bollinger_upper: Optional[float] = None
     bollinger_middle: Optional[float] = None
     bollinger_lower: Optional[float] = None
     volume: Optional[int] = None
     volume_avg_20: Optional[float] = None
+    willy_vwap: Optional[float] = None
 
 class TickerAnalysis(BaseModel):
     symbol: str
@@ -79,6 +85,19 @@ class HoldingModel(BaseModel):
     total_value: float
     unrealized_pnl: float
 
+class IBOrderModel(BaseModel):
+    order_id: int
+    account: str
+    ticker: str
+    action: str
+    total_quantity: float
+    filled: float
+    remaining: float
+    status: str
+    price: float
+    avg_fill_price: float
+    last_update: str
+
 class PortfolioSummaryResponse(BaseModel):
     current_cash: float
     invested_capital: float
@@ -86,3 +105,4 @@ class PortfolioSummaryResponse(BaseModel):
     total_profit: float
     holdings: List[HoldingModel]
     transactions: List[TransactionResponse]
+    ib_orders: Optional[List[IBOrderModel]] = []

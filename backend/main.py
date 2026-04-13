@@ -1,9 +1,12 @@
 from fastapi import FastAPI, HTTPException
+from typing import List
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
+from services.ib_client import IBClient
 import csv
 import os
 
@@ -12,6 +15,15 @@ app = FastAPI(
     description="Backend for the Quant Strategies Dashboard",
     version="1.0.0"
 )
+
+# Standardize data paths relative to this script
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+PORTFOLIO_CSV = os.path.join(os.path.dirname(BACKEND_DIR), "portfolio.csv")
+PAPER_STUDY_CSV = os.path.join(os.path.dirname(BACKEND_DIR), "PaperStudy.csv")
+
+print(f"Backend Directory: {BACKEND_DIR}")
+print(f"Portfolio CSV: {PORTFOLIO_CSV}")
+print(f"Paper Study CSV: {PAPER_STUDY_CSV}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,18 +40,106 @@ class HealthCheck(BaseModel):
 def health_check() -> HealthCheck:
     return HealthCheck(status="ok")
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LogRequest(BaseModel):
+    level: str
+    message: str
+    data: dict | list | str | int | float | bool | None = None
+
+@app.post("/api/logs")
+def post_logs(log: LogRequest):
+    prefix = f"[FRONTEND {log.level.upper()}]"
+    if log.data:
+        print(f"{prefix} {log.message} - {log.data}")
+    else:
+        print(f"{prefix} {log.message}")
+    return {"status": "ok"}
+
+class SaveCsvRequest(BaseModel):
+    filename: str
+    content: str
+
+@app.post("/api/save_csv")
+def save_csv(req: SaveCsvRequest):
+    try:
+        safe_filename = os.path.basename(req.filename)
+        filepath = os.path.join(BASE_DIR, safe_filename)
+        with open(filepath, "w", encoding="utf-8", newline="") as f:
+            f.write(req.content)
+        return {"status": "success", "message": f"Successfully saved to {filepath}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class IBDataResponse(BaseModel):
+    unrealized_pnl: float
+    realized_pnl: float
+    buying_power: float
+    cash_available: float
+    invested_capital: float
+    total_equity: float
+    holdings: List[HoldingModel]
+    orders: List[IBOrderModel]
+
+ib_control = IBClient()
+
+@app.get("/api/ib/config")
+def get_ib_config():
+    username = os.getenv("IB_USERNAME")
+    password = os.getenv("IB_PASSWORD")
+    print("IB Username: ", username)
+    print("IB Password: ", password)
+    res = {
+        "is_configured": bool(username and password),
+        "is_connected": ib_control.is_connected()
+    }
+    print("IB Config: ", res)
+    return res
+
+@app.post("/api/ib/login")
+def ib_login(credentials: LoginRequest):
+    # In a real scenario, we might use the credentials to start a gateway 
+    # or authenticate against a service. For now, we connect to the local API.
+    print("Attempting to login to IB at " + credentials.username + "/api/ib/login")
+    success, error_msg = ib_control.connect()
+    if success:
+        return {"status": "success", "message": "Logged into Interactive Brokers"}
+    else:
+        # For development/demo, if it fails, we provide the actual error or a generic one.
+        raise HTTPException(status_code=500, detail=f"Failed to connect to IB Gateway/TWS: {error_msg}. Ensure it is running and API is enabled.")
+
+@app.get("/api/ib/data", response_model=IBDataResponse)
+def get_ib_data():
+    data = ib_control.get_portfolio_summary()
+    if data:
+        return data
+    else:
+        raise HTTPException(status_code=400, detail="Not connected to Interactive Brokers")
+
 @app.get("/api/portfolio")
-def get_portfolio_tickers():
+def get_portfolio_tickers(filename: str = "portfolio.csv"):
+    # Security: prevent path traversal
+    safe_filename = os.path.basename(filename)
+    if safe_filename != filename:
+         raise HTTPException(status_code=400, detail="Invalid filename format. Path traversal is not allowed.")
+    
+    # Path relative to project root (one level up from backend/)
+    file_path = os.path.join(os.path.dirname(BACKEND_DIR), safe_filename)
+    
     tickers = []
-    # portfolio.csv is at the root level, one directory up from backend/
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "portfolio.csv")
     try:
         if os.path.exists(file_path):
-            with open(file_path, mode='r', encoding='utf-8') as f:
+            with open(file_path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if 'Symbol' in row and row['Symbol'].strip():
-                        tickers.append(row['Symbol'].strip())
+                    # Clean up header/keys in case they have spaces or BOM issues
+                    clean_row = {k.strip() if k else k: v for k, v in row.items()}
+                    if 'Symbol' in clean_row and clean_row['Symbol'].strip():
+                        tickers.append(clean_row['Symbol'].strip())
+        else:
+            raise HTTPException(status_code=404, detail=f"File {safe_filename} not found in project directory.")
         return {"tickers": tickers}
     except Exception as e:
         return {"tickers": [], "error": str(e)}
@@ -82,11 +182,16 @@ def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
     # Validation will happen automatically by Pydantic Model
     return HistoryResponse(period=period, data=result["data"])
 
-from datetime import datetime
-import csv
-import os
+@app.get("/api/price/{ticker}")
+def get_current_price(ticker: str):
+    try:
+        t = yf.Ticker(ticker.upper())
+        price = t.fast_info.last_price
+        return {"price": price}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="Ticker not found or price unavailable")
+
 import yfinance as yf
-from models import TransactionModel, TransactionResponse, PortfolioSummaryResponse, HoldingModel
 
 @app.get("/api/price/{ticker}")
 def get_ticker_price(ticker: str):
@@ -103,14 +208,13 @@ def get_ticker_price(ticker: str):
 
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
 def get_paper_study():
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
     transactions = []
     current_cash = 100000.0
     total_cash_deposited = 100000.0
     holdings_dict = {}
     
-    if os.path.exists(file_path):
-        with open(file_path, mode='r', encoding='utf-8') as f:
+    if os.path.exists(PAPER_STUDY_CSV):
+        with open(PAPER_STUDY_CSV, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             
@@ -198,8 +302,10 @@ def get_paper_study():
                 except ValueError:
                     pass
                     
+                    pass
+                    
         # Synchronously write the CSV update so it stores the new schema and up to date values 
-        with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+        with open(PAPER_STUDY_CSV, mode='w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             writer.writerows(updated_rows)
@@ -228,25 +334,30 @@ def get_paper_study():
     holdings_list.sort(key=lambda x: x.unrealized_pnl, reverse=True)
     transactions.reverse() # show latest first in history
 
+    # Fetch real IB orders if connected
+    ib_orders = []
+    if ib_control.is_connected():
+        ib_orders = ib_control.get_orders()
+
     return PortfolioSummaryResponse(
         current_cash=current_cash,
         invested_capital=invested_capital,
         total_equity=total_equity,
         total_profit=total_profit,
         holdings=holdings_list,
-        transactions=transactions
+        transactions=transactions,
+        ib_orders=ib_orders
     )
 
 @app.post("/api/paper-study")
 def add_paper_study_transaction(tx: TransactionModel):
-    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "PaperStudy.csv")
-    write_header = not os.path.exists(file_path)
+    write_header = not os.path.exists(PAPER_STUDY_CSV)
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     current_cash = 100000.0
     holdings = {}
-    if os.path.exists(file_path):
-        with open(file_path, mode='r', encoding='utf-8') as f:
+    if os.path.exists(PAPER_STUDY_CSV):
+        with open(PAPER_STUDY_CSV, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 t = row.get('Ticker', '').strip().upper()
@@ -307,13 +418,21 @@ def add_paper_study_transaction(tx: TransactionModel):
         else:
             total_val = quantity * curr_price
     
+    # If IB is connected, attempt to place a real order for BUY/SELL
+    ib_msg = ""
+    if ib_control.is_connected() and tx_type in ['buy', 'sell']:
+        success, msg = ib_control.place_order(ticker, tx_type.upper(), abs(tx.quantity), tx.price)
+        if not success:
+            raise HTTPException(status_code=500, detail=f"IB Order Failed: {msg}")
+        ib_msg = f" (IB Order: {msg})"
+
     try:
-        with open(file_path, mode='a', newline='', encoding='utf-8') as f:
+        with open(PAPER_STUDY_CSV, mode='a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             if write_header:
                 writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             
             writer.writerow([current_date, ticker, quantity, tx.price, total_cost, curr_price, total_val, new_cash])
-        return {"status": "success", "message": "Transaction added successfully"}
+        return {"status": "success", "message": f"Transaction added successfully{ib_msg}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

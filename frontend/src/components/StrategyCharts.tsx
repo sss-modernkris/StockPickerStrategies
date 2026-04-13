@@ -4,7 +4,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { LineChart as LineChartIcon } from 'lucide-react';
 
 interface StrategyChartsProps {
-    priceHistory?: { date: string; close: number }[];
+    priceHistory?: { date: string; close: number; willy_vwap?: number | null }[];
     symbol: string | null;
 }
 
@@ -74,7 +74,7 @@ export function StrategyCharts({ priceHistory, symbol }: StrategyChartsProps) {
                                 borderRadius: '8px',
                                 color: 'hsl(var(--foreground))'
                             }}
-                            formatter={(value: number | string | undefined) => [`$${Number(value || 0).toFixed(2)}`, 'Price']}
+                            formatter={(value: any) => [`$${Number(value || 0).toFixed(2)}`]}
                             labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px' }}
                         />
                         <Area
@@ -84,6 +84,14 @@ export function StrategyCharts({ priceHistory, symbol }: StrategyChartsProps) {
                             strokeWidth={3}
                             fillOpacity={1}
                             fill="url(#colorClose)"
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="willy_vwap"
+                            name="Willy VWAP"
+                            stroke="#f97316"
+                            strokeWidth={2}
+                            fill="transparent"
                         />
                     </AreaChart>
                 </ResponsiveContainer>

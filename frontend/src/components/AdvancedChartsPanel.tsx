@@ -42,7 +42,33 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean, payload?:
     return null;
 };
 
+const PLOT_CONFIG = [
+    { key: 'close', name: 'Close Price', color: '#ffffff', strokeWidth: 2, dash: undefined, opacity: 1 },
+    { key: 'sma_9', name: 'SMA 9', color: '#3b82f6', strokeWidth: 1.5, dash: undefined, opacity: 1 },
+    { key: 'sma_12', name: 'SMA 12', color: '#0ea5e9', strokeWidth: 1.5, dash: '5 5', opacity: 1 },
+    { key: 'sma_26', name: 'SMA 26', color: '#8b5cf6', strokeWidth: 1.5, dash: undefined, opacity: 1 },
+    { key: 'sma_50', name: 'SMA 50', color: '#f59e0b', strokeWidth: 2, dash: undefined, opacity: 1 },
+    { key: 'sma_200', name: 'SMA 200', color: '#ef4444', strokeWidth: 2, dash: undefined, opacity: 1 },
+    { key: 'bb_upper', name: 'BB Upper', color: '#9ca3af', strokeWidth: 1, dash: '3 3', opacity: 0.7 },
+    { key: 'bb_lower', name: 'BB Lower', color: '#9ca3af', strokeWidth: 1, dash: '3 3', opacity: 0.7 },
+    { key: 'bb_middle', name: 'SMA 20 (BB)', color: '#6b7280', strokeWidth: 1, dash: '3 3', opacity: 0.7 },
+    { key: 'willy_vwap', name: 'Willy VWAP', color: '#f97316', strokeWidth: 2, dash: undefined, opacity: 1 },
+    { key: 'vwap_upper', name: 'VWAP Upper (ATR)', color: '#fdba74', strokeWidth: 1.5, dash: '4 4', opacity: 0.8 },
+    { key: 'vwap_lower', name: 'VWAP Lower (ATR)', color: '#fdba74', strokeWidth: 1.5, dash: '4 4', opacity: 0.8 },
+];
+
 export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) {
+    const [activePlots, setActivePlots] = React.useState<Record<string, boolean>>(
+        PLOT_CONFIG.reduce((acc, plot) => {
+            acc[plot.key] = true;
+            return acc;
+        }, {} as Record<string, boolean>)
+    );
+
+    const togglePlot = (key: string) => {
+        setActivePlots(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
     if (!data || data.length === 0) {
         return (
             <div className="flex items-center justify-center h-64 text-muted-foreground border rounded-xl bg-card">
@@ -67,27 +93,54 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                         {symbol} Price Action & Moving Averages
                     </CardTitle>
                     <CardDescription>Daily Close with SMAs and Bollinger Bands</CardDescription>
+                    <div className="flex flex-wrap gap-2 mt-4">
+                        {PLOT_CONFIG.map((plot) => {
+                            const isActive = activePlots[plot.key];
+                            return (
+                                <button
+                                    key={plot.key}
+                                    onClick={() => togglePlot(plot.key)}
+                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors border flex items-center gap-1.5
+                                        ${isActive ? 'bg-card text-foreground shadow-sm' : 'bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50'}
+                                    `}
+                                    style={{ borderColor: isActive ? plot.color : undefined }}
+                                >
+                                    <span 
+                                        className="w-2 h-2 rounded-full" 
+                                        style={{ backgroundColor: isActive ? plot.color : 'currentColor' }} 
+                                    />
+                                    {plot.name}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="h-[400px] w-full mt-4 border rounded-xl bg-card/50 p-4">
+                    <div className="h-[400px] w-full mt-2 border rounded-xl bg-card/50 p-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
                                 <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickMargin={10} minTickGap={30} axisLine={false} tickLine={false} />
                                 <YAxis domain={['auto', 'auto']} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} orientation="right" />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Legend verticalAlign="top" height={36} iconType="circle" />
-
-                                <Line type="monotone" dataKey="close" name="Close Price" stroke="#ffffff" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                                <Line type="monotone" dataKey="sma_9" name="SMA 9" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
-                                <Line type="monotone" dataKey="sma_12" name="SMA 12" stroke="#0ea5e9" strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
-                                <Line type="monotone" dataKey="sma_26" name="SMA 26" stroke="#8b5cf6" strokeWidth={1.5} dot={false} />
-                                <Line type="monotone" dataKey="sma_50" name="SMA 50" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="sma_200" name="SMA 200" stroke="#ef4444" strokeWidth={2} dot={false} />
                                 
-                                <Line type="monotone" dataKey="bb_upper" name="BB Upper" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
-                                <Line type="monotone" dataKey="bb_lower" name="BB Lower" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
-                                <Line type="monotone" dataKey="bb_middle" name="SMA 20 (BB)" stroke="#6b7280" strokeWidth={1} strokeDasharray="3 3" dot={false} opacity={0.7} />
+                                {PLOT_CONFIG.map((plot) => (
+                                    activePlots[plot.key] && (
+                                        <Line 
+                                            key={plot.key}
+                                            type="monotone" 
+                                            dataKey={plot.key} 
+                                            name={plot.name} 
+                                            stroke={plot.color} 
+                                            strokeWidth={plot.strokeWidth} 
+                                            strokeDasharray={plot.dash}
+                                            opacity={plot.opacity}
+                                            dot={false} 
+                                            activeDot={plot.key === 'close' ? { r: 4 } : false} 
+                                            isAnimationActive={false}
+                                        />
+                                    )
+                                ))}
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
