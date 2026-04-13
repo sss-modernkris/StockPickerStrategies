@@ -17,7 +17,7 @@ interface ComparisonTableProps {
     analysisData: Record<string, TickerAnalysis>;
 }
 
-type SortKey = 'ticker' | 'ml_alpha' | 'ranking' | 'macd_rel_slope' | string;
+type SortKey = 'ticker' | 'ml_alpha' | string;
 type SortDirection = 'asc' | 'desc';
 
 export function ComparisonTable({ analysisData }: ComparisonTableProps) {
@@ -74,30 +74,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             ? macdHist / macdSignal
             : null;
 
-        let slopeMacdRel: number | null = null;
-        if (data.price_history && data.price_history.length >= 2) {
-            const last = data.price_history[data.price_history.length - 1];
-            const prev = data.price_history[data.price_history.length - 2];
-            
-            const lastRel = (last.macd_hist != null && last.macd_signal != null && last.macd_signal !== 0) ? last.macd_hist / last.macd_signal : null;
-            const prevRel = (prev.macd_hist != null && prev.macd_signal != null && prev.macd_signal !== 0) ? prev.macd_hist / prev.macd_signal : null;
-            
-            if (lastRel != null && prevRel != null) {
-                slopeMacdRel = lastRel - prevRel;
-            }
-        }
-
-        let isTopPick = false;
-        if (alphaProb > 40 && stratAvg > 50 && macdHist != null && macdHist < 0 && macdRel != null && macdRel > 0 && macdRel < 0.2 && slopeMacdRel != null && slopeMacdRel < 0) {
-            isTopPick = true;
-        }
-
-        let rankScore = 0;
-        if (alphaProb > 40) rankScore++;
-        if (stratAvg > 50) rankScore++;
-        if (macdHist != null && macdHist < 0) rankScore++;
-        if (macdRel != null && macdRel > 0 && macdRel < 0.2) rankScore++;
-        if (slopeMacdRel != null && slopeMacdRel < 0) rankScore++;
+        const macdSlope = data.technical_indicators?.macd_slope ?? null;
 
         const rsi = data.technical_indicators?.rsi_14 ?? null;
         const rsiSlope = data.technical_indicators?.rsi_slope ?? null;
@@ -144,10 +121,8 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             macd_hist: macdHist,
             macd_slope: macdSlope,
             macd_rel: macdRel,
-            macd_rel_slope: slopeMacdRel,
             rsi: rsi,
-            ranking: rankScore,
-            isTopPick: isTopPick,
+            rsi_slope: rsiSlope,
             strats: stratMap,
             original: data
         };
@@ -190,12 +165,6 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'macd_rel') {
             valA = a.macd_rel ?? -99999;
             valB = b.macd_rel ?? -99999;
-        } else if (sortKey === 'macd_rel_slope') {
-            valA = a.macd_rel_slope ?? -99999;
-            valB = b.macd_rel_slope ?? -99999;
-        } else if (sortKey === 'ranking') {
-            valA = a.ranking;
-            valB = b.ranking;
         } else if (sortKey === 'rsi') {
             valA = a.rsi ?? -99999;
             valB = b.rsi ?? -99999;
@@ -354,19 +323,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             MACD Rel {renderSortIcon("macd_rel")}
                         </TableHead>
                         <TableHead
-                            className="font-bold text-teal-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
-                            onClick={() => handleSort('macd_rel_slope')}
-                        >
-                            MACD Slope {renderSortIcon("macd_rel_slope")}
-                        </TableHead>
-                        <TableHead
-                            className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center"
-                            onClick={() => handleSort('ranking')}
-                        >
-                            Ranking {renderSortIcon("ranking")}
-                        </TableHead>
-                        <TableHead
-                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center"
+                            className="font-bold text-indigo-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[80px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('rsi')}
                         >
                             RSI {renderSortIcon("rsi")}
@@ -451,18 +408,6 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                                 {row.macd_rel > 0 ? '+' : ''}{row.macd_rel.toFixed(3)}
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
-                                    </TableCell>
-                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
-                                        {row.macd_rel_slope != null ? (
-                                            <span className={row.macd_rel_slope > 0 ? "text-teal-500 font-bold" : "text-rose-400 font-bold"}>
-                                                {row.macd_rel_slope > 0 ? '+' : ''}{row.macd_rel_slope.toFixed(3)}
-                                            </span>
-                                        ) : <span className="text-muted-foreground">N/A</span>}
-                                    </TableCell>
-                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
-                                        <div className={`px-2 py-1 mx-auto max-w-[80px] rounded text-xs font-bold ${row.isTopPick ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-muted-foreground'}`}>
-                                            {row.isTopPick ? '⭐ Pick' : `${row.ranking}/5`}
-                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[80px]">
                                         {row.rsi != null ? (
