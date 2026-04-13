@@ -18,10 +18,12 @@ app = FastAPI(
 
 # Standardize data paths relative to this script
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-PORTFOLIO_CSV = os.path.join(os.path.dirname(BACKEND_DIR), "portfolio.csv")
-PAPER_STUDY_CSV = os.path.join(os.path.dirname(BACKEND_DIR), "PaperStudy.csv")
+BASE_DIR = os.path.dirname(BACKEND_DIR)
+PORTFOLIO_CSV = os.path.join(BASE_DIR, "portfolio.csv")
+PAPER_STUDY_CSV = os.path.join(BASE_DIR, "PaperStudy.csv")
 
 print(f"Backend Directory: {BACKEND_DIR}")
+print(f"Base Directory: {BASE_DIR}")
 print(f"Portfolio CSV: {PORTFOLIO_CSV}")
 print(f"Paper Study CSV: {PAPER_STUDY_CSV}")
 
@@ -126,7 +128,7 @@ def get_portfolio_tickers(filename: str = "portfolio.csv"):
          raise HTTPException(status_code=400, detail="Invalid filename format. Path traversal is not allowed.")
     
     # Path relative to project root (one level up from backend/)
-    file_path = os.path.join(os.path.dirname(BACKEND_DIR), safe_filename)
+    file_path = os.path.join(BASE_DIR, safe_filename)
     
     tickers = []
     try:
