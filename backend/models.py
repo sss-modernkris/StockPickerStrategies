@@ -102,7 +102,6 @@ class PortfolioSummaryResponse(BaseModel):
     current_cash: float
     invested_capital: float
     total_equity: float
-    total_profit: float
     holdings: List[HoldingModel]
     transactions: List[TransactionResponse]
     ib_orders: Optional[List[IBOrderModel]] = []

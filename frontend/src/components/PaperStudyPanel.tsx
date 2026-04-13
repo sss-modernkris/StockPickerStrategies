@@ -4,36 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DollarSign, Briefcase, TrendingUp } from 'lucide-react';
-
-interface Holding {
-  ticker: string;
-  total_quantity: number;
-  avg_buy_price: number;
-  current_price: number;
-  total_value: number;
-  unrealized_pnl: number;
-}
-
-interface Transaction {
-  date: string;
-  ticker: string;
-  quantity: number;
-  price: number;
-  total_cost: number;
-  current_close_price: number | null;
-  total_current_value: number | null;
-  cash_balance: number;
-  action: string;
-}
-
-interface PortfolioSummary {
-  current_cash: number;
-  invested_capital: number;
-  total_equity: number;
-  total_profit: number;
-  holdings: Holding[];
-  transactions: Transaction[];
-}
+import { API_BASE_URL } from '@/lib/api';
+import { logger } from '@/lib/logger';
+import { PortfolioSummary } from '@/lib/types';
 
 const formatMoney = (val: number | null | undefined) => {
   if (val == null) return '--';
@@ -53,40 +26,26 @@ export function PaperStudyPanel() {
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [transactionType, setTransactionType] = useState<'Buy' | 'Sell' | 'Deposit' | 'Withdraw'>('Buy');
-  const [tickerError, setTickerError] = useState<string | null>(null);
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
 
-  useEffect(() => {
-    const fetchPrice = async () => {
-      if (!ticker || transactionType === 'Deposit' || transactionType === 'Withdraw') {
-        setTickerError(null);
-        return;
-      }
+  const fetchCurrentPrice = async (symbol: string) => {
+    if (!symbol || symbol === 'CASH' || transactionType === 'Deposit' || transactionType === 'Withdraw') return;
+    
+    try {
       setIsFetchingPrice(true);
-      setTickerError(null);
-      try {
-        const res = await fetch(`http://localhost:8001/api/price/${ticker}`);
-        if (!res.ok) {
-          throw new Error('Invalid ticker');
-        }
+      const res = await fetch(`${API_BASE_URL}/api/price/${symbol}`);
+      if (res.ok) {
         const data = await res.json();
-        setPrice(data.price.toString());
-      } catch (err: any) {
-        setTickerError(`Ticker '${ticker}' not found or invalid.`);
-        setPrice('');
-      } finally {
-        setIsFetchingPrice(false);
+        if (data.price) {
+          setPrice(data.price.toString());
+        }
       }
-    };
-
-    const timeoutId = setTimeout(() => {
-      if (ticker) {
-        fetchPrice();
-      }
-    }, 600);
-
-    return () => clearTimeout(timeoutId);
-  }, [ticker, transactionType]);
+    } catch (err) {
+      logger.error("Failed to fetch current price", err);
+    } finally {
+      setIsFetchingPrice(false);
+    }
+  };
 
   const fetchPortfolio = async () => {
     try {
@@ -120,11 +79,6 @@ export function PaperStudyPanel() {
 
     if ((!tick && transactionType !== 'Deposit' && transactionType !== 'Withdraw') || isNaN(q) || isNaN(p) || q <= 0 || p <= 0) {
       setError('Please provide valid positive numbers for quantity and price, and a ticker.');
-      return;
-    }
-    
-    if (tickerError) {
-      setError('Please fix the ticker error before submitting.');
       return;
     }
 
@@ -238,19 +192,6 @@ export function PaperStudyPanel() {
             </p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${portfolio && portfolio.total_profit < 0 ? 'text-destructive' : (portfolio && portfolio.total_profit > 0 ? 'text-emerald-500' : '')}`}>
-              {portfolio ? (portfolio.total_profit > 0 ? '+' : '') + formatMoney(portfolio.total_profit) : '--'}
-            </div>
-            <p className="text-xs text-muted-foreground">Equity vs Net Deposits</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -273,7 +214,6 @@ export function PaperStudyPanel() {
                 disabled={transactionType === 'Deposit' || transactionType === 'Withdraw'}
                 required={transactionType === 'Buy' || transactionType === 'Sell'}
               />
-              {tickerError && <p className="text-xs text-destructive absolute mt-1">{tickerError}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Action</label>
@@ -312,7 +252,6 @@ export function PaperStudyPanel() {
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 {transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'Amount ($)' : 'Current Price ($)'}
-                {isFetchingPrice && <span className="ml-2 text-xs text-muted-foreground animate-pulse">Fetching...</span>}
               </label>
               <div className="relative">
                 <Input
