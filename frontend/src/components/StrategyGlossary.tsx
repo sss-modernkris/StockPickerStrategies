@@ -275,35 +275,31 @@ export function StrategyGlossary() {
             )
         },
         {
-            id: "willy-vwap",
-            icon: <Activity className="w-5 h-5 text-orange-500" />,
-            title: "10. WillyAlgo Dynamic Swing VWAP",
-            badge: "Dynamic Anchoring",
-            description: "A specialized volume-weighted average price (VWAP) that automatically re-anchors to market structure swing pivots (pivots highs and lows).",
-            formula: "VWAP = Sum(Price * Volume) / Sum(Volume) [Resets at Swing High/Low]",
-            bullets: [
-                { label: "Pivot Logic", text: "Identifies swing points using a rolling window of 5 periods. A pivot high is a point higher than 5 points before and after it." },
-                { label: "Bullish Signal", text: "The strategy returns a 100% match if the current price is trading above the most recent Swing VWAP, indicating positive momentum relative to the volume-fair-value of the recent swing." },
-                { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." },
-                { label: "ATR Volatility Bands", text: "Includes Upper and Lower exhaustion bands calculated using a 14-day ATR with a 2.0 multiplier applied to the VWAP baseline. These identify volatility-adjusted extreme levels." }
-            ]
-        },
-        {
-            id: "ranking-score",
-            icon: <Gauge className="w-5 h-5 text-amber-500" />,
-            title: "Composite Ranking Score",
-            badge: "Dashboard Metric",
-            description: "A custom 8-point ranking score used on the Comparison page to quickly identify stocks that meet a specific confluence of momentum, technical, and quantitative criteria.",
-            bullets: [
-                { label: "WillyAlgo > 50%", text: "Requires the WillyAlgo Indicator match percentage to be greater than 50%." },
-                { label: "RSI > 30", text: "Ensures the stock is not in a deeply oversold structural collapse." },
-                { label: "RSI Slope > 0", text: "Requires positive short-term momentum (the RSI indicator is currently rising)." },
-                { label: "MACD Hist < 0.1", text: "Focuses on early momentum shifts or contained histogram expansion." },
-                { label: "MACD Hist > 0", text: "Requires the MACD histogram to be positive (bullish momentum)." },
-                { label: "MACD Slope > 0", text: "Requires the MACD line itself to have a positive, rising trajectory." },
-                { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." },
-                { label: "Close Slope > 0", text: "Requires the short-term price trend (last 2 days) to be positive." }
-            ]
+            id: "ranking-logic",
+            icon: <Activity className="w-5 h-5 text-amber-500" />,
+            title: "10. Multi-Factor Ranking Logic",
+            badge: "Composite Scoring",
+            description: "A proprietary screener used in the Comparison Dashboard to systematically rank assets out of 5 points based on converging momentum, fundamentals, and quantitative ML overlays.",
+            customContent: (
+                <div className="space-y-4 mt-4">
+                    <div>
+                        <h4 className="font-semibold text-foreground">1. The 5-Point Criteria</h4>
+                        <ul className="list-disc list-inside text-muted-foreground ml-2 mt-1 space-y-2 text-sm">
+                            <li><span className="font-medium text-foreground">ML Alpha {">"} 40%:</span> The XGBoost model must see at least a 40% probability of market outperformance.</li>
+                            <li><span className="font-medium text-foreground">Strat Avg {">"} 50%:</span> The asset must pass at least half of the traditional fundamental and technical strategy filters.</li>
+                            <li><span className="font-medium text-foreground">MACD Histogram {"<"} 0:</span> The MACD line must be below the signal line, implying the asset is technically oversold or in a dip.</li>
+                            <li><span className="font-medium text-foreground">0 {"<"} MACD Rel {"<"} 0.2:</span> The MACD relative distance must be strictly positive but below 0.2, capturing tight threshold boundaries.</li>
+                            <li><span className="font-medium text-foreground">MACD Rel Slope {"<"} 0:</span> The recent slope of the MACD Relative curve must be negative, confirming convergence.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">2. Highlighting System (<span className="text-amber-500">⭐ Pick</span>)</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed text-sm">
+                            When an asset simultaneously fulfills all five strict conditions above, it receives a perfect 5/5 score. The Comparison tab instantly flags these rare, high-conviction setups with a custom "⭐ Pick" badge.
+                        </p>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -318,8 +314,7 @@ export function StrategyGlossary() {
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
-            (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query)) ||
-            (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query))
+            (item.id === 'ranking-logic' && "Multi-Factor Ranking Logic Composite Scoring Comparison Dashboard ⭐ Pick".toLowerCase().includes(query))
         );
     });
 
