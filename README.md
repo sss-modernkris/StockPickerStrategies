@@ -1,76 +1,113 @@
-# Strategic Alpha Dashboard Walkthrough
+# Strategic Alpha Stock Picker Dashboard
 
-I have successfully built the full-stack Next.js and FastAPI application for the "Strategic Alpha" Stock Selection Dashboard. 
+The **Strategic Alpha Dashboard** is a high-performance, full-stack quantitative stock analysis platform. It combines traditional financial strategies with modern machine learning to provide deep insights into stock performance, technical indicators, and fundamental metrics.
 
-## Features Implemented
-- **Frontend**: A highly responsive dark-mode dashboard built with Next.js 15, Tailwind CSS, shadcn/ui.
-- **Backend API**: A modular FastAPI server that retrieves real-time and historical financial data via `yfinance`.
-- **Strategy Engine**: All 10 strategies are fully coded, dynamically assigning Match Percentages and providing bulleted justifications.
-- **Machine Learning**: Strategy 10 ("Quantitative Machine Learning") is powered by `XGBClassifier` and uses `TimeSeriesSplit` cross-validation with factors computed dynamically (Value, Quality, Momentum, Volatility).
-- **Justification Engine**: Translates API computations into human-readable bullish/bearish points. 
-- **Recharts**: Displays simple 6-month historical price trends.
+Built with **Next.js 15**, **FastAPI**, and powered by **yfinance**, it offers a responsive, dark-mode optimized experience for traders and analysts.
 
-## Verification & Screenshots
+---
 
-Using the integrated browser, I started the Next.js and FastAPI servers and verified the data pipeline. Everything populated as required.
+## 🚀 Key Features & Pages
 
-### Example: $NVDA Evaluation
-* **CAN SLIM:** Achieved a **75% Match**. NVDA meets the criteria for strong quarterly EPS growth, strong annual growth, and recent volume trends.
-* **FCF Yield:** **0% Match**. Current Free Cash Flow yield (1.32%) is below the 5% target threshold.
-* **Strategy 10 XGBoost:** Constrained using `max_depth=2` and `n_estimators=15` to output realistic variance in predictions over the 2-year feature set, reducing earlier overfitting bounds. For example, the probability of Alpha outperformance currently displays uniquely relative to each stock (e.g. 34.3% for AAPL, driven mostly by expected Volatility factors).
+### 1. Dashboard (Main Evaluation)
+The primary view for evaluating individual stocks. It runs **11 quantitative strategies** in real-time and provides a visual price trend for the last 6 months.
+- **Match Percentages**: Instantly see how a stock aligns with proven strategies.
+- **Bullish/Bearish Justifications**: Human-readable points explaining the "Why" behind the numbers.
+- **ML Alpha Probability**: Predicts outperformance based on an XGBoost model.
 
-Here is the final screenshot of the resulting dashboard populated with data tracking AAPL's prediction successfully:
+![Dashboard View](images/dashboard_new.png)
 
-![Dashboard Result for AAPL](images/aapl_ml_prediction_1772777853740.png)
+### 2. Comparison Table
+Track your entire portfolio at a glance.
+- **Interactive Sorting**: Click any header (Ticker, CAN SLIM, FCF Yield, etc.) to sort.
+- **Color-Coded Metrics**: Green ($\ge$ 75%), Yellow ($\ge$ 40%), and Red for quick visual filtering.
+- **6-Month Sparklines**: Mini-charts for immediate trend comparison.
 
-### Phase 5: Comparison Table View
-A new feature allows you to view and compare all the loaded stocks at a single glance. By clicking **Table View** in the top right of the dashboard, the UI swaps out the deep-dive panel for a clean `ComparisonTable` component.
+![Comparison Table](images/comparison_new.png)
 
-*   **Color-Coded Metrics:** All the Match Percentages (e.g., CAN SLIM, FCF Yield) are dynamically colored (Green for $\ge$ 75%, Yellow $\ge$ 40%, Red otherwise) to quickly identify strong criteria matches.
-*   **6-Month Trend Sparklines:** The far right column features lightweight, responsive Recharts sparklines, providing an instant visual comparison of the stocks' recent 6-month trajectory alongside their quant scores.
-*   **Interactive Sorting:** You can click on any column header (like Ticker, ML Alpha, or CAN SLIM) to sort the rows ascending or descending based on that specific metric. Sort arrows indicator which column is active and its direction.
-*   **Responsive Scrolling & Wrapping:** Long column headers smoothly wrap text to maintain a compact design. On narrower screens or when comparing many tickers, the table features a horizontal scrollbar while the **Ticker** column intelligently "freezes" (sticky left) so you always know which stock you are looking at as you scroll across the metrics.
+### 3. Compare Charts (Relative Performance)
+Visualize multiple stocks on a level playing field by indexing all selected assets to a baseline of 100.
+- **Multi-Ticker Selection**: Overlay different companies to see who is leading the pack.
+- **Timeframe Toggles**: Switch between 1-week, 1-month, 6-month, and 1-year views.
 
+![Compare Charts](images/compare_charts_new.png)
 
-![Table Wrapping & Scrollbar](images/table_wrapping_scrollbar_1772867252209.png)
-<!-- slide -->
-![Sticky Ticker Column during Scroll](images/sticky_ticker_column_1772867263903.png)
+### 4. Technicals & Advanced Charts
+Deep dive into price action and momentum.
+- **Technicals**: Real-time calculations for RSI, MACD, Bollinger Bands, and Moving Averages.
+- **Advanced Charts**: TradingView-style visualization tracking MACD Histograms and RSI slopes.
+- **WillyAlgo VWAP**: Specialized anchor-based price analysis.
 
+![Technicals View](images/technicals_new.png)
+![Advanced Charts](images/adv_charts_new.png)
 
-### Phase 6: Raw Data Exploration
-By request, added a new feature that intercepts the `yfinance` raw `info` payload, bypasses the quant engine, and exposes all $\sim$150 data keys to the frontend for direct exploration. 
+### 5. Raw Data & Strategy Glossary
+- **Raw Data**: Access the unfiltered Fundamental Data payload (150+ metrics) from `yfinance`.
+- **Glossary**: Comprehensive documentation of the internal methodology for all strategies.
 
-The new `<RawDataPanel>` component sits directly underneath the 6-Month Chart and Justification Engine on the main Dashboard view. It safely filters null fields, auto-formats large numbers into billions(`B`)/millions(`M`), and groups metrics into logical buckets tracking identical style queues as the quant factors:
+![Raw Data](images/raw_data_new.png)
+![Strategy Glossary](images/glossary_new.png)
 
-*   **Company Profile:** Sector, Employees, Exchange
-*   **Valuation Metrics:** Market Cap, Forward PE, Enterprise/Ebitda
-*   **Financial Highlights:** Revenue, Gross Margins, RoE
-*   **Financial Highlights:** Revenue, Gross Margins, RoE
-*   **Trading Information:** 52-Week Range, Average Volume, Beta
+### 6. Paper Study & Simulation
+Log and track simulated transactions to practice strategy execution.
+- **Auto-Fill Price**: Fetches real-time price when you enter a ticker.
+- **P&L Tracking**: Automatically calculates unrealized gains based on your average buy price.
+- **Persistent Ledger**: Transactions are saved to a local CSV for record-keeping.
 
-**Note on Navigation:** As the dashboard has grown, a top-right Tab Navigation bar has been added. This functions effectively as a Single Page Application router allowing seamless transitions between the **Dashboard** (Charts & Strategies), **Comparison** (Sorting Table), and **Raw Data** (Fundamental Metrics) views without needing to re-fetch data or lose your selected ticker.
+![Paper Study](images/paper_study_new.png)
 
-![Raw Fundamental Data Page](images/raw_data_page_view_1772899727814.png)
+---
 
-### Phase 7: Strategy Glossary Page
-By request, added a specialized **Methodology & Glossary** tracking page to serve as internal documentation for the 7 primary quant factors and the ML Dynamic Logic tracking Alpha.
+## 🛠️ The Strategy Engine
 
-The `StrategyGlossary.tsx` code parses the complex definitions into clean Shadcn/UI `<Card>` components, using multi-colored `Lucide-React` iconography, `Badge` chips for high-level strategy targeting (like "High-Pass Filter" vs "Contrarian Indicators"), and mono-spaced `<div className="bg-muted">` wrapping to render the complex financial math formats elegantly in the app's Dark Mode palette.
+The dashboard evaluates every ticker against **11 distinct models**:
 
+1.  **CAN SLIM**: Focuses on quarterly/annual EPS growth and current price strength.
+2.  **FCF Yield**: Targets high free cash flow relative to enterprise value.
+3.  **GARP**: Growth At a Reasonable Price (PEG ratio focus).
+4.  **Low Volatility & Quality**: Selects stocks with stable price action and strong profitability.
+5.  **Pure Growth**: High revenue and earnings trajectory.
+6.  **Fundamental Technical**: Combines valuation with 50/200-day trend alignment.
+7.  **Sentiment Quant**: Volume trends and momentum-based RSI analysis.
+8.  **Earnings Momentum**: Focuses on revisions and surprises.
+9.  **Dividend Aristocrat**: Reliability of income and payout ratios.
+10. **Willy Algo (VWAP)**: Anchor-based volume-weighted price analysis with ATR bands.
+11. **Machine Learning (XGBoost)**: A quantitative model predicting the probability of alpha outperformance.
 
-![Glossary Upper View](images/glossary_view_upper_1772903602978.png)
-<!-- slide -->
-![XGBoost ML Detailed View](images/glossary_view_lower_xgboost_1772903614275.png)
+---
 
+## ⚙️ Setup & Installation
 
-### Phase 8: Deployment Containerization
-To ensure the application can be seamlessly deployed to any cloud provider (AWS, DigitalOcean, Render, etc.) without dependency hell, the entire stack has been containerized using Docker.
-
-*   **`backend/Dockerfile`**: A lightweight `python:3.10-slim` container that pre-installs the heavy data science libraries (`xgboost`, `scikit-learn`, `pandas`) and exposes the FastAPI server on port `8080`.
-*   **`frontend/Dockerfile`**: A multi-stage `node:18-alpine` builder. The Next.js configuration (`next.config.ts`) was updated to produce a `standalone` server build, drastically reducing the final production image size. It exposes the UI on port `3000`.
-*   **`docker-compose.yml`**: A root-level orchestrator that links the two containers within a private bridge network, establishes the boot order (`frontend` depends on `backend`), and passes the necessary environment variables.
-
-To launch the full production-ready stack on any Docker-enabled machine, one simply runs:
+### Option 1: Docker (Recommended)
+Ensure you have Docker and Docker Compose installed.
 ```bash
 docker-compose up -d --build
 ```
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8080`
+
+### Option 2: Manual Setup
+
+#### Backend (FastAPI)
+1. Navigate to `backend/`
+2. Create and activate a virtual environment.
+3. Install dependencies: `pip install -r requirements.txt`
+4. Start the server:
+```bash
+python -m uvicorn main:app --host localhost --port 8080
+```
+
+#### Frontend (Next.js)
+1. Navigate to `frontend/`
+2. Install dependencies: `npm install`
+3. Start the dev server:
+```bash
+npm run dev
+```
+
+---
+
+## 📁 Data Management
+
+- **Portfolio Selection**: Use the sidebar to upload or select custom CSV files as ticker sources.
+- **CSV Format**: Ticker files should have a column header named `Symbol`.
+- **Persistence**: Your selected portfolio and view preferences are saved to `localStorage` for seamless return visits.
