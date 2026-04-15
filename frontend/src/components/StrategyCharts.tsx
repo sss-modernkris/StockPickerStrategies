@@ -54,14 +54,14 @@ export function StrategyCharts({ priceHistory, symbol }: StrategyChartsProps) {
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.4} />
                         <XAxis
                             dataKey="shortDate"
-                            tick={{ fontSize: 12, fill: '#e2e8f0' }}
+                            tick={{ fontSize: 12, fill: '#f8fafc', fontWeight: 500 }}
                             tickLine={false}
                             axisLine={false}
                             minTickGap={30}
                         />
                         <YAxis
                             domain={[minPrice * 0.95, maxPrice * 1.05]}
-                            tick={{ fontSize: 12, fill: '#e2e8f0' }}
+                            tick={{ fontSize: 12, fill: '#f8fafc', fontWeight: 500 }}
                             tickLine={false}
                             axisLine={false}
                             tickFormatter={(value) => `$${value.toFixed(0)}`}

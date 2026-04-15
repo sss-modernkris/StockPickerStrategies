@@ -402,7 +402,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
                             <XAxis
                                 dataKey="date"
-                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                                tick={{ fill: '#f8fafc', fontSize: 12, fontWeight: 500 }}
                                 tickMargin={10}
                                 minTickGap={30}
                                 axisLine={false}
@@ -416,7 +416,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                             <YAxis
                                 domain={['auto', 'auto']}
                                 tickFormatter={formatYAxis}
-                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                                tick={{ fill: '#f8fafc', fontSize: 12, fontWeight: 500 }}
                                 tickMargin={10}
                                 axisLine={false}
                                 tickLine={false}
@@ -445,7 +445,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                     y1={0} // Handled dynamically by recharts
                                     x2="100%"
                                     y2={0}
-                                    stroke="hsl(var(--muted-foreground))"
+                                    stroke="#cbd5e1"
                                     strokeWidth={1}
                                     strokeDasharray="4 4"
                                     opacity={0.5}

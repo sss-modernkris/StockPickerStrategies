@@ -120,8 +120,8 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
-                                <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickMargin={10} minTickGap={30} axisLine={false} tickLine={false} />
-                                <YAxis domain={['auto', 'auto']} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} orientation="right" />
+                                <XAxis dataKey="date" tick={{ fill: '#f8fafc', fontSize: 12, fontWeight: 500 }} tickMargin={10} minTickGap={30} axisLine={false} tickLine={false} />
+                                <YAxis domain={['auto', 'auto']} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fill: '#f8fafc', fontSize: 12, fontWeight: 500 }} tickMargin={10} axisLine={false} tickLine={false} orientation="right" />
                                 <Tooltip content={<CustomTooltip />} />
                                 
                                 {PLOT_CONFIG.map((plot) => (
@@ -168,17 +168,17 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                                         <LineChart data={data} syncId="techSync" margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
                                             <XAxis dataKey="date" hide={true} />
-                                            <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} axisLine={false} tickLine={false} orientation="right" />
+                                            <YAxis tick={{ fill: '#f8fafc', fontSize: 10, fontWeight: 500 }} axisLine={false} tickLine={false} orientation="right" />
                                             <Tooltip content={<CustomTooltip />} />
                                             <Legend verticalAlign="top" height={24} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                                            <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" opacity={0.5} />
+                                            <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" opacity={0.5} />
                                             <Line type="monotone" dataKey="macd" name="MACD" stroke="#3b82f6" strokeWidth={2} dot={false} />
                                             <Line type="monotone" dataKey="macd_signal" name="Signal" stroke="#f59e0b" strokeWidth={2} dot={false} />
                                         </LineChart>
                                     </ResponsiveContainer>
                                     <ResponsiveContainer width="100%" height="30%">
                                         <BarChart data={data} syncId="techSync" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-                                            <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} tickMargin={5} minTickGap={30} axisLine={false} tickLine={false} />
+                                            <XAxis dataKey="date" tick={{ fill: '#f8fafc', fontSize: 10, fontWeight: 500 }} tickMargin={5} minTickGap={30} axisLine={false} tickLine={false} />
                                             <YAxis hide={true} domain={['auto', 'auto']} />
                                             <Tooltip content={<CustomTooltip />} />
                                             <Bar dataKey="macd_hist" name="Histogram">
@@ -211,12 +211,12 @@ export function AdvancedChartsPanel({ data, symbol }: AdvancedChartsPanelProps) 
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={data} syncId="techSync" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
-                                    <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickMargin={10} minTickGap={30} axisLine={false} tickLine={false} />
-                                    <YAxis domain={[0, 100]} ticks={[0, 30, 50, 70, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} orientation="right" />
+                                    <XAxis dataKey="date" tick={{ fill: '#f8fafc', fontSize: 12, fontWeight: 500 }} tickMargin={10} minTickGap={30} axisLine={false} tickLine={false} />
+                                    <YAxis domain={[0, 100]} ticks={[0, 30, 50, 70, 100]} tick={{ fill: '#f8fafc', fontSize: 12, fontWeight: 500 }} tickMargin={10} axisLine={false} tickLine={false} orientation="right" />
                                     <Tooltip content={<CustomTooltip />} />
                                     <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={1} opacity={0.6} />
                                     <ReferenceLine y={30} stroke="#10b981" strokeDasharray="4 4" strokeWidth={1} opacity={0.6} />
-                                    <ReferenceLine y={50} stroke="hsl(var(--muted-foreground))" strokeDasharray="2 2" strokeWidth={1} opacity={0.3} />
+                                    <ReferenceLine y={50} stroke="#cbd5e1" strokeDasharray="2 2" strokeWidth={1} opacity={0.3} />
                                     <Line type="monotone" dataKey="rsi_14" name="RSI (14)" stroke="#14b8a6" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
