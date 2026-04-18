@@ -20,6 +20,8 @@ export function PaperStudyPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [availablePortfolios, setAvailablePortfolios] = useState<string[]>([]);
+  const [selectedPortfolio, setSelectedPortfolio] = useState('PaperStudy.csv');
 
   // Form State
   const [ticker, setTicker] = useState('');
@@ -47,11 +49,23 @@ export function PaperStudyPanel() {
     }
   };
 
+  const fetchPortfolios = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/list-portfolios`);
+      if (res.ok) {
+        const data = await res.json();
+        setAvailablePortfolios(data.files || []);
+      }
+    } catch (err) {
+      logger.error("Failed to fetch available portfolios", err);
+    }
+  };
+
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
-      logger.info("Fetching portfolio data from " + API_BASE_URL + "/api/paper-study");
-      const res = await fetch(`${API_BASE_URL}/api/paper-study`);
+      logger.info("Fetching portfolio data from " + API_BASE_URL + "/api/paper-study?filename=" + selectedPortfolio);
+      const res = await fetch(`${API_BASE_URL}/api/paper-study?filename=${selectedPortfolio}`);
       if (!res.ok) throw new Error('Failed to fetch portfolio data');
       const data = await res.json();
       setPortfolio(data);
@@ -65,8 +79,12 @@ export function PaperStudyPanel() {
   };
 
   useEffect(() => {
-    fetchPortfolio();
+    fetchPortfolios();
   }, []);
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, [selectedPortfolio]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +120,8 @@ export function PaperStudyPanel() {
           quantity: q,
           price: p,
           total_cost: transactionType === 'Deposit' ? -p : (transactionType === 'Withdraw' ? p : totalCost),
-          transaction_type: transactionType
+          transaction_type: transactionType,
+          filename: selectedPortfolio
         })
       });
 
@@ -128,6 +147,32 @@ export function PaperStudyPanel() {
 
   return (
     <div className="space-y-6">
+
+      {/* Portfolio Selector */}
+      <div className="flex items-center justify-between gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Active Study File</h2>
+          <div className="flex items-center gap-2">
+            <Briefcase className="w-4 h-4 text-primary" />
+            <span className="font-mono text-lg font-bold">{selectedPortfolio}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-muted-foreground">Switch Portfolio:</label>
+          <select 
+            className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-w-[200px]"
+            value={selectedPortfolio}
+            onChange={(e) => setSelectedPortfolio(e.target.value)}
+          >
+            {availablePortfolios.map(file => (
+              <option key={file} value={file}>{file}</option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" onClick={fetchPortfolio}>
+            Refresh
+          </Button>
+        </div>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

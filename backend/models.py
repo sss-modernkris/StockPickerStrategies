@@ -65,6 +65,7 @@ class TransactionModel(BaseModel):
     price: float
     total_cost: float
     transaction_type: str
+    filename: Optional[str] = "PaperStudy.csv"
 
 class TransactionResponse(BaseModel):
     date: str

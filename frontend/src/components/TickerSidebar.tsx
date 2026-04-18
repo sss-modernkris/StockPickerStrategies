@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { Plus, X, Activity } from 'lucide-react';
+import { Plus, X, Activity, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
+import { logger } from '@/lib/logger';
 
 interface TickerSidebarProps {
     tickers: string[];
@@ -24,12 +26,26 @@ export function TickerSidebar({
     onLoadPortfolio
 }: TickerSidebarProps) {
     const [newTicker, setNewTicker] = useState('');
-    const [tempFilename, setTempFilename] = useState(portfolioFilename);
+    const [availablePortfolios, setAvailablePortfolios] = useState<string[]>([]);
+    const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(false);
 
-    // Update internal state if external filename changes (e.g. from initial load)
     React.useEffect(() => {
-        setTempFilename(portfolioFilename);
-    }, [portfolioFilename]);
+        const fetchPortfolios = async () => {
+            try {
+                setIsLoadingPortfolios(true);
+                const res = await fetch(`${API_BASE_URL}/api/list-portfolios`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setAvailablePortfolios(data.files || []);
+                }
+            } catch (err) {
+                logger.error("Failed to fetch available portfolios", err);
+            } finally {
+                setIsLoadingPortfolios(false);
+            }
+        };
+        fetchPortfolios();
+    }, []);
 
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
@@ -52,24 +68,32 @@ export function TickerSidebar({
             </div>
 
             <div className="p-4 border-b space-y-2 bg-muted/30">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Portfolio Source</label>
-                <div className="flex gap-2">
-                    <Input
-                        placeholder="filename.csv"
-                        value={tempFilename}
-                        onChange={(e) => setTempFilename(e.target.value)}
-                        className="text-xs h-8 bg-background"
-                    />
+                <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Portfolio Source</label>
                     <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-8 px-2"
-                        onClick={() => onLoadPortfolio(tempFilename)}
-                        title="Load tickers from this file"
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-4 w-4" 
+                        onClick={() => onLoadPortfolio(portfolioFilename)}
+                        title="Reload current portfolio"
                     >
-                        Load
+                        <RefreshCw className={`w-3 h-3 ${isLoadingPortfolios ? 'animate-spin' : ''}`} />
                     </Button>
                 </div>
+                <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all cursor-pointer"
+                    value={portfolioFilename}
+                    onChange={(e) => onLoadPortfolio(e.target.value)}
+                    disabled={isLoadingPortfolios}
+                >
+                    {availablePortfolios.length === 0 ? (
+                        <option value={portfolioFilename}>{portfolioFilename}</option>
+                    ) : (
+                        availablePortfolios.map(file => (
+                            <option key={file} value={file}>{file}</option>
+                        ))
+                    )}
+                </select>
             </div>
 
             <form onSubmit={handleAdd} className="p-4 border-b flex gap-2">

@@ -146,6 +146,14 @@ def get_portfolio_tickers(filename: str = "portfolio.csv"):
     except Exception as e:
         return {"tickers": [], "error": str(e)}
 
+@app.get("/api/list-portfolios")
+def list_portfolios():
+    """Lists all .csv files in the project root that can be used as portfolios."""
+    files = [f for f in os.listdir(BASE_DIR) if f.endswith('.csv')]
+    # Priority to PaperStudy.csv and portfolio.csv if they exist
+    files.sort(key=lambda x: (x != 'PaperStudy.csv', x != 'portfolio.csv', x))
+    return {"files": files}
+
 @app.get("/api/analyze/{ticker}", response_model=TickerAnalysis)
 def analyze_ticker(ticker: str) -> TickerAnalysis:
     analysis = run_all_strategies(ticker.upper())
@@ -196,17 +204,21 @@ def get_current_price(ticker: str):
 import yfinance as yf
 
 @app.get("/api/paper-study", response_model=PortfolioSummaryResponse)
-def get_paper_study():
+def get_paper_study(filename: str = "PaperStudy.csv"):
+    # Security: prevent path traversal
+    safe_filename = os.path.basename(filename)
+    target_path = os.path.join(BASE_DIR, safe_filename)
+    
     transactions = []
     current_cash = 100000.0
     holdings_dict = {}
     
-    if os.path.exists(PAPER_STUDY_CSV):
-        with open(PAPER_STUDY_CSV, mode='r', encoding='utf-8-sig') as f:
+    if os.path.exists(target_path):
+        with open(target_path, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             
-        tickers = list(set([row['Ticker'].strip().upper() for row in rows if 'Ticker' in row and row['Ticker'].strip()]))
+        tickers = list(set([row['Ticker'].strip().upper() for row in rows if row.get('Ticker')]))
         
         latest_prices = {}
         if tickers:
@@ -288,7 +300,7 @@ def get_paper_study():
                     pass
                     
         # Synchronously write the CSV update so it stores the new schema and up to date values 
-        with open(PAPER_STUDY_CSV, mode='w', newline='', encoding='utf-8-sig') as f:
+        with open(target_path, mode='w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             writer.writerows(updated_rows)
@@ -332,13 +344,17 @@ def get_paper_study():
 
 @app.post("/api/paper-study")
 def add_paper_study_transaction(tx: TransactionModel):
-    write_header = not os.path.exists(PAPER_STUDY_CSV)
+    # Security: prevent path traversal
+    safe_filename = os.path.basename(tx.filename or "PaperStudy.csv")
+    target_path = os.path.join(BASE_DIR, safe_filename)
+    
+    write_header = not os.path.exists(target_path)
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     current_cash = 100000.0
     holdings = {}
-    if os.path.exists(PAPER_STUDY_CSV):
-        with open(PAPER_STUDY_CSV, mode='r', encoding='utf-8-sig') as f:
+    if os.path.exists(target_path):
+        with open(target_path, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 t = row.get('Ticker', '').strip().upper()
@@ -408,7 +424,7 @@ def add_paper_study_transaction(tx: TransactionModel):
         ib_msg = f" (IB Order: {msg})"
 
     try:
-        with open(PAPER_STUDY_CSV, mode='a', newline='', encoding='utf-8-sig') as f:
+        with open(target_path, mode='a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             if write_header:
                 writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
