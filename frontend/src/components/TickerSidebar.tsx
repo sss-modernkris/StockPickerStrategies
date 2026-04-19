@@ -10,6 +10,8 @@ interface TickerSidebarProps {
     onAddTicker: (ticker: string) => void;
     onRemoveTicker: (ticker: string) => void;
     onSelectTicker: (ticker: string) => void;
+    portfolioFilename: string;
+    onLoadPortfolio: (filename: string) => void;
 }
 
 export function TickerSidebar({
@@ -17,9 +19,17 @@ export function TickerSidebar({
     selectedTicker,
     onAddTicker,
     onRemoveTicker,
-    onSelectTicker
+    onSelectTicker,
+    portfolioFilename,
+    onLoadPortfolio
 }: TickerSidebarProps) {
     const [newTicker, setNewTicker] = useState('');
+    const [tempFilename, setTempFilename] = useState(portfolioFilename);
+
+    // Update internal state if external filename changes (e.g. from initial load)
+    React.useEffect(() => {
+        setTempFilename(portfolioFilename);
+    }, [portfolioFilename]);
 
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,9 +41,35 @@ export function TickerSidebar({
 
     return (
         <div className="w-64 h-full border-r bg-card flex flex-col">
-            <div className="p-4 border-b flex items-center gap-2">
-                <Activity className="w-6 h-6 text-primary" />
-                <h2 className="font-bold text-lg tracking-tight">Strategic Alpha</h2>
+            <div className="p-4 border-b space-y-1">
+                <div className="flex items-center gap-2">
+                    <Activity className="w-6 h-6 text-primary" />
+                    <h2 className="font-bold text-lg tracking-tight">Strategic Alpha</h2>
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono pl-8">
+                    v20260411
+                </div>
+            </div>
+
+            <div className="p-4 border-b space-y-2 bg-muted/30">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Portfolio Source</label>
+                <div className="flex gap-2">
+                    <Input
+                        placeholder="filename.csv"
+                        value={tempFilename}
+                        onChange={(e) => setTempFilename(e.target.value)}
+                        className="text-xs h-8 bg-background"
+                    />
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 px-2"
+                        onClick={() => onLoadPortfolio(tempFilename)}
+                        title="Load tickers from this file"
+                    >
+                        Load
+                    </Button>
+                </div>
             </div>
 
             <form onSubmit={handleAdd} className="p-4 border-b flex gap-2">
@@ -78,7 +114,7 @@ export function TickerSidebar({
                     )}
                 </div>
             </div>
-            <div className="p-4 border-t text-xs text-muted-foreground text-center">
+            <div className="p-4 border-t text-[10px] text-muted-foreground text-center">
                 {tickers.length} / 100 Selected
             </div>
         </div>

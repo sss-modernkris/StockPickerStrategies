@@ -9,8 +9,8 @@ services:
       - "8080:8080"
     networks:
       - stock-picker-network
-    depends_on:
-      - ib-gateway
+#    depends_on:
+#      - ib-gateway
     environment:
       - PORT=8080
       - IB_GATEWAY_HOST=ib-gateway
@@ -31,30 +31,30 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
     depends_on:
       - backend
-      - ib-gateway
+#      - ib-gateway
     restart: always
     networks:
       - stock-picker-network
 
-  ib-gateway:
-    restart: always
-    container_name: ib-container
-    hostname: ib-gateway
-    build:
-      context: ./ib-gateway
-      dockerfile: Dockerfile
-    environment:
-      TWS_USERID: ${IB_USERNAME:-username}
-      TWS_PASSWORD: ${IB_PASSWORD:-password}
-      TRADING_MODE: ${TRADING_MODE:-paper}
-      READ_ONLY_API: ${READ_ONLY:-no}
-      VNC_SERVER_PASSWORD: ${VNC_SERVER_PASSWORD:-password}
-    ports:
-      - "127.0.0.1:4001:4001"
-      - "127.0.0.1:4002:4002"
-      - "127.0.0.1:5900:5900"
-    networks:
-      - stock-picker-network
+#  ib-gateway:
+#    restart: always
+#    container_name: ib-container
+#    hostname: ib-gateway
+#    build:
+#      context: ./ib-gateway
+#      dockerfile: Dockerfile
+#    environment:
+#      TWS_USERID: ${IB_USERNAME:-username}
+#      TWS_PASSWORD: ${IB_PASSWORD:-password}
+#      TRADING_MODE: ${TRADING_MODE:-paper}
+#      READ_ONLY_API: ${READ_ONLY:-no}
+#      VNC_SERVER_PASSWORD: ${VNC_SERVER_PASSWORD:-password}
+#    ports:
+#      - "127.0.0.1:4001:4001"
+#      - "127.0.0.1:4002:4002"
+#      - "127.0.0.1:5900:5900"
+#    networks:
+#      - stock-picker-network
 
 networks:
   stock-picker-network:

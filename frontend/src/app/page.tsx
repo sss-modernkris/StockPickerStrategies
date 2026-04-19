@@ -29,26 +29,41 @@ export default function Dashboard() {
   // Lifted state for Compare Charts to persist across tab changes
   const [compareSelectedTickers, setCompareSelectedTickers] = useState<string[]>([]);
   const [comparePeriod, setComparePeriod] = useState<string>('1y');
+  const [portfolioFilename, setPortfolioFilename] = useState<string>('portfolio.csv');
+
+  const loadPortfolioTickers = async (filename: string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/portfolio?filename=${filename}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.tickers) {
+          const uniqueTickers = Array.from(new Set(data.tickers as string[])).slice(0, 100);
+          setTickers(uniqueTickers);
+          if (uniqueTickers.length > 0) {
+            setSelectedTicker(uniqueTickers[0]);
+          } else {
+            setSelectedTicker(null);
+          }
+          setPortfolioFilename(filename);
+          localStorage.setItem('ag_portfolio_filename', filename);
+        }
+      } else {
+        const errData = await res.json();
+        setError(`Failed to load portfolio ${filename}: ${errData.detail || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error("Failed to fetch portfolio tickers", err);
+      setError("Network error while loading portfolio.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 1. Fetch initial portfolio tickers on mount
   useEffect(() => {
-    const fetchPortfolio = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/portfolio`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.tickers && data.tickers.length > 0) {
-            // Take up to 100 unique tickers
-            const uniqueTickers = Array.from(new Set(data.tickers as string[])).slice(0, 100);
-            setTickers(uniqueTickers);
-            setSelectedTicker(uniqueTickers[0]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch portfolio tickers", err);
-      }
-    };
-    fetchPortfolio();
+    const savedFilename = localStorage.getItem('ag_portfolio_filename') || 'portfolio.csv';
+    loadPortfolioTickers(savedFilename);
   }, []);
 
   // 2. Fetch all analysis data in a single batch as soon as tickers are loaded
@@ -118,6 +133,8 @@ export default function Dashboard() {
         onAddTicker={handleAddTicker}
         onRemoveTicker={handleRemoveTicker}
         onSelectTicker={setSelectedTicker}
+        portfolioFilename={portfolioFilename}
+        onLoadPortfolio={loadPortfolioTickers}
       />
 
       <main className="flex-1 p-6 overflow-y-auto w-full">

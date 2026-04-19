@@ -20,7 +20,7 @@ RUN chmod a+x ./ibgateway-latest-standalone-linux-x64.sh
 RUN ./ibgateway-latest-standalone-linux-x64.sh -q -dir /root/Jts/ibgateway/${IB_GATEWAY_VERSION}
 
 # Copy configuration files (relative to build context)
-COPY ./config/ibgateway/jts.ini /root/Jts/jts.ini
+COPY config/ibgateway/jts.ini /root/Jts/jts.ini
 
 # Install IBC
 RUN curl -sSL https://github.com/IbcAlpha/IBC/releases/download/${IBC_VERSION}/IBCLinux-${IBC_VERSION}.zip --output IBCLinux-${IBC_VERSION}.zip
@@ -29,8 +29,8 @@ RUN unzip ./IBCLinux-${IBC_VERSION}.zip -d /root/ibc
 RUN chmod -R u+x /root/ibc/*.sh 
 RUN chmod -R u+x /root/ibc/scripts/*.sh
 
-COPY ./config/ibc/config.ini.tmpl /root/ibc/config.ini.tmpl
-COPY ./scripts /root/scripts
+COPY config/ibc/config.ini.tmpl /root/ibc/config.ini.tmpl
+COPY scripts /root/scripts
 
 #
 # Build Stage: build production image

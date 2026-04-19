@@ -26,6 +26,26 @@ export function PaperStudyPanel() {
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [transactionType, setTransactionType] = useState<'Buy' | 'Sell' | 'Deposit' | 'Withdraw'>('Buy');
+  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
+
+  const fetchCurrentPrice = async (symbol: string) => {
+    if (!symbol || symbol === 'CASH' || transactionType === 'Deposit' || transactionType === 'Withdraw') return;
+
+    try {
+      setIsFetchingPrice(true);
+      const res = await fetch(`${API_BASE_URL}/api/price/${symbol}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.price) {
+          setPrice(data.price.toString());
+        }
+      }
+    } catch (err) {
+      logger.error("Failed to fetch current price", err);
+    } finally {
+      setIsFetchingPrice(false);
+    }
+  };
 
   const fetchPortfolio = async () => {
     try {
@@ -104,11 +124,13 @@ export function PaperStudyPanel() {
     }
   };
 
+  const totalUnrealizedPnl = portfolio?.holdings.reduce((sum, h) => sum + h.unrealized_pnl, 0) || 0;
+
   return (
     <div className="space-y-6">
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cash Available</CardTitle>
@@ -153,6 +175,23 @@ export function PaperStudyPanel() {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unrealized P&L</CardTitle>
+            <div className={`text-xs font-bold ${totalUnrealizedPnl >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+              {totalUnrealizedPnl >= 0 ? 'Positive' : 'Negative'}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totalUnrealizedPnl >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+              {formatMoney(totalUnrealizedPnl)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total Paper Profit/Loss
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -171,6 +210,7 @@ export function PaperStudyPanel() {
                 placeholder="e.g. AAPL"
                 value={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'CASH' : ticker}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTicker(e.target.value.toUpperCase())}
+                onBlur={() => fetchCurrentPrice(ticker)}
                 disabled={transactionType === 'Deposit' || transactionType === 'Withdraw'}
                 required={transactionType === 'Buy' || transactionType === 'Sell'}
               />
@@ -180,7 +220,15 @@ export function PaperStudyPanel() {
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={transactionType}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTransactionType(e.target.value as 'Buy' | 'Sell' | 'Deposit' | 'Withdraw')}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const newType = e.target.value as 'Buy' | 'Sell' | 'Deposit' | 'Withdraw';
+                  setTransactionType(newType);
+                  if (newType === 'Deposit' || newType === 'Withdraw') {
+                    setTicker('CASH');
+                  } else if (ticker === 'CASH') {
+                    setTicker('');
+                  }
+                }}
               >
                 <option value="Buy">Buy</option>
                 <option value="Sell">Sell</option>
@@ -205,14 +253,21 @@ export function PaperStudyPanel() {
               <label className="text-sm font-medium">
                 {transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'Amount ($)' : 'Current Price ($)'}
               </label>
-              <Input
-                type="number"
-                placeholder={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'e.g. 5000' : 'e.g. 150.50'}
-                value={price}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
-                required
-                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
+              <div className="relative">
+                <Input
+                  type="number"
+                  placeholder={transactionType === 'Deposit' || transactionType === 'Withdraw' ? 'e.g. 5000' : 'e.g. 150.50'}
+                  value={price}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
+                  required
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                {isFetchingPrice && (
+                  <div className="absolute right-3 top-2.5 animate-spin">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                  </div>
+                )}
+              </div>
             </div>
             <Button type="submit" className="w-full">Submit</Button>
           </form>

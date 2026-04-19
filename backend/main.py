@@ -17,11 +17,12 @@ app = FastAPI(
 )
 
 # Standardize data paths relative to this script
-# BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(BACKEND_DIR)
 PORTFOLIO_CSV = os.path.join(BASE_DIR, "portfolio.csv")
 PAPER_STUDY_CSV = os.path.join(BASE_DIR, "PaperStudy.csv")
 
+print(f"Backend Directory: {BACKEND_DIR}")
 print(f"Base Directory: {BASE_DIR}")
 print(f"Portfolio CSV: {PORTFOLIO_CSV}")
 print(f"Paper Study CSV: {PAPER_STUDY_CSV}")
@@ -58,6 +59,21 @@ def post_logs(log: LogRequest):
     else:
         print(f"{prefix} {log.message}")
     return {"status": "ok"}
+
+class SaveCsvRequest(BaseModel):
+    filename: str
+    content: str
+
+@app.post("/api/save_csv")
+def save_csv(req: SaveCsvRequest):
+    try:
+        safe_filename = os.path.basename(req.filename)
+        filepath = os.path.join(BASE_DIR, safe_filename)
+        with open(filepath, "w", encoding="utf-8", newline="") as f:
+            f.write(req.content)
+        return {"status": "success", "message": f"Successfully saved to {filepath}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 class IBDataResponse(BaseModel):
     unrealized_pnl: float
@@ -105,17 +121,27 @@ def get_ib_data():
         raise HTTPException(status_code=400, detail="Not connected to Interactive Brokers")
 
 @app.get("/api/portfolio")
-def get_portfolio_tickers():
+def get_portfolio_tickers(filename: str = "portfolio.csv"):
+    # Security: prevent path traversal
+    safe_filename = os.path.basename(filename)
+    if safe_filename != filename:
+         raise HTTPException(status_code=400, detail="Invalid filename format. Path traversal is not allowed.")
+    
+    # Path relative to project root (one level up from backend/)
+    file_path = os.path.join(BASE_DIR, safe_filename)
+    
     tickers = []
     try:
-        if os.path.exists(PORTFOLIO_CSV):
-            with open(PORTFOLIO_CSV, mode='r', encoding='utf-8-sig') as f:
+        if os.path.exists(file_path):
+            with open(file_path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     # Clean up header/keys in case they have spaces or BOM issues
                     clean_row = {k.strip() if k else k: v for k, v in row.items()}
                     if 'Symbol' in clean_row and clean_row['Symbol'].strip():
                         tickers.append(clean_row['Symbol'].strip())
+        else:
+            raise HTTPException(status_code=404, detail=f"File {safe_filename} not found in project directory.")
         return {"tickers": tickers}
     except Exception as e:
         return {"tickers": [], "error": str(e)}
@@ -157,6 +183,15 @@ def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
         
     # Validation will happen automatically by Pydantic Model
     return HistoryResponse(period=period, data=result["data"])
+
+@app.get("/api/price/{ticker}")
+def get_current_price(ticker: str):
+    try:
+        t = yf.Ticker(ticker.upper())
+        price = t.fast_info.last_price
+        return {"price": price}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="Ticker not found or price unavailable")
 
 import yfinance as yf
 

@@ -284,7 +284,8 @@ export function StrategyGlossary() {
             bullets: [
                 { label: "Pivot Logic", text: "Identifies swing points using a rolling window of 5 periods. A pivot high is a point higher than 5 points before and after it." },
                 { label: "Bullish Signal", text: "The strategy returns a 100% match if the current price is trading above the most recent Swing VWAP, indicating positive momentum relative to the volume-fair-value of the recent swing." },
-                { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." }
+                { label: "Bearish Signal", text: "Returns a 0% match if the current price is below the Swing VWAP, suggesting that the recent volume-weighted average is acting as resistance." },
+                { label: "ATR Volatility Bands", text: "Includes Upper and Lower exhaustion bands calculated using a 14-day ATR with a 2.0 multiplier applied to the VWAP baseline. These identify volatility-adjusted extreme levels." }
             ]
         },
         {
@@ -292,7 +293,7 @@ export function StrategyGlossary() {
             icon: <Gauge className="w-5 h-5 text-amber-500" />,
             title: "Composite Ranking Score",
             badge: "Dashboard Metric",
-            description: "A custom 7-point ranking score used on the Comparison page to quickly identify stocks that meet a specific confluence of momentum, technical, and quantitative criteria.",
+            description: "A custom 8-point ranking score used on the Comparison page to quickly identify stocks that meet a specific confluence of momentum, technical, and quantitative criteria.",
             bullets: [
                 { label: "WillyAlgo > 50%", text: "Requires the WillyAlgo Indicator match percentage to be greater than 50%." },
                 { label: "RSI > 30", text: "Ensures the stock is not in a deeply oversold structural collapse." },
@@ -300,7 +301,8 @@ export function StrategyGlossary() {
                 { label: "MACD Hist < 0.1", text: "Focuses on early momentum shifts or contained histogram expansion." },
                 { label: "MACD Hist > 0", text: "Requires the MACD histogram to be positive (bullish momentum)." },
                 { label: "MACD Slope > 0", text: "Requires the MACD line itself to have a positive, rising trajectory." },
-                { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." }
+                { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." },
+                { label: "Close Slope > 0", text: "Requires the short-term price trend (last 2 days) to be positive." }
             ]
         }
     ];

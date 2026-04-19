@@ -19,6 +19,8 @@ export interface PricePoint {
     bb_upper?: number | null;
     bb_lower?: number | null;
     bb_middle?: number | null;
+    vwap_upper?: number | null;
+    vwap_lower?: number | null;
     willy_vwap?: number | null;
 }
 
