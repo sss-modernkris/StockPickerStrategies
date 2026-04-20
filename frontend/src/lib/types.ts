@@ -57,7 +57,7 @@ export interface TickerAnalysis {
     error?: string;
 }
 export interface Holding {
-  ticker: string;
+  symbol: string;
   total_quantity: number;
   avg_buy_price: number;
   current_price: number;
@@ -67,7 +67,7 @@ export interface Holding {
 
 export interface Transaction {
   date: string;
-  ticker: string;
+  symbol: string;
   quantity: number;
   price: number;
   total_cost: number;
@@ -80,7 +80,7 @@ export interface Transaction {
 export interface IBOrder {
   order_id: number;
   account: string;
-  ticker: string;
+  symbol: string;
   action: string;
   total_quantity: number;
   filled: number;

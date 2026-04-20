@@ -218,7 +218,7 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
             reader = csv.DictReader(f)
             rows = list(reader)
             
-        tickers = list(set([row['Ticker'].strip().upper() for row in rows if row.get('Ticker')]))
+        tickers = list(set([ (row.get('Symbol') or row.get('Ticker', '')).strip().upper() for row in rows if row.get('Symbol') or row.get('Ticker')]))
         
         latest_prices = {}
         if tickers:
@@ -231,9 +231,10 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
         updated_rows = []
         for row in rows:
             clean_row = {k.strip(): v.strip() for k, v in row.items() if k}
-            if 'Ticker' in clean_row:
+            symbol_key = 'Symbol' if 'Symbol' in clean_row else 'Ticker'
+            if symbol_key in clean_row:
                 try:
-                    t = clean_row.get('Ticker', '').upper()
+                    t = clean_row.get(symbol_key, '').upper()
                     q = float(clean_row.get('Quantity', 0))
                     p = float(clean_row.get('Price', 0))
                     
@@ -280,7 +281,7 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
 
                     tx = TransactionResponse(
                         date=clean_row.get('Date', ''),
-                        ticker=t,
+                        symbol=t,
                         quantity=q,
                         price=p,
                         total_cost=tc,
@@ -291,7 +292,7 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
                     )
                     transactions.append(tx)
                     updated_rows.append([
-                        tx.date, tx.ticker, tx.quantity, tx.price, tx.total_cost, 
+                        tx.date, tx.symbol, tx.quantity, tx.price, tx.total_cost, 
                         tx.current_close_price, tx.total_current_value, tx.cash_balance
                     ])
                 except ValueError:
@@ -302,7 +303,7 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
         # Synchronously write the CSV update so it stores the new schema and up to date values 
         with open(target_path, mode='w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
-            writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
+            writer.writerow(['Date', 'Symbol', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             writer.writerows(updated_rows)
 
     holdings_list = []
@@ -314,7 +315,7 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
            pnl = (cp - h['avg_buy_price']) * h['qty']
            invested_capital += tv
            holdings_list.append(HoldingModel(
-               ticker=t,
+               symbol=t,
                total_quantity=h['qty'],
                avg_buy_price=h['avg_buy_price'],
                current_price=cp,
@@ -357,7 +358,7 @@ def add_paper_study_transaction(tx: TransactionModel):
         with open(target_path, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                t = row.get('Ticker', '').strip().upper()
+                t = (row.get('Symbol') or row.get('Ticker', '')).strip().upper()
                 q_str = row.get('Quantity', '0')
                 p_str = row.get('Price', '0')
                 tc_str = row.get('Total Cost', '')
@@ -376,7 +377,7 @@ def add_paper_study_transaction(tx: TransactionModel):
     # Adjust quantity and compute cost based on transaction type
     quantity = tx.quantity
     tx_type = tx.transaction_type.lower()
-    ticker = tx.ticker.upper()
+    ticker = tx.symbol.upper()
     
     if tx_type == 'deposit':
         quantity = 1.0
@@ -427,7 +428,7 @@ def add_paper_study_transaction(tx: TransactionModel):
         with open(target_path, mode='a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             if write_header:
-                writer.writerow(['Date', 'Ticker', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
+                writer.writerow(['Date', 'Symbol', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             
             writer.writerow([current_date, ticker, quantity, tx.price, total_cost, curr_price, total_val, new_cash])
         return {"status": "success", "message": f"Transaction added successfully{ib_msg}"}

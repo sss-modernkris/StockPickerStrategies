@@ -246,7 +246,7 @@ export function BrokersPanel() {
                 <TableBody>
                   {ibData.holdings.map((h, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-bold">{h.ticker}</TableCell>
+                      <TableCell className="font-bold">{h.symbol}</TableCell>
                       <TableCell className="text-right">{h.total_quantity}</TableCell>
                       <TableCell className="text-right">{formatMoney(h.avg_buy_price)}</TableCell>
                       <TableCell className="text-right font-medium">{formatMoney(h.current_price)}</TableCell>
@@ -293,7 +293,7 @@ export function BrokersPanel() {
                   {ibData.orders.map((ord: IBOrder) => (
                     <TableRow key={ord.order_id}>
                       <TableCell className="text-xs whitespace-nowrap">{ord.last_update || "Pending..."}</TableCell>
-                      <TableCell className="font-bold">{ord.ticker}</TableCell>
+                      <TableCell className="font-bold">{ord.symbol}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
                           ord.status === 'Filled' ? 'bg-emerald-500/10 text-emerald-500' : 

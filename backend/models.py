@@ -60,7 +60,7 @@ class TickerAnalysis(BaseModel):
     error: Optional[str] = None
 
 class TransactionModel(BaseModel):
-    ticker: str
+    symbol: str
     quantity: float
     price: float
     total_cost: float
@@ -69,7 +69,7 @@ class TransactionModel(BaseModel):
 
 class TransactionResponse(BaseModel):
     date: str
-    ticker: str
+    symbol: str
     quantity: float
     price: float
     total_cost: float
@@ -79,7 +79,7 @@ class TransactionResponse(BaseModel):
     action: Optional[str] = None
 
 class HoldingModel(BaseModel):
-    ticker: str
+    symbol: str
     total_quantity: float
     avg_buy_price: float
     current_price: float
@@ -89,7 +89,7 @@ class HoldingModel(BaseModel):
 class IBOrderModel(BaseModel):
     order_id: int
     account: str
-    ticker: str
+    symbol: str
     action: str
     total_quantity: float
     filled: float

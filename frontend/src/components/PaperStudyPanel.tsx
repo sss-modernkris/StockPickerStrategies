@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign, Briefcase, TrendingUp } from 'lucide-react';
+import { DollarSign, Briefcase, TrendingUp, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { PortfolioSummary } from '@/lib/types';
@@ -22,6 +22,22 @@ export function PaperStudyPanel() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [availablePortfolios, setAvailablePortfolios] = useState<string[]>([]);
   const [selectedPortfolio, setSelectedPortfolio] = useState('PaperStudy.csv');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const handleSort = (key: string) => {
+      let direction: 'asc' | 'desc' = 'desc';
+      if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+          direction = 'asc';
+      }
+      setSortConfig({ key, direction });
+  };
+
+  const SortIcon = (columnKey: string) => {
+      if (!sortConfig || sortConfig.key !== columnKey) {
+          return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30 group-hover:opacity-100 inline-block" />;
+      }
+      return sortConfig.direction === 'asc' ? <ChevronUp className="ml-2 h-4 w-4 inline-block" /> : <ChevronDown className="ml-2 h-4 w-4 inline-block" />;
+  };
 
   // Form State
   const [ticker, setTicker] = useState('');
@@ -116,7 +132,7 @@ export function PaperStudyPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticker: tick,
+          symbol: tick,
           quantity: q,
           price: p,
           total_cost: transactionType === 'Deposit' ? -p : (transactionType === 'Withdraw' ? p : totalCost),
@@ -142,6 +158,32 @@ export function PaperStudyPanel() {
       setError(err.message || 'An error occurred while saving the transaction.');
     }
   };
+
+  const computedHoldings = useMemo(() => {
+      if (!portfolio || !portfolio.holdings) return [];
+      
+      const holdings = [...portfolio.holdings];
+      
+      if (sortConfig !== null) {
+          holdings.sort((a, b) => {
+              const aValue = a[sortConfig.key as keyof typeof a];
+              const bValue = b[sortConfig.key as keyof typeof b];
+
+              if (aValue === null && bValue === null) return 0;
+              if (aValue === null) return sortConfig.direction === 'asc' ? 1 : -1;
+              if (bValue === null) return sortConfig.direction === 'asc' ? -1 : 1;
+
+              if (aValue < bValue) {
+                  return sortConfig.direction === 'asc' ? -1 : 1;
+              }
+              if (aValue > bValue) {
+                  return sortConfig.direction === 'asc' ? 1 : -1;
+              }
+              return 0;
+          });
+      }
+      return holdings;
+  }, [portfolio, sortConfig]);
 
   const totalUnrealizedPnl = portfolio?.holdings.reduce((sum, h) => sum + h.unrealized_pnl, 0) || 0;
 
@@ -332,18 +374,48 @@ export function PaperStudyPanel() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Ticker</TableHead>
-                    <TableHead className="text-right">Total Qty</TableHead>
-                    <TableHead className="text-right">Avg Cost Basis</TableHead>
-                    <TableHead className="text-right">Current Price</TableHead>
-                    <TableHead className="text-right">Total Position Value</TableHead>
-                    <TableHead className="text-right">Unrealized P&L</TableHead>
+                    <TableHead className="font-semibold w-[120px]">
+                        <Button variant="ghost" onClick={() => handleSort('symbol')} className="px-0 hover:bg-transparent -ml-2 h-8 font-semibold">
+                            Symbol
+                            {SortIcon('symbol')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="font-semibold text-right">
+                        <Button variant="ghost" onClick={() => handleSort('total_quantity')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                            Total Qty
+                            {SortIcon('total_quantity')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="font-semibold text-right">
+                        <Button variant="ghost" onClick={() => handleSort('avg_buy_price')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                            Avg Cost Basis
+                            {SortIcon('avg_buy_price')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="font-semibold text-right">
+                        <Button variant="ghost" onClick={() => handleSort('current_price')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                            Current Price
+                            {SortIcon('current_price')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="font-semibold text-right">
+                        <Button variant="ghost" onClick={() => handleSort('total_value')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                            Total Position Value
+                            {SortIcon('total_value')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="font-semibold text-right">
+                        <Button variant="ghost" onClick={() => handleSort('unrealized_pnl')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                            Unrealized P&L
+                            {SortIcon('unrealized_pnl')}
+                        </Button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {portfolio.holdings.map((h, idx) => (
+                  {computedHoldings.map((h, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-bold">{h.ticker}</TableCell>
+                      <TableCell className="font-bold">{h.symbol}</TableCell>
                       <TableCell className="text-right">{h.total_quantity}</TableCell>
                       <TableCell className="text-right">{formatMoney(h.avg_buy_price)}</TableCell>
                       <TableCell className="text-right font-medium">{formatMoney(h.current_price)}</TableCell>
@@ -377,7 +449,7 @@ export function PaperStudyPanel() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Action</TableHead>
-                    <TableHead>Ticker</TableHead>
+                    <TableHead>Symbol</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">Trade Price</TableHead>
                     <TableHead className="text-right">Trade Value</TableHead>
@@ -393,13 +465,13 @@ export function PaperStudyPanel() {
                           {tx.action}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{tx.ticker}</TableCell>
-                      <TableCell className={`text-right font-semibold ${tx.ticker === 'CASH' ? 'text-muted-foreground' : (tx.quantity < 0 ? 'text-orange-500' : 'text-indigo-500')}`}>
-                        {tx.ticker === 'CASH' ? '--' : (tx.quantity > 0 ? '+' : '') + tx.quantity}
+                      <TableCell className="font-medium">{tx.symbol}</TableCell>
+                      <TableCell className={`text-right font-semibold ${tx.symbol === 'CASH' ? 'text-muted-foreground' : (tx.quantity < 0 ? 'text-orange-500' : 'text-indigo-500')}`}>
+                        {tx.symbol === 'CASH' ? '--' : (tx.quantity > 0 ? '+' : '') + tx.quantity}
                       </TableCell>
-                      <TableCell className="text-right">{tx.ticker === 'CASH' ? '--' : formatMoney(tx.price)}</TableCell>
+                      <TableCell className="text-right">{tx.symbol === 'CASH' ? '--' : formatMoney(tx.price)}</TableCell>
                       <TableCell className={`text-right font-medium ${tx.total_cost < 0 ? 'text-emerald-500' : (tx.action === 'Withdraw' ? 'text-orange-500' : '')}`}>
-                        {tx.ticker === 'CASH' ? (tx.action === 'Deposit' ? `+${formatMoney(Math.abs(tx.total_cost))}` : `-${formatMoney(tx.total_cost)}`) : formatMoney(tx.total_cost)}
+                        {tx.symbol === 'CASH' ? (tx.action === 'Deposit' ? `+${formatMoney(Math.abs(tx.total_cost))}` : `-${formatMoney(tx.total_cost)}`) : formatMoney(tx.total_cost)}
                       </TableCell>
                       <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">
                         {formatMoney(tx.cash_balance)}

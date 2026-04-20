@@ -1,4 +1,4 @@
-"Ticker","ML Alpha","Strat Avg","Ranking","Rec","Close Price","Close Slope","MACD Hist","MACD Slope","MACD Rel","RSI","RSI Slope","WillyAlgo Indicator","CAN SLIM","FCF Yield","GARP","Low-Vol/Quality","Pure Growth/Value","Fundamental/Technical","Sentiment/Quant","Earnings Momentum","Dividend Value"
+"Symbol","ML Alpha","Strat Avg","Ranking","Rec","Close Price","Close Slope","MACD Hist","MACD Slope","MACD Rel","RSI","RSI Slope","WillyAlgo Indicator","CAN SLIM","FCF Yield","GARP","Low-Vol/Quality","Pure Growth/Value","Fundamental/Technical","Sentiment/Quant","Earnings Momentum","Dividend Value"
 "NVDA","41.4","67.4","7","Hold","188.63","+","1.79","0.91","-1.08","68.17","12.22","100.0","75.0","50.0","100.0","66.0","33.0","100.0","0.0","100.0","50.0"
 "GOOG","42.3","80.7","6","Sell","315.72","-","4.00","1.27","-1.29","61.81","4.99","100.0","75.0","50.0","100.0","66.0","66.0","100.0","50.0","100.0","100.0"
 "MSFT","69.3","69.1","6","Sell","370.87","-","1.46","0.40","-0.15","39.49","3.41","100.0","50.0","0.0","100.0","100.0","66.0","75.0","0.0","100.0","100.0"

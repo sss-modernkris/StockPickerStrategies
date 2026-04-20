@@ -186,7 +186,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             }
 
             return {
-                ticker,
+                symbol: ticker,
                 mlAlpha,
                 mlAlphaStr,
                 stratAvg,
@@ -398,7 +398,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                     )}
 
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 25 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
                             <XAxis
                                 dataKey="date"
@@ -475,9 +475,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
                                     <TableHead className="font-semibold w-[120px]">
-                                        <Button variant="ghost" onClick={() => handleSort('ticker')} className="px-0 hover:bg-transparent -ml-2 h-8 font-semibold">
-                                            Ticker
-                                            {SortIcon('ticker')}
+                                        <Button variant="ghost" onClick={() => handleSort('symbol')} className="px-0 hover:bg-transparent -ml-2 h-8 font-semibold">
+                                            Symbol
+                                            {SortIcon('symbol')}
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
@@ -514,13 +514,13 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                             </TableHeader>
                             <TableBody>
                                 {computedTableData.map((row) => (
-                                    <TableRow key={row.ticker}>
+                                    <TableRow key={row.symbol}>
                                         <TableCell className="font-bold flex items-center gap-2">
                                             <div
                                                 className="w-2.5 h-2.5 rounded-full"
-                                                style={{ backgroundColor: getTickerColor(row.ticker) }}
+                                                style={{ backgroundColor: getTickerColor(row.symbol) }}
                                             />
-                                            {row.ticker}
+                                            {row.symbol}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">{row.mlAlphaStr}</TableCell>
                                         <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
