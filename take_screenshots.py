@@ -1,9 +1,17 @@
 import os
 import time
 import re
+import argparse
 from playwright.sync_api import sync_playwright
 
 def main():
+    parser = argparse.ArgumentParser(description="Capture advanced charts screenshots.")
+    parser.add_argument("--portfolio", "-p", default="portfolio-01.csv", help="Portfolio CSV filename to analyze")
+    args = parser.parse_args()
+    
+    portfolio_file = args.portfolio
+    print(f"Target Portfolio file: {portfolio_file}")
+
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "public", "images_advanced")
     os.makedirs(output_dir, exist_ok=True)
     
@@ -21,10 +29,10 @@ def main():
             
         time.sleep(3)
         
-        # 1. Change portfolio filename to 'portfolio-01.csv'
-        print("Selecting portfolio 'portfolio-01.csv'...")
+        # 1. Change portfolio filename to dynamic target
+        print(f"Selecting portfolio '{portfolio_file}'...")
         page.wait_for_selector("select")
-        page.select_option("select", "portfolio-01.csv")
+        page.select_option("select", portfolio_file)
         
         # Wait for loading batch analysis to complete
         print("Waiting for portfolio batch analysis to complete...")

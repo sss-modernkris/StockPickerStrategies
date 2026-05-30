@@ -439,12 +439,12 @@ def add_paper_study_transaction(tx: TransactionModel):
 
 import subprocess
 
-def run_take_screenshots_script():
+def run_take_screenshots_script(filename: str):
     try:
         script_path = os.path.join(BASE_DIR, "take_screenshots.py")
         python_exe = r"C:\Users\moder\AppData\Local\Programs\Python\Python311\python.exe"
-        print(f"[BACKGROUND] Starting screenshot capture: {python_exe} {script_path}")
-        subprocess.Popen([python_exe, script_path], cwd=BASE_DIR)
+        print(f"[BACKGROUND] Starting screenshot capture: {python_exe} {script_path} --portfolio {filename}")
+        subprocess.Popen([python_exe, script_path, "--portfolio", filename], cwd=BASE_DIR)
     except Exception as e:
         print(f"[BACKGROUND] Error launching screenshots script: {e}")
 
@@ -544,7 +544,7 @@ def run_analysis(background_tasks: BackgroundTasks, filename: str = "portfolio-0
     except Exception as e:
         print(f"Error persisting last_analysis.json: {e}")
         
-    background_tasks.add_task(run_take_screenshots_script)
+    background_tasks.add_task(run_take_screenshots_script, safe_filename)
     
     # Return with status triggered so the frontend knows background CAPTURE has started
     response_data.status = "triggered"
