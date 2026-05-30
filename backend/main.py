@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
@@ -566,4 +566,103 @@ def get_last_analysis() -> PortfolioAnalysisResponse:
         items=[],
         status="idle"
     )
+
+@app.post("/api/save-analysis-report")
+def save_analysis_report(req: SaveReportRequest):
+    # 1. Prevent Path Traversal and ensure file extension is .md
+    safe_filename = os.path.basename(req.filename)
+    if not safe_filename.endswith(".md"):
+        safe_filename += ".md"
+    
+    # 2. Check if we have last analysis
+    last_analysis_path = os.path.join(BASE_DIR, "last_analysis.json")
+    if not os.path.exists(last_analysis_path):
+        raise HTTPException(status_code=404, detail="No active analysis data found. Run Live Analysis first.")
+        
+    try:
+        with open(last_analysis_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            portfolio_data = PortfolioAnalysisResponse(**data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read analysis data: {str(e)}")
+        
+    if not portfolio_data.items:
+        raise HTTPException(status_code=400, detail="Analysis data is empty. Run Live Analysis first.")
+        
+    # 3. Build Markdown content
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    md = []
+    md.append(f"# Strategic Alpha Portfolio Analysis Report")
+    md.append("")
+    md.append(f"- **Generated:** {timestamp}")
+    md.append(f"- **Source Portfolio:** `{portfolio_data.filename}`")
+    md.append("")
+    md.append("## Executive Summary")
+    md.append("")
+    
+    # Calculate stats
+    total_tickers = len(portfolio_data.items)
+    buys = sum(1 for item in portfolio_data.items if "BUY" in item.recommendation.upper())
+    sells = sum(1 for item in portfolio_data.items if "SELL" in item.recommendation.upper())
+    holds = total_tickers - buys - sells
+    
+    md.append(f"- **Total Tickers Analyzed:** {total_tickers}")
+    md.append(f"- **BUY / ACCUMULATE Recommendations:** {buys}")
+    md.append(f"- **SELL / TAKE PROFITS Recommendations:** {sells}")
+    md.append(f"- **HOLD / WATCH Recommendations:** {holds}")
+    md.append("")
+    
+    # 4. Action Matrix Table
+    md.append("## Action Matrix Table")
+    md.append("")
+    md.append("| Ticker | Current Price ($) | Willy VWAP Support ($) | ATR Lower Support ($) | ATR Upper Resistance ($) | Posture | Recommendation |")
+    md.append("| :--- | :---: | :---: | :---: | :---: | :--- | :--- |")
+    for item in portfolio_data.items:
+        md.append(f"| **{item.symbol}** | {item.close:.2f} | {item.willy_vwap:.2f} | {item.vwap_lower:.2f} | {item.vwap_upper:.2f} | {item.posture} | **{item.recommendation}** |")
+    md.append("")
+    
+    # 5. Detailed Ticker Justifications & Charts
+    md.append("## Detailed Technical Justifications")
+    md.append("")
+    
+    # Relative path from base dir to images: frontend/public/images_advanced/
+    for item in portfolio_data.items:
+        md.append(f"### {item.symbol} - {item.recommendation}")
+        md.append("")
+        md.append(f"- **Current Close Price:** ${item.close:.2f}")
+        md.append(f"- **Willy VWAP Dynamic Support:** ${item.willy_vwap:.2f}")
+        md.append(f"- **ATR Boundary Envelope:** ${item.vwap_lower:.2f} (Lower Support) to ${item.vwap_upper:.2f} (Upper Resistance)")
+        md.append(f"- **Technical Posture:** {item.posture}")
+        md.append("")
+        md.append("#### Justification Bulletins:")
+        for detail in item.details:
+            md.append(f"- {detail}")
+        md.append("")
+        
+        # Verify if chart image exists
+        image_name = f"{item.symbol}_advanced_chart.png"
+        image_rel_path = os.path.join("frontend", "public", "images_advanced", image_name)
+        image_abs_path = os.path.join(BASE_DIR, image_rel_path)
+        
+        # Render dynamic screenshot
+        md.append("#### Technical Analysis Chart")
+        md.append("")
+        if os.path.exists(image_abs_path):
+            md.append(f"![{item.symbol} Technical Chart](frontend/public/images_advanced/{image_name})")
+        else:
+            md.append("> *Note: Chart screenshot generation is in progress or unavailable for this ticker.*")
+        md.append("")
+        md.append("---")
+        md.append("")
+        
+    markdown_content = "\n".join(md)
+    
+    # 6. Write Markdown file to base directory
+    output_path = os.path.join(BASE_DIR, safe_filename)
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+        return {"status": "success", "message": f"Successfully saved analysis report to {safe_filename}", "filepath": output_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write markdown report: {str(e)}")
 

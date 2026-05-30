@@ -10,10 +10,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  console.log('Launching browser...');
+  console.log('Launching browser with native 80% window zoom...');
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--force-device-scale-factor=0.8']
   });
 
   const page = await browser.newPage();
@@ -136,15 +136,20 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       await targetEl.click();
       await delay(4000); // Wait for API and chart lines to render
 
-      // Find the card element for Advanced Charts and take an element screenshot
+      // Find the container element for all Advanced Charts and take an element screenshot
       const cards = await page.$$('div');
       let chartCard = null;
       for (const card of cards) {
         try {
-          const hasTitle = await page.evaluate(element => {
-            return element.innerText && element.innerText.includes('Price Action & Moving Averages');
+          const isTarget = await page.evaluate(element => {
+            const className = element.className || '';
+            const text = element.innerText || '';
+            return className.includes('space-y-6') && 
+                   !className.includes('max-w-7xl') && 
+                   text.includes('Price Action & Moving Averages') && 
+                   text.includes('MACD');
           }, card);
-          if (hasTitle) {
+          if (isTarget) {
             chartCard = card;
             break;
           }

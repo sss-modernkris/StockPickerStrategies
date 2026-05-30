@@ -16,8 +16,11 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     
     with sync_playwright() as p:
-        print("Launching browser...")
-        browser = p.chromium.launch(headless=True)
+        print("Launching browser with native 80% window zoom...")
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--force-device-scale-factor=0.8", "--no-sandbox", "--disable-setuid-sandbox"]
+        )
         page = browser.new_page()
         page.set_viewport_size({"width": 1600, "height": 1200})
         
@@ -134,15 +137,17 @@ def main():
                 target_el.click()
                 time.sleep(5) # Wait for API and recharts animation
                 
-                # Find the card element for Advanced Charts and take screenshot
+                # Find the container for all Advanced Charts (Price Action + MACD + RSI) and take screenshot
                 all_divs = page.query_selector_all("div")
                 chart_card = None
                 for div in all_divs:
                     try:
-                        inner_text = div.inner_text() or ""
-                        if "Price Action & Moving Averages" in inner_text and ("Daily Close with SMAs" in inner_text or "Close Price" in inner_text):
-                            chart_card = div
-                            break
+                        class_name = div.get_attribute("class") or ""
+                        if "space-y-6" in class_name and "max-w-7xl" not in class_name:
+                            inner_text = div.inner_text() or ""
+                            if "Price Action & Moving Averages" in inner_text and "MACD" in inner_text:
+                                chart_card = div
+                                break
                     except Exception:
                         pass
                         

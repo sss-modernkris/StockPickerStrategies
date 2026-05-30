@@ -123,3 +123,6 @@ class PortfolioAnalysisResponse(BaseModel):
     filename: str
     items: List[StockAnalysisItem]
     status: str
+
+class SaveReportRequest(BaseModel):
+    filename: str

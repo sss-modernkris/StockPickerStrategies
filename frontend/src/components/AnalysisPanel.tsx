@@ -5,7 +5,7 @@ import { API_BASE_URL } from '@/lib/api';
 import { 
     Loader2, Play, CheckCircle, RefreshCw, AlertTriangle, 
     TrendingUp, TrendingDown, Info, Maximize2, X, ClipboardList,
-    Layers, LayoutList, Calendar, CheckSquare
+    Layers, LayoutList, Calendar, CheckSquare, FileText
 } from 'lucide-react';
 import { StockAnalysisItem, PortfolioAnalysisResponse } from '@/lib/types';
 
@@ -21,9 +21,54 @@ export function AnalysisPanel() {
     const [imageSalt, setImageSalt] = useState<number>(0);
     const [imageStatus, setImageStatus] = useState<Record<string, 'loading' | 'loaded' | 'error'>>({});
 
+    // Save report states
+    const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
+    const [saveFilename, setSaveFilename] = useState<string>('Portfolio_Analysis_Report.md');
+    const [savingReport, setSavingReport] = useState<boolean>(false);
+    const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
     useEffect(() => {
         setImageStatus({});
     }, [imageSalt, analysisData]);
+
+    useEffect(() => {
+        if (toastMessage) {
+            const timer = setTimeout(() => setToastMessage(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [toastMessage]);
+
+    const handleSaveReport = async () => {
+        try {
+            setSavingReport(true);
+            let finalFilename = saveFilename.trim();
+            if (!finalFilename.toLowerCase().endsWith('.md')) {
+                finalFilename += '.md';
+            }
+
+            const res = await fetch(`${API_BASE_URL}/api/save-analysis-report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filename: finalFilename }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setToastMessage({ text: data.message || `Saved to ${finalFilename}`, type: 'success' });
+                setShowSaveModal(false);
+            } else {
+                const errData = await res.json();
+                setToastMessage({ text: errData.detail || 'Failed to save analysis report.', type: 'error' });
+            }
+        } catch (err) {
+            console.error("Error saving report", err);
+            setToastMessage({ text: 'Network error or server down.', type: 'error' });
+        } finally {
+            setSavingReport(false);
+        }
+    };
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -218,6 +263,20 @@ export function AnalysisPanel() {
                                 <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
                                 Elapsed: {elapsedTime}s
                             </div>
+                        )}
+                        {analysisData && !loading && (
+                            <Button 
+                                variant="outline"
+                                className="h-10 px-4 border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300 font-semibold transition-all duration-300 flex items-center gap-2"
+                                onClick={() => {
+                                    const base = selectedFile.replace(/\.csv$/, '');
+                                    setSaveFilename(`${base}_Analysis_Report.md`);
+                                    setShowSaveModal(true);
+                                }}
+                            >
+                                <FileText className="w-4 h-4" />
+                                Save Report
+                            </Button>
                         )}
                         <Button 
                             variant="default"
@@ -468,6 +527,91 @@ export function AnalysisPanel() {
                                 className="max-w-full max-h-[75vh] object-contain"
                             />
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Save Report Modal */}
+            {showSaveModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-all duration-300">
+                    <Card className="w-full max-w-md border border-border bg-card/95 shadow-2xl backdrop-blur-lg animate-in fade-in zoom-in-95 duration-200">
+                        <CardHeader className="pb-4">
+                            <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-cyan-500" />
+                                Save Analysis Report
+                            </CardTitle>
+                            <CardDescription>
+                                Specify the filename to export the technical analysis report as Markdown.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs text-muted-foreground font-semibold">Output Filename</label>
+                                <input 
+                                    type="text" 
+                                    value={saveFilename}
+                                    onChange={(e) => setSaveFilename(e.target.value)}
+                                    className="w-full h-10 px-3 rounded-lg border border-border bg-background/50 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 text-foreground font-mono"
+                                    placeholder="portfolio_report.md"
+                                    autoFocus
+                                />
+                                <p className="text-[10px] text-muted-foreground">
+                                    The report will be saved inside the project's base directory with Action Matrix and local chart image references.
+                                </p>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <Button 
+                                    variant="ghost"
+                                    onClick={() => setShowSaveModal(false)}
+                                    disabled={savingReport}
+                                    className="h-10 hover:bg-muted text-muted-foreground hover:text-foreground"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button 
+                                    variant="default"
+                                    className="h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold flex items-center gap-2"
+                                    onClick={handleSaveReport}
+                                    disabled={savingReport || !saveFilename.trim()}
+                                >
+                                    {savingReport ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        'Save File'
+                                    )}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Custom Premium Toast */}
+            {toastMessage && (
+                <div className="fixed top-6 right-6 z-[120] animate-in slide-in-from-top-5 duration-300">
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md font-medium text-sm transition-all duration-300 ${
+                        toastMessage.type === 'success' 
+                            ? 'bg-green-950/80 text-green-400 border-green-500/30 shadow-green-500/5' 
+                            : 'bg-red-950/80 text-red-400 border-red-500/30 shadow-red-500/5'
+                    }`}>
+                        {toastMessage.type === 'success' ? (
+                            <CheckCircle className="w-5 h-5 text-green-400" />
+                        ) : (
+                            <AlertTriangle className="w-5 h-5 text-red-400" />
+                        )}
+                        <span>{toastMessage.text}</span>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-5 h-5 rounded-full text-current hover:bg-white/10 p-0 ml-1"
+                            onClick={() => setToastMessage(null)}
+                        >
+                            <X className="w-3 h-3" />
+                        </Button>
                     </div>
                 </div>
             )}
