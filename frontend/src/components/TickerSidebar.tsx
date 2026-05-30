@@ -63,7 +63,7 @@ export function TickerSidebar({
                     <h2 className="font-bold text-lg tracking-tight">Strategic Alpha</h2>
                 </div>
                 <div className="text-[10px] text-muted-foreground font-mono pl-8">
-                    v20260420
+                    v20260530
                 </div>
             </div>
 

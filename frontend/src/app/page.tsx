@@ -13,8 +13,9 @@ import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
 import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
 import { PaperStudyPanel } from '@/components/PaperStudyPanel';
 import { BrokersPanel } from '@/components/BrokersPanel';
+import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -22,7 +23,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -146,7 +147,7 @@ export default function Dashboard() {
 
         {!selectedTicker ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260420</span></h2>
+            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260530</span></h2>
             <p>Add and select a ticker from the sidebar to view quant analysis.</p>
           </div>
         ) : loading ? (
@@ -169,6 +170,7 @@ export default function Dashboard() {
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
                   {viewMode === 'paper-study' && 'Paper Trading Log'}
                   {viewMode === 'brokers' && 'Broker Management'}
+                  {viewMode === 'analysis' && 'Portfolio Technical Analysis'}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
@@ -180,6 +182,7 @@ export default function Dashboard() {
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                   {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
                   {viewMode === 'brokers' && 'Manage Interactive Brokers connection and view real-time portfolio data'}
+                  {viewMode === 'analysis' && 'Willy VWAP dynamics, 2.0 ATR volatility boundaries, and high-precision visual summaries.'}
                 </p>
               </div>
               <div className="flex bg-muted/50 p-1 rounded-lg border">
@@ -209,6 +212,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'brokers' ? 'secondary' : 'ghost'} onClick={() => setViewMode('brokers')} size="sm" className="rounded-md">
                   <Landmark className="w-4 h-4 mr-2" /> Brokers
+                </Button>
+                <Button variant={viewMode === 'analysis' ? 'secondary' : 'ghost'} onClick={() => setViewMode('analysis')} size="sm" className="rounded-md">
+                  <FileText className="w-4 h-4 mr-2" /> Analysis
                 </Button>
               </div>
             </div>
@@ -291,6 +297,12 @@ export default function Dashboard() {
             {viewMode === 'brokers' && (
               <div className="mt-2">
                 <BrokersPanel />
+              </div>
+            )}
+
+            {viewMode === 'analysis' && (
+              <div className="mt-2">
+                <AnalysisPanel />
               </div>
             )}
           </div>

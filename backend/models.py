@@ -48,6 +48,8 @@ class TechnicalIndicators(BaseModel):
     volume: Optional[int] = None
     volume_avg_20: Optional[float] = None
     willy_vwap: Optional[float] = None
+    willy_vwap_ratio: Optional[float] = None
+
 
 class TickerAnalysis(BaseModel):
     symbol: str
@@ -106,3 +108,18 @@ class PortfolioSummaryResponse(BaseModel):
     holdings: List[HoldingModel]
     transactions: List[TransactionResponse]
     ib_orders: Optional[List[IBOrderModel]] = []
+
+class StockAnalysisItem(BaseModel):
+    symbol: str
+    close: float
+    willy_vwap: float
+    vwap_upper: float
+    vwap_lower: float
+    posture: str
+    recommendation: str
+    details: List[str]
+
+class PortfolioAnalysisResponse(BaseModel):
+    filename: str
+    items: List[StockAnalysisItem]
+    status: str

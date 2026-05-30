@@ -1,14 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from typing import List
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
 import csv
 import os
+import json
+
 
 app = FastAPI(
     title="Strategic Alpha Dashboard API",
@@ -434,3 +436,134 @@ def add_paper_study_transaction(tx: TransactionModel):
         return {"status": "success", "message": f"Transaction added successfully{ib_msg}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+import subprocess
+
+def run_take_screenshots_script():
+    try:
+        script_path = os.path.join(BASE_DIR, "take_screenshots.py")
+        python_exe = r"C:\Users\moder\AppData\Local\Programs\Python\Python311\python.exe"
+        print(f"[BACKGROUND] Starting screenshot capture: {python_exe} {script_path}")
+        subprocess.Popen([python_exe, script_path], cwd=BASE_DIR)
+    except Exception as e:
+        print(f"[BACKGROUND] Error launching screenshots script: {e}")
+
+@app.get("/api/run-analysis", response_model=PortfolioAnalysisResponse)
+def run_analysis(background_tasks: BackgroundTasks, filename: str = "portfolio-01.csv") -> PortfolioAnalysisResponse:
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(BASE_DIR, safe_filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Portfolio file {safe_filename} not found.")
+        
+    tickers = []
+    try:
+        with open(file_path, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                clean_row = {k.strip() if k else k: v for k, v in row.items()}
+                if 'Symbol' in clean_row and clean_row['Symbol'].strip():
+                    tickers.append(clean_row['Symbol'].strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading portfolio: {str(e)}")
+        
+    items = []
+    for ticker in tickers:
+        if ticker.upper() == 'CASH':
+            continue
+            
+        try:
+            analysis = run_all_strategies(ticker.upper())
+            if analysis.error or not analysis.price_history or not analysis.technical_indicators:
+                continue
+                
+            latest = analysis.price_history[-1]
+            close = float(latest.close)
+            willy = float(analysis.technical_indicators.willy_vwap)
+            upper = float(latest.vwap_upper) if latest.vwap_upper is not None else willy * 1.10
+            lower = float(latest.vwap_lower) if latest.vwap_lower is not None else willy * 0.90
+            
+            # Determine Posture & Recommendation
+            if close > upper:
+                posture = "Overbought (Above Upper ATR)"
+                recommendation = "SELL / TAKE PROFITS"
+                details = [
+                    f"Price (${close:.2f}) has broken above the 2.0 ATR Upper Band (${upper:.2f}).",
+                    "This signifies an extremely overextended bullish swing with high probability of near-term mean reversion.",
+                    f"Willy VWAP Dynamic Support sits at ${willy:.2f}. Recommend locking in gains."
+                ]
+            elif close < lower:
+                posture = "Oversold (Below Lower ATR)"
+                recommendation = "BUY / ACCUMULATE"
+                details = [
+                    f"Price (${close:.2f}) has fallen below the 2.0 ATR Lower Band (${lower:.2f}).",
+                    "This indicates highly oversold conditions within the dynamic volatility channel.",
+                    f"Willy VWAP Dynamic Pivot sits at ${willy:.2f}. Bounces off this level provide a highly defined risk/reward ratio."
+                ]
+            elif close > willy:
+                posture = "Bullish Swing (Mid-channel)"
+                recommendation = "HOLD"
+                details = [
+                    f"Price (${close:.2f}) is in an orderly upward trend above the Willy VWAP Dynamic Anchor (${willy:.2f}).",
+                    f"Upward momentum is intact. The nearest resistance target sits at the upper ATR line (${upper:.2f}).",
+                    "Maintain current swing long postures."
+                ]
+            else:
+                posture = "Bearish Swing (Retraction Zone)"
+                recommendation = "HOLD / WATCH FOR BUY"
+                details = [
+                    f"Price (${close:.2f}) is retracing in a bearish short-term swing below the Willy VWAP pivot (${willy:.2f}).",
+                    f"Approaching the lower ATR support envelope at ${lower:.2f}.",
+                    "Hold current shares but watch for a volume-supported bounce near the support boundary to add exposure."
+                ]
+                
+            items.append(StockAnalysisItem(
+                symbol=ticker.upper(),
+                close=close,
+                willy_vwap=willy,
+                vwap_upper=upper,
+                vwap_lower=lower,
+                posture=posture,
+                recommendation=recommendation,
+                details=details
+            ))
+        except Exception as e:
+            print(f"Error processing {ticker} in /api/run-analysis: {e}")
+            
+    response_data = PortfolioAnalysisResponse(
+        filename=safe_filename,
+        items=items,
+        status="complete"
+    )
+    
+    # Persist the dynamic calculations to last_analysis.json
+    try:
+        last_analysis_path = os.path.join(BASE_DIR, "last_analysis.json")
+        with open(last_analysis_path, "w", encoding="utf-8") as f:
+            json.dump(response_data.model_dump(), f, indent=2)
+    except Exception as e:
+        print(f"Error persisting last_analysis.json: {e}")
+        
+    background_tasks.add_task(run_take_screenshots_script)
+    
+    # Return with status triggered so the frontend knows background CAPTURE has started
+    response_data.status = "triggered"
+    return response_data
+
+@app.get("/api/last-analysis", response_model=PortfolioAnalysisResponse)
+def get_last_analysis() -> PortfolioAnalysisResponse:
+    last_analysis_path = os.path.join(BASE_DIR, "last_analysis.json")
+    if os.path.exists(last_analysis_path):
+        try:
+            with open(last_analysis_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return PortfolioAnalysisResponse(**data)
+        except Exception as e:
+            print(f"Error loading last_analysis.json: {e}")
+            
+    return PortfolioAnalysisResponse(
+        filename="",
+        items=[],
+        status="idle"
+    )
+

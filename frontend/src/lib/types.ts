@@ -44,6 +44,7 @@ export interface TechnicalIndicators {
     volume?: number;
     volume_avg_20?: number;
     willy_vwap?: number;
+    willy_vwap_ratio?: number;
 }
 
 export interface TickerAnalysis {
@@ -108,4 +109,21 @@ export interface IBData {
   buying_power: number;
   holdings: Holding[];
   orders: IBOrder[];
+}
+
+export interface StockAnalysisItem {
+  symbol: string;
+  close: number;
+  willy_vwap: number;
+  vwap_upper: number;
+  vwap_lower: number;
+  posture: string;
+  recommendation: string;
+  details: string[];
+}
+
+export interface PortfolioAnalysisResponse {
+  filename: string;
+  items: StockAnalysisItem[];
+  status: string;
 }

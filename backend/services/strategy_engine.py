@@ -65,6 +65,10 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
         willy_vwap_series = calculate_willy_vwap(history)
         willy_vwap = willy_vwap_series.iloc[-1]
         
+        # Calculate ratio of current close to Willy VWAP
+        current_close = float(closes.iloc[-1])
+        willy_vwap_ratio = current_close / willy_vwap if willy_vwap and willy_vwap != 0 else None
+        
         return TechnicalIndicators(
             sma_50=float(sma_50) if pd.notna(sma_50) else None,
             sma_200=float(sma_200) if pd.notna(sma_200) else None,
@@ -79,7 +83,8 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
             bollinger_lower=float(boll_lower) if pd.notna(boll_lower) else None,
             volume=volume if pd.notna(volume) else None,
             volume_avg_20=float(volume_avg_20) if pd.notna(volume_avg_20) else None,
-            willy_vwap=float(willy_vwap) if pd.notna(willy_vwap) else None
+            willy_vwap=float(willy_vwap) if pd.notna(willy_vwap) else None,
+            willy_vwap_ratio=float(willy_vwap_ratio) if willy_vwap_ratio is not None and pd.notna(willy_vwap_ratio) else None
         )
     except Exception as e:
         print(f"Error calculating technical indicators: {e}")

@@ -109,6 +109,11 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             rec = (currentPrice > willyVwap && closeSlopeRaw > 0) ? 'Hold' : 'Sell';
         }
 
+        let willyVwapRatio = data.technical_indicators?.willy_vwap_ratio ?? null;
+        if (willyVwapRatio === null && currentPrice !== null && willyVwap !== null && willyVwap !== 0) {
+            willyVwapRatio = currentPrice / willyVwap;
+        }
+
         return {
             symbol: data.symbol,
             ml_alpha: alphaProb,
@@ -118,6 +123,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             close_price: currentPrice,
             close_slope: closeSlopeStr,
             close_slope_raw: closeSlopeRaw,
+            willy_vwap_ratio: willyVwapRatio,
             macd_hist: macdHist,
             macd_slope: macdSlope,
             macd_rel: macdRel,
@@ -171,6 +177,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'rsi_slope') {
             valA = a.rsi_slope ?? -99999;
             valB = b.rsi_slope ?? -99999;
+        } else if (sortKey === 'willy_vwap_ratio') {
+            valA = a.willy_vwap_ratio ?? -99999;
+            valB = b.willy_vwap_ratio ?? -99999;
         } else {
             valA = a.strats[sortKey] || 0;
             valB = b.strats[sortKey] || 0;
@@ -199,7 +208,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         setIsExporting(true);
         const headers = [
             "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Close Price", "Close Slope",
-            "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
+            "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
         ];
 
         const rows = sortedData.map(row => {
@@ -211,6 +220,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.rec,
                 row.close_price !== null ? row.close_price.toFixed(2) : "N/A",
                 row.close_slope,
+                row.willy_vwap_ratio !== null ? row.willy_vwap_ratio.toFixed(3) : "N/A",
                 row.macd_hist !== null ? row.macd_hist.toFixed(2) : "N/A",
                 row.macd_slope !== null ? row.macd_slope.toFixed(2) : "N/A",
                 row.macd_rel !== null ? row.macd_rel.toFixed(2) : "N/A",
@@ -305,6 +315,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             Close Slope {renderSortIcon("close_slope")}
                         </TableHead>
                         <TableHead
+                            className="font-bold text-cyan-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('willy_vwap_ratio')}
+                        >
+                            Price/Willy VWAP {renderSortIcon("willy_vwap_ratio")}
+                        </TableHead>
+                        <TableHead
                             className="font-bold text-teal-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('macd_hist')}
                         >
@@ -349,7 +365,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 <TableBody>
                     {sortedData.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={STRATEGY_NAMES.length + 6} className="text-center py-10 text-muted-foreground">
+                            <TableCell colSpan={STRATEGY_NAMES.length + 15} className="text-center py-10 text-muted-foreground">
                                 No data loaded yet. Select stocks from the sidebar.
                             </TableCell>
                         </TableRow>
@@ -387,6 +403,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                                 {row.close_slope}
                                             </span>
                                         ) : <span className="text-muted-foreground text-sm">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[90px]">
+                                        {row.willy_vwap_ratio != null ? (
+                                            <span className={row.willy_vwap_ratio >= 1.0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                                                {row.willy_vwap_ratio.toFixed(3)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[90px]">
                                         {row.macd_hist != null ? (
