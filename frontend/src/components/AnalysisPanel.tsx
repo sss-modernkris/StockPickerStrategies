@@ -19,6 +19,11 @@ export function AnalysisPanel() {
     const [lightboxTitle, setLightboxTitle] = useState<string | null>(null);
     const [screenshotStatus, setScreenshotStatus] = useState<'idle' | 'capturing' | 'complete'>('idle');
     const [imageSalt, setImageSalt] = useState<number>(0);
+    const [imageStatus, setImageStatus] = useState<Record<string, 'loading' | 'loaded' | 'error'>>({});
+
+    useEffect(() => {
+        setImageStatus({});
+    }, [imageSalt, analysisData]);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -354,6 +359,7 @@ export function AnalysisPanel() {
                         {analysisData.items.map(item => {
                             const c = getPostureColorClasses(item.posture);
                             const imgUrl = `/images_advanced/${item.symbol}_advanced_chart.png?salt=${imageSalt}`;
+                            const status = imageStatus[item.symbol] || 'loading';
 
                             return (
                                 <Card key={item.symbol} className={`border border-border/50 bg-card/45 backdrop-blur-sm overflow-hidden flex flex-col group transition-all duration-300 hover:shadow-xl`}>
@@ -373,34 +379,33 @@ export function AnalysisPanel() {
                                         {/* Image Section */}
                                         <div className="relative rounded-lg overflow-hidden border border-border/60 bg-muted/20 group/img h-[200px] flex items-center justify-center cursor-pointer"
                                              onClick={() => {
-                                                 setLightboxImage(imgUrl);
-                                                 setLightboxTitle(`${item.symbol} Technical Indicators`);
+                                                 if (status === 'loaded') {
+                                                     setLightboxImage(imgUrl);
+                                                     setLightboxTitle(`${item.symbol} Technical Indicators`);
+                                                 }
                                              }}
                                         >
+                                            {status !== 'loaded' && (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs p-4 text-center">
+                                                    <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
+                                                    {status === 'loading' ? 'Loading Visual Chart...' : 'Generating Advanced Chart...'}
+                                                </div>
+                                            )}
+
                                             <img 
                                                 src={imgUrl} 
                                                 alt={`${item.symbol} Chart`} 
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-[1.03]"
-                                                onError={(e) => {
-                                                    // Fallback if image doesn't exist yet
-                                                    (e.target as HTMLElement).style.display = 'none';
-                                                    const parent = (e.target as HTMLElement).parentElement;
-                                                    if (parent) {
-                                                        const el = parent.querySelector('.fallback-el');
-                                                        if (el) (el as HTMLElement).style.display = 'flex';
-                                                    }
-                                                }}
+                                                className={`w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-[1.03] ${status === 'loaded' ? 'block' : 'hidden'}`}
+                                                onLoad={() => setImageStatus(prev => ({ ...prev, [item.symbol]: 'loaded' }))}
+                                                onError={() => setImageStatus(prev => ({ ...prev, [item.symbol]: 'error' }))}
                                             />
-                                            {/* Fallback Viewport during screenshot run */}
-                                            <div className="fallback-el hidden absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground text-xs p-4 text-center">
-                                                <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
-                                                Generating Advanced Chart...
-                                            </div>
 
                                             {/* Maximizer Hover Button */}
-                                            <div className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-white opacity-0 group-hover/img:opacity-100 transition-opacity duration-200">
-                                                <Maximize2 className="w-3.5 h-3.5" />
-                                            </div>
+                                            {status === 'loaded' && (
+                                                <div className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-white opacity-0 group-hover/img:opacity-100 transition-opacity duration-200">
+                                                    <Maximize2 className="w-3.5 h-3.5" />
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Technical Posture Metrics */}
