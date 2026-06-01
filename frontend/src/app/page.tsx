@@ -14,6 +14,7 @@ import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
 import { PaperStudyPanel } from '@/components/PaperStudyPanel';
 import { BrokersPanel } from '@/components/BrokersPanel';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
+import { BxTrenderPanel } from '@/components/BxTrenderPanel';
 import { TickerAnalysis } from '@/lib/types';
 import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -160,7 +161,7 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">
+                 <h1 className="text-3xl font-bold tracking-tight">
                   {viewMode === 'dashboard' && currentData.symbol}
                   {viewMode === 'table' && 'Comparison Table'}
                   {viewMode === 'normalized-compare' && 'Relative Performance Analytics'}
@@ -171,6 +172,7 @@ export default function Dashboard() {
                   {viewMode === 'paper-study' && 'Paper Trading Log'}
                   {viewMode === 'brokers' && 'Broker Management'}
                   {viewMode === 'analysis' && 'Portfolio Technical Analysis'}
+                  {viewMode === 'bx' && `${currentData.symbol} BX Trender Analysis`}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
@@ -183,6 +185,7 @@ export default function Dashboard() {
                   {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
                   {viewMode === 'brokers' && 'Manage Interactive Brokers connection and view real-time portfolio data'}
                   {viewMode === 'analysis' && 'Willy VWAP dynamics, 2.0 ATR volatility boundaries, and high-precision visual summaries.'}
+                  {viewMode === 'bx' && 'Dual-momentum oscillator calculations, short-term spreads, long-term background histograms, and automated crossover logs.'}
                 </p>
               </div>
               <div className="flex bg-muted/50 p-1 rounded-lg border">
@@ -215,6 +218,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'analysis' ? 'secondary' : 'ghost'} onClick={() => setViewMode('analysis')} size="sm" className="rounded-md">
                   <FileText className="w-4 h-4 mr-2" /> Analysis
+                </Button>
+                <Button variant={viewMode === 'bx' ? 'secondary' : 'ghost'} onClick={() => setViewMode('bx')} size="sm" className="rounded-md">
+                  <TrendingUp className="w-4 h-4 mr-2" /> BX Trender
                 </Button>
               </div>
             </div>
@@ -303,6 +309,12 @@ export default function Dashboard() {
             {viewMode === 'analysis' && (
               <div className="mt-2">
                 <AnalysisPanel />
+              </div>
+            )}
+
+            {viewMode === 'bx' && (
+              <div className="mt-2">
+                <BxTrenderPanel priceHistory={currentData.price_history || []} symbol={currentData.symbol} />
               </div>
             )}
           </div>

@@ -7,6 +7,11 @@ export interface StrategyResult {
 export interface PricePoint {
     date: string;
     close: number;
+    open?: number | null;
+    high?: number | null;
+    low?: number | null;
+    bx_short?: number | null;
+    bx_long?: number | null;
     macd?: number | null;
     macd_signal?: number | null;
     macd_hist?: number | null;

@@ -164,9 +164,29 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
         
         history_df["vwap_upper"] = history_df["willy_vwap"] + (atr_14 * 2.0)
         history_df["vwap_lower"] = history_df["willy_vwap"] - (atr_14 * 2.0)
+
+        # BX Trender calculations
+        def pandas_rsi(series: pd.Series, period: int = 14) -> pd.Series:
+            diff = series.diff()
+            up = diff.clip(lower=0)
+            down = -diff.clip(upper=0)
+            avg_up = up.rolling(window=period).mean()
+            avg_down = down.rolling(window=period).mean()
+            relative_strength = avg_up / avg_down.replace(0, 1e-9)
+            return 100 - (100 / (1 + relative_strength))
+
+        # 1. Short-Term Xtrender
+        ema_5 = closes.ewm(span=5, adjust=False).mean()
+        ema_20 = closes.ewm(span=20, adjust=False).mean()
+        spread = ema_5 - ema_20
+        history_df["bx_short"] = pandas_rsi(spread, 14) - 50
+
+        # 2. Long-Term Xtrender
+        ema_200 = closes.ewm(span=200, adjust=False).mean()
+        history_df["bx_long"] = pandas_rsi(ema_200, 14) - 50
         
-        # Capture the last 126 days (~6 months)
-        hist = history_df.tail(126) 
+        # Capture the last 252 days (~12 months rolling)
+        hist = history_df.tail(252) 
         
         for date, row in hist.iterrows():
             def safe_float(val):
@@ -175,6 +195,11 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
             price_history.append({
                 "date": date.strftime("%Y-%m-%d"),
                 "close": float(row["Close"]),
+                "open": safe_float(row.get("Open")),
+                "high": safe_float(row.get("High")),
+                "low": safe_float(row.get("Low")),
+                "bx_short": safe_float(row.get("bx_short")),
+                "bx_long": safe_float(row.get("bx_long")),
                 "macd": safe_float(row.get("macd")),
                 "macd_signal": safe_float(row.get("macd_signal")),
                 "macd_hist": safe_float(row.get("macd_hist")),

@@ -9,6 +9,11 @@ class StrategyResult(BaseModel):
 class PricePoint(BaseModel):
     date: str
     close: float
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    bx_short: Optional[float] = None
+    bx_long: Optional[float] = None
     macd: Optional[float] = None
     macd_signal: Optional[float] = None
     macd_hist: Optional[float] = None
