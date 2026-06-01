@@ -2,7 +2,23 @@ import React, { useState } from 'react';
 import { PricePoint } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ComposedChart, Bar, Cell, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TrendingUp, TrendingDown, Activity, AlertCircle, Info, Calendar, Zap } from 'lucide-react';
+import { 
+    TrendingUp, 
+    TrendingDown, 
+    Activity, 
+    AlertCircle, 
+    Info, 
+    Calendar, 
+    Zap, 
+    CheckCircle2, 
+    XCircle, 
+    BookOpen, 
+    ShieldAlert, 
+    ChevronRight, 
+    HelpCircle,
+    ArrowUpRight,
+    ArrowDownRight
+} from 'lucide-react';
 
 interface BxTrenderPanelProps {
     priceHistory: PricePoint[];
@@ -19,6 +35,7 @@ interface CrossoverSignal {
 
 export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
     const [timeRange, setTimeRange] = useState<'3M' | '6M' | '12M'>('12M');
+    const [activeGuideTab, setActiveGuideTab] = useState<'signals' | 'checklist' | 'math' | 'risk'>('signals');
 
     if (!priceHistory || priceHistory.length === 0) {
         return (
@@ -310,6 +327,362 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                     Note: Signals are generated dynamically by scanning the historical daily price coordinates chronologically. A zero-crossing triggers a **BUY** or **SELL** alert, whereas a baseline spread crossover marks **ACCUMULATE** or **CAUTION** alerts.
                 </p>
             </div>
+
+            {/* BX Trender Strategic Trading & Decision Guide */}
+            <div className="bg-card border rounded-lg p-6 shadow-md flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
+                    <div>
+                        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-primary" />
+                            <span>BX Trender Trading Guide & Decision Hub</span>
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            A highly detailed breakdown of the mathematical properties, signal definitions, and advanced execution rules of the proprietary dual-momentum BX Trender strategy.
+                        </p>
+                    </div>
+
+                    {/* Interactive Tab Selectors */}
+                    <div className="flex flex-wrap gap-1.5 bg-muted/30 p-1 rounded-lg border">
+                        <button
+                            onClick={() => setActiveGuideTab('signals')}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                                activeGuideTab === 'signals'
+                                    ? 'bg-secondary text-secondary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                            }`}
+                        >
+                            <Zap className="w-3.5 h-3.5" />
+                            Core Decision Signals
+                        </button>
+                        <button
+                            onClick={() => setActiveGuideTab('checklist')}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                                activeGuideTab === 'checklist'
+                                    ? 'bg-secondary text-secondary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                            }`}
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Trader's Audit Flow
+                        </button>
+                        <button
+                            onClick={() => setActiveGuideTab('math')}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                                activeGuideTab === 'math'
+                                    ? 'bg-secondary text-secondary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                            }`}
+                        >
+                            <Activity className="w-3.5 h-3.5" />
+                            Mathematical Framework
+                        </button>
+                        <button
+                            onClick={() => setActiveGuideTab('risk')}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                                activeGuideTab === 'risk'
+                                    ? 'bg-secondary text-secondary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                            }`}
+                        >
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                            Risk & Invalidation
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tab content renderer */}
+                <div className="min-h-[220px]">
+                    {activeGuideTab === 'signals' && (
+                        <div className="space-y-6">
+                            <p className="text-xs text-muted-foreground max-w-4xl">
+                                The BX Trender uses a dual-momentum regime to classify four distinct stages in an asset's cycle. 
+                                Always confirm short-term triggers with the primary trend (Long-Term background histogram) before making final buy/sell decisions.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* Card 1: Strong Buy */}
+                                <div className="bg-muted/20 border border-green-500/20 rounded-lg p-4 flex flex-col justify-between hover:bg-muted/30 transition-all shadow-[0_0_12px_rgba(34,197,94,0.02)]">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold tracking-wider bg-green-500/10 text-green-500 border border-green-500/20 px-2 py-0.5 rounded uppercase">
+                                                <ArrowUpRight className="w-3 h-3" /> Strong Buy
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">Confluent Breakout</span>
+                                        </div>
+                                        <h4 className="font-bold text-foreground text-sm">Dual Bullish Confluence</h4>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Short-Term Xtrender is <strong className="text-green-500">&gt; 0</strong> (crossing zero upwards) while the Long-Term background histogram is <strong className="text-emerald-500">Green (&gt; 0)</strong>.
+                                        </p>
+                                    </div>
+                                    <div className="border-t border-muted/50 mt-3 pt-3 text-[11px] text-muted-foreground">
+                                        <span className="font-semibold text-foreground">Action:</span> Initiate full long exposure or buy call options. High probability of immediate momentum expansion.
+                                    </div>
+                                </div>
+
+                                {/* Card 2: Accumulate */}
+                                <div className="bg-muted/20 border border-emerald-500/20 rounded-lg p-4 flex flex-col justify-between hover:bg-muted/30 transition-all shadow-[0_0_12px_rgba(16,185,129,0.02)]">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded uppercase">
+                                                <Zap className="w-3 h-3 text-emerald-400" /> Accumulate
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">Pullback Resolution</span>
+                                        </div>
+                                        <h4 className="font-bold text-foreground text-sm">Secondary Dip Buying</h4>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Short-Term Xtrender crosses <strong className="text-emerald-400">above the Long-Term baseline</strong> while the macro histogram is already positive (<strong className="text-green-500">Green</strong>).
+                                        </p>
+                                    </div>
+                                    <div className="border-t border-muted/50 mt-3 pt-3 text-[11px] text-muted-foreground">
+                                        <span className="font-semibold text-foreground">Action:</span> Add to existing positions on dips. Suggests intermediate-term profit taking has settled and primary uptrend is resuming.
+                                    </div>
+                                </div>
+
+                                {/* Card 3: Caution */}
+                                <div className="bg-muted/20 border border-amber-500/20 rounded-lg p-4 flex flex-col justify-between hover:bg-muted/30 transition-all shadow-[0_0_12px_rgba(245,158,11,0.02)]">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded uppercase">
+                                                <AlertCircle className="w-3 h-3 text-amber-500" /> Caution
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">Early Exhaustion</span>
+                                        </div>
+                                        <h4 className="font-bold text-foreground text-sm">Trend Fatigue Signal</h4>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Short-Term Xtrender crosses <strong className="text-amber-500">below the Long-Term baseline</strong>. Indicates buying momentum is starting to decay relative to the macro mean.
+                                        </p>
+                                    </div>
+                                    <div className="border-t border-muted/50 mt-3 pt-3 text-[11px] text-muted-foreground">
+                                        <span className="font-semibold text-foreground">Action:</span> Tighten trailing stop-losses, avoid adding new shares, take partial profits. Precedes full bearish crossings.
+                                    </div>
+                                </div>
+
+                                {/* Card 4: Strong Sell */}
+                                <div className="bg-muted/20 border border-red-500/20 rounded-lg p-4 flex flex-col justify-between hover:bg-muted/30 transition-all shadow-[0_0_12px_rgba(239,68,68,0.02)]">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold tracking-wider bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded uppercase">
+                                                <ArrowDownRight className="w-3 h-3 text-red-500" /> Strong Sell
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">Confluent Breakdown</span>
+                                        </div>
+                                        <h4 className="font-bold text-foreground text-sm">Dual Bearish Confluence</h4>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Short-Term Xtrender is <strong className="text-red-500">&lt; 0</strong> (crossing zero downwards) while the Long-Term background histogram is <strong className="text-red-500">Red (&lt; 0)</strong>.
+                                        </p>
+                                    </div>
+                                    <div className="border-t border-muted/50 mt-3 pt-3 text-[11px] text-muted-foreground">
+                                        <span className="font-semibold text-foreground">Action:</span> Exit long holdings completely, hedge exposure, or purchase protective puts. Heavy downside acceleration risk.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeGuideTab === 'checklist' && (
+                        <div className="space-y-5">
+                            <p className="text-xs text-muted-foreground max-w-4xl font-sans">
+                                Follow this rigorous step-by-step trading audit workflow to assess a stock ticker systematically before executing buy or sell transactions:
+                            </p>
+                            <div className="relative border-l border-muted pl-6 ml-4 space-y-6">
+                                {/* Step 1 */}
+                                <div className="relative">
+                                    <span className="absolute -left-[33px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground border-4 border-background">
+                                        1
+                                    </span>
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-foreground text-xs flex items-center gap-2">
+                                            Assess the Primary Regime (Background Histogram)
+                                        </h4>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                            Check if the background bar is <strong className="text-green-500">Green</strong> or <strong className="text-red-500">Red</strong>. 
+                                            Green signifies a bullish environment where buy signals represent highly profitable breakouts. Red indicates a bearish regime where capital should be primarily in cash, or focused on hedging.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 2 */}
+                                <div className="relative">
+                                    <span className="absolute -left-[33px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground border-4 border-background">
+                                        2
+                                    </span>
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-foreground text-xs flex items-center gap-2">
+                                            Identify Crossover Trigger Events
+                                        </h4>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                            Consult the <strong className="text-foreground">Crossover Signal Logs</strong> table. 
+                                            Has the orange line recently crossed above the 0 mark (creating a BUY signal) or below the 0 mark (creating a SELL signal)? 
+                                            Or has it crossed the long-term baseline (ACCUMULATE / CAUTION)? Recent crossover occurrences represent entry and exit windows.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 3 */}
+                                <div className="relative">
+                                    <span className="absolute -left-[33px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground border-4 border-background">
+                                        3
+                                    </span>
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-foreground text-xs flex items-center gap-2">
+                                            Measure Momentum Velocity and Fatigue
+                                            <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded font-mono font-normal text-muted-foreground">Short-Term Amplitude</span>
+                                        </h4>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                            Observe the absolute height/depth of the Short-Term line (orange). 
+                                            If the orange line is in extreme zones (above <strong className="text-foreground">+40</strong> or below <strong className="text-foreground">-40</strong>), the current move is highly mature. 
+                                            A downward hook from $+45$ is highly indicative of trend fatigue, even in a strong macro bull market.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 4 */}
+                                <div className="relative">
+                                    <span className="absolute -left-[33px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground border-4 border-background">
+                                        4
+                                    </span>
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-foreground text-xs flex items-center gap-2">
+                                            Verify Stop-Loss and Exit Alignment
+                                        </h4>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                            Establish the invalidation parameters before entering a trade. 
+                                            If buying, your strict stop-loss should trigger if the Short-Term line closes back below the Zero Line or the baseline. 
+                                            Adhering to these indicators protects portfolio equity during whipsaw periods.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeGuideTab === 'math' && (
+                        <div className="space-y-6">
+                            <p className="text-xs text-muted-foreground max-w-4xl font-sans">
+                                The BX Trender acts as a double-normalized momentum oscillator, translating raw price rates of change into stable, bounded ranges.
+                                This allows for robust visual alignment and reliable comparison across different asset classes and stock tickers.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Formula 1 */}
+                                <div className="bg-muted/10 border border-muted/50 rounded-lg p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-foreground text-xs tracking-wide uppercase border-b pb-2 mb-3 text-amber-500">
+                                            1. Short-Term Spread
+                                        </h4>
+                                        <div className="bg-card border rounded p-3 font-mono text-center text-xs text-foreground font-semibold shadow-sm my-2">
+                                            Spread = EMA(Close, 5) - EMA(Close, 20)
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                                            Calculates the differential between the fast 5-period and medium 20-period Exponential Moving Averages. 
+                                            This captures intermediate shifting price momentum before it affects primary trend structures.
+                                        </p>
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground border-t border-muted/50 pt-2 mt-4">
+                                        Tracks high-velocity trend changes.
+                                    </div>
+                                </div>
+
+                                {/* Formula 2 */}
+                                <div className="bg-muted/10 border border-muted/50 rounded-lg p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-foreground text-xs tracking-wide uppercase border-b pb-2 mb-3 text-amber-400">
+                                            2. Short-Term Normalization
+                                        </h4>
+                                        <div className="bg-card border rounded p-3 font-mono text-center text-xs text-foreground font-semibold shadow-sm my-2">
+                                            ShortTerm = RSI(Spread, 14) - 50
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                                            Feeds the raw EMA Spread into a 14-period Relative Strength Index (RSI). 
+                                            Subtracting 50 centers the bounds precisely from <strong className="text-foreground">-50</strong> to <strong className="text-foreground">+50</strong>. 
+                                            This isolates high-probability breakout momentum while neutralizing the price scale of the stock.
+                                        </p>
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground border-t border-muted/50 pt-2 mt-4">
+                                        Bounded momentum removes stock price bias.
+                                    </div>
+                                </div>
+
+                                {/* Formula 3 */}
+                                <div className="bg-muted/10 border border-muted/50 rounded-lg p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-foreground text-xs tracking-wide uppercase border-b pb-2 mb-3 text-green-500">
+                                            3. Long-Term Baseline
+                                        </h4>
+                                        <div className="bg-card border rounded p-3 font-mono text-center text-xs text-foreground font-semibold shadow-sm my-2">
+                                            LongTerm = RSI(EMA(Close, 200), 14) - 50
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                                            Calculates a 14-period RSI directly over the major 200-period Exponential Moving Average (EMA 200). 
+                                            Subtracting 50 centers the output. 
+                                            This creates a macro structural regime filter, which determines if the primary market trend is positive or negative.
+                                        </p>
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground border-t border-muted/50 pt-2 mt-4">
+                                        Determines primary long-term market regime.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeGuideTab === 'risk' && (
+                        <div className="space-y-6">
+                            <p className="text-xs text-muted-foreground max-w-4xl font-sans">
+                                Even the most precise quantitative oscillators generate false breakout signals in choppy markets. 
+                                Apply these systematic risk management rules to preserve capital and ensure high-probability trades.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs leading-relaxed">
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-foreground flex items-center gap-1.5">
+                                        <ShieldAlert className="w-4 h-4 text-primary" />
+                                        <span>Position Sizing Guidelines</span>
+                                    </h4>
+                                    <ul className="space-y-2.5 pl-4 list-disc text-muted-foreground">
+                                        <li>
+                                            <strong className="text-foreground">Confluent Trades (100% Size)</strong>: Allocate normal, full capital parameters when executing a BUY signal that is supported by a <span className="text-green-500 font-semibold">Green Long-Term Histogram</span>.
+                                        </li>
+                                        <li>
+                                            <strong className="text-foreground">Counter-Trend Scalps (50% Size)</strong>: If taking a buy signal when the background histogram is <span className="text-red-500 font-semibold">Red</span>, reduce your trade capital allocation by at least 50%. Counter-trend trades are highly prone to sudden failure.
+                                        </li>
+                                        <li>
+                                            <strong className="text-foreground">The Whipsaw Trap</strong>: If the Short-Term line (orange) is oscillating tightly between <strong className="text-foreground">-10</strong> and <strong className="text-foreground">+10</strong>, the stock is in a low-liquidity consolidation range. Avoid entry entirely and keep capital in cash until a high-velocity breakout is registered.
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-foreground flex items-center gap-1.5">
+                                        <XCircle className="w-4 h-4 text-red-500" />
+                                        <span>Trade Invalidation & Stop-Loss Placement</span>
+                                    </h4>
+                                    <ul className="space-y-2.5 pl-4 list-disc text-muted-foreground">
+                                        <li>
+                                            <strong className="text-foreground">Zero Line Invalidation</strong>: If long on a BUY trigger, the ultimate structural invalidation occurs when the Short-Term line closes back below <strong className="text-red-500">0</strong>. Exit immediately; do not hope for a recovery.
+                                        </li>
+                                        <li>
+                                            <strong className="text-foreground">EMA-Based Stops</strong>: Set hard stop-loss targets at the 20-period EMA price level on your chart. A physical daily close beneath the EMA 20 confirms the breakdown of short-term velocity.
+                                        </li>
+                                        <li>
+                                            <strong className="text-foreground">Trailing Profit Protection</strong>: When the Short-Term line climbs above <strong className="text-foreground">+40</strong> and begins to curl downwards, scale out of 50% of the position. This secures profits at peak velocity, before trend exhaustion manifests.
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Warning banner */}
+                <div className="mt-2 p-3.5 bg-muted/40 border border-amber-500/20 rounded-lg border-l-4 border-l-amber-500 flex items-start gap-3">
+                    <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                        <h5 className="font-semibold text-foreground text-xs">Risk Disclosure & Execution Rationale</h5>
+                        <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                            BX Trender analytics should never be used in a vacuum. Combining these signals with volume indicators (e.g. Volume Spikes, VWAP boundaries) and macroeconomic factors provides the highest rate of success. All quantitative strategies are subject to market conditions, and stop-loss enforcement remains the single most important factor in portfolio longevity.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 }
