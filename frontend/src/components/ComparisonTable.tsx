@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API_BASE_URL } from '@/lib/api';
-import { TickerAnalysis } from '@/lib/types';
+import { TickerAnalysis, PricePoint } from '@/lib/types';
 import {
     Table,
     TableBody,
@@ -10,14 +10,168 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
-import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2 } from 'lucide-react';
+import { LineChart, Line, AreaChart, Area, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, YAxis } from 'recharts';
+import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ComparisonTableProps {
     analysisData: Record<string, TickerAnalysis>;
 }
 
-type SortKey = 'ticker' | 'ml_alpha' | string;
+export interface BacktestResult {
+    finalValue: number;
+    totalReturn: number;
+    buyAndHoldReturn: number;
+    buyAndHoldValue: number;
+    transactions: {
+        date: string;
+        action: 'BUY' | 'SELL';
+        price: number;
+        shares: number;
+        cash: number;
+        value: number;
+    }[];
+    chartData: {
+        date: string;
+        strategyValue: number;
+        bhValue: number;
+        closePrice: number;
+        willyVwap: number;
+    }[];
+}
+
+export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
+    const defaultResult: BacktestResult = {
+        finalValue: 10000,
+        totalReturn: 0,
+        buyAndHoldReturn: 0,
+        buyAndHoldValue: 10000,
+        transactions: [],
+        chartData: []
+    };
+
+    if (!priceHistory || priceHistory.length === 0) {
+        return defaultResult;
+    }
+
+    // Filter price history between 2026-01-31 and 2026-05-31
+    const filtered = priceHistory.filter(
+        p => p.date >= '2026-01-31' && p.date <= '2026-05-31'
+    );
+
+    if (filtered.length === 0) {
+        return defaultResult;
+    }
+
+    const firstDay = filtered[0];
+    const startClose = firstDay.close;
+    if (!startClose || startClose <= 0) {
+        return defaultResult;
+    }
+
+    let cash = 0;
+    let shares = 10000 / startClose;
+    let isHolding = true;
+
+    const transactions: BacktestResult['transactions'] = [];
+
+    // Initial BUY transaction on the Start Date
+    transactions.push({
+        date: firstDay.date,
+        action: 'BUY',
+        price: startClose,
+        shares: shares,
+        cash: 0,
+        value: 10000
+    });
+
+    const chartData: BacktestResult['chartData'] = [];
+
+    chartData.push({
+        date: firstDay.date,
+        strategyValue: 10000,
+        bhValue: 10000,
+        closePrice: startClose,
+        willyVwap: firstDay.willy_vwap ?? startClose
+    });
+
+    for (let i = 1; i < filtered.length; i++) {
+        const day = filtered[i];
+        const prevDay = filtered[i - 1];
+        const close = day.close;
+        const willyVwap = day.willy_vwap;
+        const prevClose = prevDay.close;
+        const prevWillyVwap = prevDay.willy_vwap;
+
+        if (close === null || close === undefined || close <= 0) {
+            continue;
+        }
+
+        let action: 'BUY' | 'SELL' | null = null;
+
+        if (isHolding) {
+            // Sell Condition: Close falls below Willy VWAP
+            if (willyVwap !== null && willyVwap !== undefined && close < willyVwap) {
+                action = 'SELL';
+                cash = shares * close;
+                shares = 0;
+                isHolding = false;
+            }
+        } else {
+            // Buy Condition: Close crosses above Willy VWAP
+            // Transition from prevClose <= prevWillyVwap to close > willyVwap
+            const prevWasBelow = prevWillyVwap === null || prevWillyVwap === undefined || prevClose <= prevWillyVwap;
+            const currIsAbove = willyVwap !== null && willyVwap !== undefined && close > willyVwap;
+
+            if (currIsAbove && prevWasBelow) {
+                action = 'BUY';
+                shares = cash / close;
+                cash = 0;
+                isHolding = true;
+            }
+        }
+
+        const currentValue = isHolding ? (shares * close) : cash;
+        const bhValue = (10000 / startClose) * close;
+
+        if (action) {
+            transactions.push({
+                date: day.date,
+                action: action,
+                price: close,
+                shares: action === 'BUY' ? shares : 0,
+                cash: cash,
+                value: currentValue
+            });
+        }
+
+        chartData.push({
+            date: day.date,
+            strategyValue: currentValue,
+            bhValue: bhValue,
+            closePrice: close,
+            willyVwap: willyVwap ?? close
+        });
+    }
+
+    const lastDay = filtered[filtered.length - 1];
+    const lastClose = lastDay.close;
+    const finalValue = isHolding ? (shares * lastClose) : cash;
+    const totalReturn = ((finalValue - 10000) / 10000) * 100;
+
+    const buyAndHoldValue = (10000 / startClose) * lastClose;
+    const buyAndHoldReturn = ((buyAndHoldValue - 10000) / 10000) * 100;
+
+    return {
+        finalValue,
+        totalReturn,
+        buyAndHoldReturn,
+        buyAndHoldValue,
+        transactions,
+        chartData
+    };
+}
+
+type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'strategy_value' | 'strategy_return' | string;
 type SortDirection = 'asc' | 'desc';
 
 export function ComparisonTable({ analysisData }: ComparisonTableProps) {
@@ -25,6 +179,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [sortDir, setSortDir] = useState<SortDirection>('desc');
     const [isExporting, setIsExporting] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
+    const [selectedRowTicker, setSelectedRowTicker] = useState<string | null>(null);
 
     const dataList = Object.values(analysisData);
 
@@ -114,6 +269,8 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             willyVwapRatio = currentPrice / willyVwap;
         }
 
+        const backtest = runWillyBacktest(priceHistory);
+
         return {
             symbol: data.symbol,
             ml_alpha: alphaProb,
@@ -130,6 +287,10 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             rsi: rsi,
             rsi_slope: rsiSlope,
             strats: stratMap,
+            strategy_value: backtest.finalValue,
+            strategy_return: backtest.totalReturn,
+            bh_return: backtest.buyAndHoldReturn,
+            backtest_data: backtest,
             original: data
         };
     });
@@ -180,6 +341,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'willy_vwap_ratio') {
             valA = a.willy_vwap_ratio ?? -99999;
             valB = b.willy_vwap_ratio ?? -99999;
+        } else if (sortKey === 'strategy_value') {
+            valA = a.strategy_value;
+            valB = b.strategy_value;
+        } else if (sortKey === 'strategy_return') {
+            valA = a.strategy_return;
+            valB = b.strategy_return;
         } else {
             valA = a.strats[sortKey] || 0;
             valB = b.strats[sortKey] || 0;
@@ -207,7 +374,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const handleExportCsv = async () => {
         setIsExporting(true);
         const headers = [
-            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Close Price", "Close Slope",
+            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
             "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
         ];
 
@@ -218,6 +385,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.strat_avg.toFixed(1),
                 row.ranking,
                 row.rec,
+                row.strategy_value.toFixed(2),
+                row.strategy_return.toFixed(2),
+                row.bh_return.toFixed(2),
                 row.close_price !== null ? row.close_price.toFixed(2) : "N/A",
                 row.close_slope,
                 row.willy_vwap_ratio !== null ? row.willy_vwap_ratio.toFixed(3) : "N/A",
@@ -254,9 +424,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         }
     };
 
+    const selectedData = flatData.find(d => d.symbol === selectedRowTicker);
+    const backtest = selectedData ? selectedData.backtest_data : null;
+
     return (
-        <div className="flex flex-col gap-3 w-full h-full">
-            <div className="flex justify-end pr-2">
+        <div className="flex flex-col gap-4 w-full h-full overflow-y-auto">
+            <div className="flex justify-end pr-2 shrink-0">
                 <Button 
                     onClick={handleExportCsv} 
                     variant={exportSuccess ? "default" : "outline"} 
@@ -268,7 +441,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                     {isExporting ? "Saving..." : exportSuccess ? "Saved to Project Folder!" : "Export CSV"}
                 </Button>
             </div>
-            <div className="w-full h-full bg-card text-card-foreground border rounded-lg shadow-sm overflow-auto relative">
+            <div className={`w-full bg-card text-card-foreground border rounded-lg shadow-sm overflow-auto relative transition-all duration-300 ${selectedRowTicker ? 'h-[480px] shrink-0' : 'flex-1'}`}>
             <table className="w-full caption-bottom text-sm border-separate border-spacing-0">
                 <TableHeader className="sticky top-0 z-30 bg-card">
                     <TableRow>
@@ -301,6 +474,18 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             onClick={() => handleSort('rec')}
                         >
                             Rec {renderSortIcon("rec")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('strategy_value')}
+                        >
+                            Strategy Value ($) {renderSortIcon("strategy_value")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-emerald-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[125px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('strategy_return')}
+                        >
+                            Strat vs B&H (%) {renderSortIcon("strategy_return")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-cyan-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[90px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
@@ -372,9 +557,14 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                     ) : (
                         sortedData.map((row) => {
                             const data = row.original;
+                            const isSelected = selectedRowTicker === row.symbol;
 
                             return (
-                                <TableRow key={row.symbol}>
+                                <TableRow 
+                                    key={row.symbol}
+                                    className={`cursor-pointer transition-colors ${isSelected ? 'bg-muted/50 border-l-4 border-l-amber-500 font-semibold shadow-[inset_4px_0_0_0_#f59e0b]' : 'hover:bg-muted/30'}`}
+                                    onClick={() => setSelectedRowTicker(isSelected ? null : row.symbol)}
+                                >
                                     <TableCell className="font-bold sticky left-0 z-20 bg-card shadow-[1px_0_0_0_hsl(var(--border))]">
                                         {row.symbol}
                                     </TableCell>
@@ -389,6 +579,19 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className={`text-center font-bold ${row.rec === 'Hold' ? 'text-green-500' : row.rec === 'Sell' ? 'text-red-500' : 'text-muted-foreground'}`}>
                                         {row.rec}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono font-bold text-amber-500 bg-amber-500/5">
+                                        ${row.strategy_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </TableCell>
+                                    <TableCell className="text-center bg-emerald-500/5">
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <span className={`font-bold font-mono text-sm ${row.strategy_return >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {row.strategy_return >= 0 ? '+' : ''}{row.strategy_return.toFixed(1)}%
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground font-semibold">
+                                                B&H: {row.bh_return >= 0 ? '+' : ''}{row.bh_return.toFixed(1)}%
+                                            </span>
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[90px]">
                                         {row.close_price != null ? (
@@ -484,6 +687,172 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 </TableBody>
             </table>
         </div>
+
+        {/* Willy VWAP Backtest Dashboard Panel */}
+        {selectedRowTicker && selectedData && backtest && (
+            <div className="w-full bg-card text-card-foreground border rounded-lg shadow-md p-6 transition-all duration-300 ease-in-out border-amber-500/30 shrink-0">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                            <span className="text-amber-500 font-extrabold">{selectedData.symbol}</span> 
+                            <span>Willy VWAP Backtest Dashboard</span>
+                        </h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Backtesting period: January 31, 2026 - May 31, 2026 | Initial Capital: $10,000
+                        </p>
+                    </div>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setSelectedRowTicker(null)}
+                        className="text-xs h-8 text-muted-foreground hover:text-foreground animate-pulse"
+                    >
+                        ✕ Close
+                    </Button>
+                </div>
+
+                {/* Metric Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-muted/30 border rounded-lg p-4 flex flex-col gap-1 relative overflow-hidden">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Willy Strategy Ending Value</span>
+                        <span className="text-2xl font-extrabold font-mono text-amber-500 mt-1">
+                            ${backtest.finalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className={`text-xs font-bold mt-1 flex items-center gap-1 ${backtest.totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {backtest.totalReturn >= 0 ? '▲' : '▼'} {backtest.totalReturn.toFixed(2)}% Return
+                        </span>
+                        <div className="absolute right-3 top-3 opacity-10">
+                            <TrendingUp className="w-12 h-12 text-amber-500" />
+                        </div>
+                    </div>
+
+                    <div className="bg-muted/30 border rounded-lg p-4 flex flex-col gap-1 relative overflow-hidden">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Buy & Hold Ending Value</span>
+                        <span className="text-2xl font-extrabold font-mono text-cyan-500 mt-1">
+                            ${backtest.buyAndHoldValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className={`text-xs font-bold mt-1 flex items-center gap-1 ${backtest.buyAndHoldReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {backtest.buyAndHoldReturn >= 0 ? '▲' : '▼'} {backtest.buyAndHoldReturn.toFixed(2)}% Return
+                        </span>
+                        <div className="absolute right-3 top-3 opacity-10">
+                            <TrendingUp className="w-12 h-12 text-cyan-500" />
+                        </div>
+                    </div>
+
+                    {/* Outperformance Card */}
+                    {(() => {
+                        const outperf = backtest.totalReturn - backtest.buyAndHoldReturn;
+                        const isBeating = outperf > 0;
+                        return (
+                            <div className={`border rounded-lg p-4 flex flex-col gap-1 relative overflow-hidden transition-colors ${isBeating ? 'bg-green-500/5 border-green-500/30 font-bold' : 'bg-red-500/5 border-red-500/30'}`}>
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Alpha (Outperformance)</span>
+                                <span className={`text-2xl font-extrabold font-mono mt-1 ${isBeating ? 'text-green-500' : 'text-red-500'}`}>
+                                    {isBeating ? '+' : ''}{outperf.toFixed(2)}%
+                                </span>
+                                <span className={`text-xs font-bold mt-1 ${isBeating ? 'text-green-400' : 'text-red-400'}`}>
+                                    {isBeating ? '👑 Strategy Outperformed!' : '⚠️ Strategy Underperformed'}
+                                </span>
+                                <div className="absolute right-3 top-3 opacity-15">
+                                    <CheckCircle2 className={`w-12 h-12 ${isBeating ? 'text-green-500' : 'text-red-500'}`} />
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                {/* Details Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Recharts Area Chart */}
+                    <div className="lg:col-span-7 bg-muted/20 border rounded-lg p-4 flex flex-col">
+                        <h3 className="text-sm font-semibold text-foreground mb-4">Portfolio Growth Comparison ($10,000 Basis)</h3>
+                        <div className="w-full h-[380px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={backtest.chartData}>
+                                    <defs>
+                                        <linearGradient id="colorStrategy" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
+                                            <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                                        </linearGradient>
+                                        <linearGradient id="colorBH" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis 
+                                        dataKey="date" 
+                                        tickFormatter={(dateStr) => {
+                                            const d = new Date(dateStr);
+                                            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                        }}
+                                        tick={{ fontSize: 10 }}
+                                        stroke="#6b7280"
+                                    />
+                                    <YAxis 
+                                        domain={['auto', 'auto']}
+                                        tickFormatter={(val) => `$${val.toLocaleString()}`}
+                                        tick={{ fontSize: 10 }}
+                                        stroke="#6b7280"
+                                    />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                        labelFormatter={(label) => `Date: ${label}`}
+                                        formatter={(value: any) => [`$${parseFloat(value).toFixed(2)}`, '']}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                    <Area type="monotone" name="Willy VWAP Strategy" dataKey="strategyValue" stroke="#eab308" strokeWidth={2.5} fillOpacity={1} fill="url(#colorStrategy)" />
+                                    <Area type="monotone" name="Buy & Hold" dataKey="bhValue" stroke="#3b82f6" strokeWidth={1.5} fillOpacity={1} fill="url(#colorBH)" strokeDasharray="3 3" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Trade Log Table */}
+                    <div className="lg:col-span-5 bg-muted/20 border rounded-lg p-4 flex flex-col">
+                        <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between">
+                            <span>Chronological Trade Log</span>
+                            <span className="text-[10px] bg-muted px-2 py-0.5 rounded text-muted-foreground font-mono">
+                                {backtest.transactions.length} Trades
+                            </span>
+                        </h3>
+                        <div className="w-full flex-1 overflow-auto max-h-[350px] border rounded text-xs">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-muted/50 sticky top-0 font-bold border-b text-muted-foreground">
+                                    <tr>
+                                        <th className="p-2">Date</th>
+                                        <th className="p-2 text-center">Action</th>
+                                        <th className="p-2 text-right">Price</th>
+                                        <th className="p-2 text-right">Shares</th>
+                                        <th className="p-2 text-right">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y font-mono">
+                                    {backtest.transactions.map((tx, idx) => (
+                                        <tr key={idx} className="hover:bg-muted/30">
+                                            <td className="p-2 font-sans font-medium text-foreground">{tx.date}</td>
+                                            <td className="p-2 text-center">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${tx.action === 'BUY' ? 'bg-green-500/10 text-green-500 border border-green-500/20 animate-pulse' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                                    {tx.action}
+                                                </span>
+                                            </td>
+                                            <td className="p-2 text-right text-foreground font-semibold">${tx.price.toFixed(2)}</td>
+                                            <td className="p-2 text-right text-muted-foreground">{tx.shares > 0 ? tx.shares.toFixed(2) : '-'}</td>
+                                            <td className="p-2 text-right text-foreground font-semibold">
+                                                ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
+                            Note: The backtest initiates a full BUY of $10,000 on the start date (or first available trading day) at the close. BUY and SELL signals execute at the close when the close price crosses the Willy VWAP boundary. Zero transaction fees and slippage are assumed.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
     );
 }

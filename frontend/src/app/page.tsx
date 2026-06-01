@@ -220,7 +220,7 @@ export default function Dashboard() {
             </div>
 
             {viewMode === 'table' && (
-              <div className="h-[800px] mt-2">
+              <div className="h-[calc(100vh-190px)] min-h-[1050px] mt-2">
                 <ComparisonTable analysisData={filteredAnalysisData} />
               </div>
             )}
