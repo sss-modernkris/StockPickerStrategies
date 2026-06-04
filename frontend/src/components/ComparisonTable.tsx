@@ -37,6 +37,15 @@ export interface BacktestResult {
         closePrice: number;
         willyVwap: number;
     }[];
+    startDateStr: string;
+    endDateStr: string;
+}
+
+export function formatDate(dateStr: string): string {
+    if (!dateStr) return '';
+    // Use the Date object with the T00:00:00 suffix to ensure local timezone parsing without shifts
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
@@ -46,26 +55,50 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
         buyAndHoldReturn: 0,
         buyAndHoldValue: 10000,
         transactions: [],
-        chartData: []
+        chartData: [],
+        startDateStr: '',
+        endDateStr: ''
     };
 
     if (!priceHistory || priceHistory.length === 0) {
         return defaultResult;
     }
 
-    // Filter price history between 2026-01-31 and 2026-05-31
+    // Determine the latest available date in the price history (current date of the data)
+    const dates = priceHistory.map(p => p.date).filter(Boolean);
+    if (dates.length === 0) return defaultResult;
+
+    const latestDateStr = dates.reduce((max, d) => d > max ? d : max, '');
+    const endDate = new Date(latestDateStr + 'T00:00:00');
+    
+    // Calculate the start date exactly 4 months prior
+    const startDate = new Date(endDate);
+    startDate.setMonth(startDate.getMonth() - 4);
+    
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = latestDateStr;
+
+    // Filter price history for the 4-month duration
     const filtered = priceHistory.filter(
-        p => p.date >= '2026-01-31' && p.date <= '2026-05-31'
+        p => p.date >= startDateStr && p.date <= endDateStr
     );
 
     if (filtered.length === 0) {
-        return defaultResult;
+        return {
+            ...defaultResult,
+            startDateStr,
+            endDateStr
+        };
     }
 
     const firstDay = filtered[0];
     const startClose = firstDay.close;
     if (!startClose || startClose <= 0) {
-        return defaultResult;
+        return {
+            ...defaultResult,
+            startDateStr,
+            endDateStr
+        };
     }
 
     let cash = 0;
@@ -74,7 +107,7 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
 
     const transactions: BacktestResult['transactions'] = [];
 
-    // Initial BUY transaction on the Start Date
+    // Initial BUY transaction on the Start Date (first available trading day)
     transactions.push({
         date: firstDay.date,
         action: 'BUY',
@@ -118,7 +151,6 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
             }
         } else {
             // Buy Condition: Close crosses above Willy VWAP
-            // Transition from prevClose <= prevWillyVwap to close > willyVwap
             const prevWasBelow = prevWillyVwap === null || prevWillyVwap === undefined || prevClose <= prevWillyVwap;
             const currIsAbove = willyVwap !== null && willyVwap !== undefined && close > willyVwap;
 
@@ -167,7 +199,9 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
         buyAndHoldReturn,
         buyAndHoldValue,
         transactions,
-        chartData
+        chartData,
+        startDateStr,
+        endDateStr
     };
 }
 
@@ -699,7 +733,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             <span>Willy VWAP Backtest Dashboard</span>
                         </h2>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Backtesting period: January 31, 2026 - May 31, 2026 | Initial Capital: $10,000
+                            Backtesting period: {formatDate(backtest.startDateStr)} - {formatDate(backtest.endDateStr)} | Initial Capital: $10,000
                         </p>
                     </div>
                     <Button 

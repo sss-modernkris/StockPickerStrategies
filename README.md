@@ -18,7 +18,7 @@ The primary view for evaluating individual stocks. It runs **11 quantitative str
 
 ### 2. Comparison & Willy VWAP Backtesting
 Track your entire portfolio at a glance with batch-processed quantitative scores, while running high-precision backtests on the fly.
-*   **Willy VWAP Backtesting Engine**: Automatically calculates the performance of the specialized "Willy VWAP" trading strategy over a 4-month window (January 31, 2026, to May 31, 2026) using an initial capital of $10,000.
+*   **Willy VWAP Backtesting Engine**: Automatically calculates the performance of the specialized "Willy VWAP" trading strategy over a dynamic 4-month rolling window (up to the current/latest date) using an initial capital of $10,000.
 *   **Willy Strategy Rules**:
     *   **SELL**: Close Price falls *below* the Willy VWAP -> liquidates 100% position to cash at close.
     *   **BUY**: Close Price crosses *above* the Willy VWAP -> converts 100% cash to shares at close.
