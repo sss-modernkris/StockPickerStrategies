@@ -148,7 +148,7 @@ export default function Dashboard() {
 
         {!selectedTicker ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260530</span></h2>
+            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260608</span></h2>
             <p>Add and select a ticker from the sidebar to view quant analysis.</p>
           </div>
         ) : loading ? (
@@ -161,7 +161,7 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                 <h1 className="text-3xl font-bold tracking-tight">
+                <h1 className="text-3xl font-bold tracking-tight">
                   {viewMode === 'dashboard' && currentData.symbol}
                   {viewMode === 'table' && 'Comparison Table'}
                   {viewMode === 'normalized-compare' && 'Relative Performance Analytics'}
