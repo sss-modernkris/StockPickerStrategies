@@ -10,7 +10,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { LineChart, Line, AreaChart, Area, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, YAxis } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, YAxis, ComposedChart, ReferenceArea } from 'recharts';
 import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ComparisonTableProps {
@@ -48,12 +48,17 @@ export function formatDate(dateStr: string): string {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
+export function runWillyBacktest(
+    priceHistory?: PricePoint[],
+    initialCapital: number = 10000,
+    backtestMonths: number = 4,
+    customStartDate?: string
+): BacktestResult {
     const defaultResult: BacktestResult = {
-        finalValue: 10000,
+        finalValue: initialCapital,
         totalReturn: 0,
         buyAndHoldReturn: 0,
-        buyAndHoldValue: 10000,
+        buyAndHoldValue: initialCapital,
         transactions: [],
         chartData: [],
         startDateStr: '',
@@ -71,14 +76,18 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
     const latestDateStr = dates.reduce((max, d) => d > max ? d : max, '');
     const endDate = new Date(latestDateStr + 'T00:00:00');
     
-    // Calculate the start date exactly 4 months prior
-    const startDate = new Date(endDate);
-    startDate.setMonth(startDate.getMonth() - 4);
-    
-    const startDateStr = startDate.toISOString().split('T')[0];
+    let startDateStr = '';
+    if (customStartDate) {
+        startDateStr = customStartDate;
+    } else {
+        // Calculate the start date exactly backtestMonths prior
+        const startDate = new Date(endDate);
+        startDate.setMonth(startDate.getMonth() - backtestMonths);
+        startDateStr = startDate.toISOString().split('T')[0];
+    }
     const endDateStr = latestDateStr;
 
-    // Filter price history for the 4-month duration
+    // Filter price history for the duration
     const filtered = priceHistory.filter(
         p => p.date >= startDateStr && p.date <= endDateStr
     );
@@ -102,7 +111,7 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
     }
 
     let cash = 0;
-    let shares = 10000 / startClose;
+    let shares = initialCapital / startClose;
     let isHolding = true;
 
     const transactions: BacktestResult['transactions'] = [];
@@ -114,15 +123,15 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
         price: startClose,
         shares: shares,
         cash: 0,
-        value: 10000
+        value: initialCapital
     });
 
     const chartData: BacktestResult['chartData'] = [];
 
     chartData.push({
         date: firstDay.date,
-        strategyValue: 10000,
-        bhValue: 10000,
+        strategyValue: initialCapital,
+        bhValue: initialCapital,
         closePrice: startClose,
         willyVwap: firstDay.willy_vwap ?? startClose
     });
@@ -163,7 +172,7 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
         }
 
         const currentValue = isHolding ? (shares * close) : cash;
-        const bhValue = (10000 / startClose) * close;
+        const bhValue = (initialCapital / startClose) * close;
 
         if (action) {
             transactions.push({
@@ -188,10 +197,10 @@ export function runWillyBacktest(priceHistory?: PricePoint[]): BacktestResult {
     const lastDay = filtered[filtered.length - 1];
     const lastClose = lastDay.close;
     const finalValue = isHolding ? (shares * lastClose) : cash;
-    const totalReturn = ((finalValue - 10000) / 10000) * 100;
+    const totalReturn = ((finalValue - initialCapital) / initialCapital) * 100;
 
-    const buyAndHoldValue = (10000 / startClose) * lastClose;
-    const buyAndHoldReturn = ((buyAndHoldValue - 10000) / 10000) * 100;
+    const buyAndHoldValue = (initialCapital / startClose) * lastClose;
+    const buyAndHoldReturn = ((buyAndHoldValue - initialCapital) / initialCapital) * 100;
 
     return {
         finalValue,
@@ -214,8 +223,56 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
     const [selectedRowTicker, setSelectedRowTicker] = useState<string | null>(null);
+    const [backtestPeriodMonths, setBacktestPeriodMonths] = useState<number>(4);
+    const [initialCapital, setInitialCapital] = useState<number>(10000);
+    const [capitalInput, setCapitalInput] = useState<string>("10,000");
+    const [rangeMode, setRangeMode] = useState<'period' | 'date'>('period');
+    const [customStartDate, setCustomStartDate] = useState<string>('');
 
     const dataList = Object.values(analysisData);
+
+    // Scan all tickers for overall min/max date
+    let overallMinDate = '';
+    let overallMaxDate = '';
+    dataList.forEach(data => {
+        const hist = data.price_history;
+        if (hist && hist.length > 0) {
+            const dMin = hist[0].date;
+            const dMax = hist[hist.length - 1].date;
+            if (!overallMinDate || dMin < overallMinDate) overallMinDate = dMin;
+            if (!overallMaxDate || dMax > overallMaxDate) overallMaxDate = dMax;
+        }
+    });
+
+    // Initialize customStartDate with a default if it hasn't been set yet
+    React.useEffect(() => {
+        if (!customStartDate && overallMaxDate) {
+            const maxDateObj = new Date(overallMaxDate + 'T00:00:00');
+            const defaultStart = new Date(maxDateObj);
+            defaultStart.setMonth(defaultStart.getMonth() - 4);
+            setCustomStartDate(defaultStart.toISOString().split('T')[0]);
+        }
+    }, [overallMaxDate, customStartDate]);
+
+    // Toggles for Chart Series Visibility
+    const [showStrategyValue, setShowStrategyValue] = useState<boolean>(true);
+    const [showBhValue, setShowBhValue] = useState<boolean>(true);
+    const [showClosePrice, setShowClosePrice] = useState<boolean>(true);
+    const [showWillyVwap, setShowWillyVwap] = useState<boolean>(true);
+
+    // Zooming Area states
+    const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
+    const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
+    const [leftAxisDomain, setLeftAxisDomain] = useState<any[]>(['auto', 'auto']);
+    const [rightAxisDomain, setRightAxisDomain] = useState<any[]>(['auto', 'auto']);
+    const [xAxisDomain, setXAxisDomain] = useState<any[] | null>(null);
+
+    // Reset zoom when selected ticker or settings change
+    React.useEffect(() => {
+        setXAxisDomain(null);
+        setLeftAxisDomain(['auto', 'auto']);
+        setRightAxisDomain(['auto', 'auto']);
+    }, [selectedRowTicker, backtestPeriodMonths, initialCapital, rangeMode, customStartDate]);
 
     // Helper to color strings like "75%"
     const getColorClass = (perc: number) => {
@@ -298,12 +355,22 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             rec = (currentPrice > willyVwap && closeSlopeRaw > 0) ? 'Hold' : 'Sell';
         }
 
+        let willyMarket = "N/A";
+        if (currentPrice !== null && willyVwap !== null) {
+            willyMarket = currentPrice > willyVwap ? 'Bull' : 'Bear';
+        }
+
         let willyVwapRatio = data.technical_indicators?.willy_vwap_ratio ?? null;
         if (willyVwapRatio === null && currentPrice !== null && willyVwap !== null && willyVwap !== 0) {
             willyVwapRatio = currentPrice / willyVwap;
         }
 
-        const backtest = runWillyBacktest(priceHistory);
+        const backtest = runWillyBacktest(
+            priceHistory,
+            initialCapital,
+            backtestPeriodMonths,
+            rangeMode === 'date' ? customStartDate : undefined
+        );
 
         return {
             symbol: data.symbol,
@@ -311,6 +378,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             strat_avg: stratAvg,
             ranking: ranking,
             rec: rec,
+            willy_market: willyMarket,
             close_price: currentPrice,
             close_slope: closeSlopeStr,
             close_slope_raw: closeSlopeRaw,
@@ -351,6 +419,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'rec') {
             valA = a.rec;
             valB = b.rec;
+        } else if (sortKey === 'willy_market') {
+            valA = a.willy_market;
+            valB = b.willy_market;
         } else if (sortKey === 'close_price') {
             valA = a.close_price ?? -99999;
             valB = b.close_price ?? -99999;
@@ -408,7 +479,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const handleExportCsv = async () => {
         setIsExporting(true);
         const headers = [
-            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
+            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
             "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
         ];
 
@@ -419,6 +490,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.strat_avg.toFixed(1),
                 row.ranking,
                 row.rec,
+                row.willy_market,
                 row.strategy_value.toFixed(2),
                 row.strategy_return.toFixed(2),
                 row.bh_return.toFixed(2),
@@ -463,7 +535,105 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
 
     return (
         <div className="flex flex-col gap-4 w-full h-full overflow-y-auto">
-            <div className="flex justify-end pr-2 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-4 pr-2 shrink-0 bg-muted/20 p-3 rounded-lg border border-muted-foreground/10">
+                {/* Backtest Configuration Controls */}
+                <div className="flex flex-wrap items-center gap-4">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        Willy VWAP Backtest Settings:
+                    </span>
+
+                    {/* Range Mode Segmented Control Toggle */}
+                    <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-md border border-muted-foreground/5">
+                        <button
+                            type="button"
+                            onClick={() => setRangeMode('period')}
+                            className={`px-2.5 py-1 text-[11px] font-semibold rounded-sm transition-all cursor-pointer ${
+                                rangeMode === 'period'
+                                    ? 'bg-background text-foreground shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Period
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRangeMode('date')}
+                            className={`px-2.5 py-1 text-[11px] font-semibold rounded-sm transition-all cursor-pointer ${
+                                rangeMode === 'date'
+                                    ? 'bg-background text-foreground shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Specific Date
+                        </button>
+                    </div>
+                    
+                    {/* Period Dropdown Selector */}
+                    {rangeMode === 'period' && (
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-1 duration-200">
+                            <label className="text-xs font-medium text-muted-foreground">Period:</label>
+                            <select
+                                value={backtestPeriodMonths}
+                                onChange={(e) => setBacktestPeriodMonths(parseInt(e.target.value))}
+                                className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer hover:bg-muted/55 transition-colors"
+                            >
+                                <option value={1}>1 Month</option>
+                                <option value={3}>3 Months</option>
+                                <option value={4}>4 Months (Default)</option>
+                                <option value={6}>6 Months</option>
+                                <option value={12}>12 Months</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Date Picker Selector */}
+                    {rangeMode === 'date' && (
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-1 duration-200">
+                            <label className="text-xs font-medium text-muted-foreground">Start Date:</label>
+                            <input
+                                type="date"
+                                value={customStartDate}
+                                min={overallMinDate}
+                                max={overallMaxDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer hover:bg-muted/55 transition-colors"
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-medium text-muted-foreground">Initial Capital:</label>
+                        <div className="relative flex items-center">
+                            <span className="absolute left-2.5 text-xs text-muted-foreground font-mono">$</span>
+                            <input
+                                type="text"
+                                value={capitalInput}
+                                onChange={(e) => {
+                                    const rawVal = e.target.value;
+                                    setCapitalInput(rawVal);
+                                    const parsed = parseFloat(rawVal.replace(/[^0-9.]/g, ''));
+                                    if (!isNaN(parsed) && parsed >= 0) {
+                                        setInitialCapital(parsed);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    const parsed = parseFloat(capitalInput.replace(/[^0-9.]/g, ''));
+                                    if (!isNaN(parsed) && parsed > 0) {
+                                        setCapitalInput(parsed.toLocaleString(undefined, { maximumFractionDigits: 0 }));
+                                        setInitialCapital(parsed);
+                                    } else {
+                                        setCapitalInput("10,000");
+                                        setInitialCapital(10000);
+                                    }
+                                }}
+                                className="h-8 w-24 rounded-md border border-input bg-background pl-5 pr-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono font-semibold"
+                                placeholder="10,000"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 <Button 
                     onClick={handleExportCsv} 
                     variant={exportSuccess ? "default" : "outline"} 
@@ -508,6 +678,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             onClick={() => handleSort('rec')}
                         >
                             Rec {renderSortIcon("rec")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-orange-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('willy_market')}
+                        >
+                            Willy Market {renderSortIcon("willy_market")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
@@ -584,7 +760,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 <TableBody>
                     {sortedData.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={STRATEGY_NAMES.length + 15} className="text-center py-10 text-muted-foreground">
+                            <TableCell colSpan={STRATEGY_NAMES.length + 16} className="text-center py-10 text-muted-foreground">
                                 No data loaded yet. Select stocks from the sidebar.
                             </TableCell>
                         </TableRow>
@@ -613,6 +789,11 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className={`text-center font-bold ${row.rec === 'Hold' ? 'text-green-500' : row.rec === 'Sell' ? 'text-red-500' : 'text-muted-foreground'}`}>
                                         {row.rec}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${row.willy_market === 'Bull' ? 'bg-green-500/15 text-green-500 border border-green-500/30' : row.willy_market === 'Bear' ? 'bg-red-500/15 text-red-500 border border-red-500/30' : 'bg-muted text-muted-foreground'}`}>
+                                            {row.willy_market === 'Bull' ? '🟢 Bull' : row.willy_market === 'Bear' ? '🔴 Bear' : 'N/A'}
+                                        </span>
                                     </TableCell>
                                     <TableCell className="text-center font-mono font-bold text-amber-500 bg-amber-500/5">
                                         ${row.strategy_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -723,8 +904,123 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         </div>
 
         {/* Willy VWAP Backtest Dashboard Panel */}
-        {selectedRowTicker && selectedData && backtest && (
-            <div className="w-full bg-card text-card-foreground border rounded-lg shadow-md p-6 transition-all duration-300 ease-in-out border-amber-500/30 shrink-0">
+        {selectedRowTicker && selectedData && backtest && (() => {
+            const txMap = new Map<string, 'BUY' | 'SELL'>();
+            backtest.transactions.forEach(tx => {
+                txMap.set(tx.date, tx.action);
+            });
+
+            const renderCustomDot = (props: any) => {
+                const { cx, cy, payload } = props;
+                const tx = txMap.get(payload.date);
+                if (!tx) return null;
+                
+                return (
+                    <g key={`${payload.date}-${tx}`}>
+                        <circle 
+                            cx={cx} 
+                            cy={cy} 
+                            r={7} 
+                            fill={tx === 'BUY' ? '#10b981' : '#ef4444'} 
+                            stroke="#fff" 
+                            strokeWidth={1.5}
+                        />
+                        <text 
+                            x={cx} 
+                            y={cy + 3} 
+                            textAnchor="middle" 
+                            fill="#fff" 
+                            fontSize="9px" 
+                            fontWeight="bold"
+                            fontFamily="sans-serif"
+                        >
+                            {tx === 'BUY' ? 'B' : 'S'}
+                        </text>
+                    </g>
+                );
+            };
+
+            const handleMouseDown = (e: any) => {
+                if (e && e.activeLabel) {
+                    setRefAreaLeft(e.activeLabel);
+                }
+            };
+
+            const handleMouseMove = (e: any) => {
+                if (refAreaLeft && e && e.activeLabel) {
+                    setRefAreaRight(e.activeLabel);
+                }
+            };
+
+            const handleMouseUp = () => {
+                if (refAreaLeft && refAreaRight) {
+                    let left = refAreaLeft;
+                    let right = refAreaRight;
+                    if (left > right) {
+                        [left, right] = [right, left];
+                    }
+
+                    if (left !== right) {
+                        setXAxisDomain([left, right]);
+                        
+                        const selectedPoints = backtest.chartData.filter(
+                            (d: any) => d.date >= left && d.date <= right
+                        );
+                        
+                        if (selectedPoints.length > 0) {
+                            let minLeft = Infinity;
+                            let maxLeft = -Infinity;
+                            let minRight = Infinity;
+                            let maxRight = -Infinity;
+                            
+                            selectedPoints.forEach((d: any) => {
+                                if (showStrategyValue && d.strategyValue != null) {
+                                    minLeft = Math.min(minLeft, d.strategyValue);
+                                    maxLeft = Math.max(maxLeft, d.strategyValue);
+                                }
+                                if (showBhValue && d.bhValue != null) {
+                                    minLeft = Math.min(minLeft, d.bhValue);
+                                    maxLeft = Math.max(maxLeft, d.bhValue);
+                                }
+                                if (showClosePrice && d.closePrice != null) {
+                                    minRight = Math.min(minRight, d.closePrice);
+                                    maxRight = Math.max(maxRight, d.closePrice);
+                                }
+                                if (showWillyVwap && d.willyVwap != null) {
+                                    minRight = Math.min(minRight, d.willyVwap);
+                                    maxRight = Math.max(maxRight, d.willyVwap);
+                                }
+                            });
+
+                            if (minLeft !== Infinity && maxLeft !== -Infinity) {
+                                const rangeLeft = maxLeft - minLeft;
+                                const buffer = rangeLeft * 0.05 || 10;
+                                setLeftAxisDomain([minLeft - buffer, maxLeft + buffer]);
+                            } else {
+                                setLeftAxisDomain(['auto', 'auto']);
+                            }
+                            if (minRight !== Infinity && maxRight !== -Infinity) {
+                                const rangeRight = maxRight - minRight;
+                                const buffer = rangeRight * 0.05 || 1;
+                                setRightAxisDomain([minRight - buffer, maxRight + buffer]);
+                            } else {
+                                setRightAxisDomain(['auto', 'auto']);
+                            }
+                        }
+                    }
+                }
+                setRefAreaLeft(null);
+                setRefAreaRight(null);
+            };
+
+            const handleResetZoom = () => {
+                setXAxisDomain(null);
+                setLeftAxisDomain(['auto', 'auto']);
+                setRightAxisDomain(['auto', 'auto']);
+            };
+
+            return (
+                <div className="w-full bg-card text-card-foreground border rounded-lg shadow-md p-6 transition-all duration-300 ease-in-out border-amber-500/30 shrink-0">
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6">
                     <div>
@@ -733,7 +1029,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             <span>Willy VWAP Backtest Dashboard</span>
                         </h2>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Backtesting period: {formatDate(backtest.startDateStr)} - {formatDate(backtest.endDateStr)} | Initial Capital: $10,000
+                            Backtesting period: {formatDate(backtest.startDateStr)} - {formatDate(backtest.endDateStr)} | Initial Capital: ${initialCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                         </p>
                     </div>
                     <Button 
@@ -798,11 +1094,70 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 {/* Details Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Recharts Area Chart */}
-                    <div className="lg:col-span-7 bg-muted/20 border rounded-lg p-4 flex flex-col">
-                        <h3 className="text-sm font-semibold text-foreground mb-4">Portfolio Growth Comparison ($10,000 Basis)</h3>
+                    {/* Recharts Area Chart */}
+                    <div className="lg:col-span-7 bg-muted/20 border rounded-lg p-4 flex flex-col select-none">
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-semibold text-foreground">Portfolio Growth & Price Comparison</h3>
+                                {xAxisDomain && (
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={handleResetZoom}
+                                        className="h-6 text-[10px] text-amber-500 border-amber-500/40 hover:bg-amber-500/10 font-bold px-2 py-0 animate-pulse"
+                                    >
+                                        Reset Zoom
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs bg-muted/30 p-1.5 rounded-md border border-muted-foreground/5">
+                                <label className="flex items-center gap-1.5 cursor-pointer font-medium text-[#eab308] hover:opacity-80 select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={showStrategyValue} 
+                                        onChange={(e) => setShowStrategyValue(e.target.checked)}
+                                        className="rounded border-input text-amber-500 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
+                                    />
+                                    Strategy Value
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer font-medium text-[#3b82f6] hover:opacity-80 select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={showBhValue} 
+                                        onChange={(e) => setShowBhValue(e.target.checked)}
+                                        className="rounded border-input text-blue-500 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                                    />
+                                    Buy & Hold
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer font-medium text-[#a855f7] hover:opacity-80 select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={showClosePrice} 
+                                        onChange={(e) => setShowClosePrice(e.target.checked)}
+                                        className="rounded border-input text-purple-500 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer"
+                                    />
+                                    Close Price
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer font-medium text-[#f97316] hover:opacity-80 select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={showWillyVwap} 
+                                        onChange={(e) => setShowWillyVwap(e.target.checked)}
+                                        className="rounded border-input text-orange-500 focus:ring-orange-500 w-3.5 h-3.5 cursor-pointer"
+                                    />
+                                    Willy VWAP
+                                </label>
+                            </div>
+                        </div>
                         <div className="w-full h-[380px]">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={backtest.chartData}>
+                                <ComposedChart 
+                                    data={backtest.chartData}
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUp}
+                                    style={{ cursor: 'crosshair' }}
+                                >
                                     <defs>
                                         <linearGradient id="colorStrategy" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
@@ -816,6 +1171,8 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                                     <XAxis 
                                         dataKey="date" 
+                                        domain={xAxisDomain ? [xAxisDomain[0], xAxisDomain[1]] : undefined}
+                                        allowDataOverflow
                                         tickFormatter={(dateStr) => {
                                             const d = new Date(dateStr);
                                             return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -824,22 +1181,61 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                         stroke="#6b7280"
                                     />
                                     <YAxis 
-                                        domain={['auto', 'auto']}
+                                        yAxisId="left"
+                                        domain={leftAxisDomain}
+                                        allowDataOverflow
+                                        hide={!showStrategyValue && !showBhValue}
                                         tickFormatter={(val) => `$${val.toLocaleString()}`}
                                         tick={{ fontSize: 10 }}
-                                        stroke="#6b7280"
+                                        stroke="#eab308"
+                                    />
+                                    <YAxis 
+                                        yAxisId="right"
+                                        orientation="right"
+                                        domain={rightAxisDomain}
+                                        allowDataOverflow
+                                        hide={!showClosePrice && !showWillyVwap}
+                                        tickFormatter={(val) => `$${val.toLocaleString()}`}
+                                        tick={{ fontSize: 10 }}
+                                        stroke="#a855f7"
                                     />
                                     <Tooltip 
                                         contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                                         labelFormatter={(label) => `Date: ${label}`}
-                                        formatter={(value: any) => [`$${parseFloat(value).toFixed(2)}`, '']}
+                                        formatter={(value: any, name: any) => [
+                                            `$${parseFloat(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
+                                            name
+                                        ]}
                                     />
                                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                                    <Area type="monotone" name="Willy VWAP Strategy" dataKey="strategyValue" stroke="#eab308" strokeWidth={2.5} fillOpacity={1} fill="url(#colorStrategy)" />
-                                    <Area type="monotone" name="Buy & Hold" dataKey="bhValue" stroke="#3b82f6" strokeWidth={1.5} fillOpacity={1} fill="url(#colorBH)" strokeDasharray="3 3" />
-                                </AreaChart>
+                                    {showStrategyValue && (
+                                        <Area yAxisId="left" type="monotone" name="Willy VWAP Strategy" dataKey="strategyValue" stroke="#eab308" strokeWidth={2.5} fillOpacity={1} fill="url(#colorStrategy)" />
+                                    )}
+                                    {showBhValue && (
+                                        <Area yAxisId="left" type="monotone" name="Buy & Hold" dataKey="bhValue" stroke="#3b82f6" strokeWidth={1.5} fillOpacity={1} fill="url(#colorBH)" strokeDasharray="3 3" />
+                                    )}
+                                    {showClosePrice && (
+                                        <Line yAxisId="right" type="monotone" name="Close Price" dataKey="closePrice" stroke="#a855f7" strokeWidth={2} dot={renderCustomDot} activeDot={{ r: 6 }} />
+                                    )}
+                                    {showWillyVwap && (
+                                        <Line yAxisId="right" type="monotone" name="Willy VWAP" dataKey="willyVwap" stroke="#f97316" strokeWidth={1.5} dot={false} strokeDasharray="4 4" />
+                                    )}
+                                    {refAreaLeft && refAreaRight && (
+                                        <ReferenceArea 
+                                            yAxisId="left" 
+                                            x1={refAreaLeft} 
+                                            x2={refAreaRight} 
+                                            strokeOpacity={0.3} 
+                                            fill="#f59e0b" 
+                                            fillOpacity={0.15} 
+                                        />
+                                    )}
+                                </ComposedChart>
                             </ResponsiveContainer>
                         </div>
+                        <p className="text-[10px] text-muted-foreground mt-2 text-center select-none italic">
+                            💡 Tip: Click and drag horizontally over the chart area to zoom in on a specific period.
+                        </p>
                     </div>
 
                     {/* Trade Log Table */}
@@ -881,12 +1277,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             </table>
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
-                            Note: The backtest initiates a full BUY of $10,000 on the start date (or first available trading day) at the close. BUY and SELL signals execute at the close when the close price crosses the Willy VWAP boundary. Zero transaction fees and slippage are assumed.
+                            Note: The backtest initiates a full BUY of ${initialCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} on the start date (or first available trading day) at the close. BUY and SELL signals execute at the close when the close price crosses the Willy VWAP boundary. Zero transaction fees and slippage are assumed.
                         </p>
                     </div>
                 </div>
             </div>
-        )}
+        )})()}
     </div>
     );
 }

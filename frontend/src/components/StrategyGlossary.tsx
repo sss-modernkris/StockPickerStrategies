@@ -289,6 +289,17 @@ export function StrategyGlossary() {
             ]
         },
         {
+            id: "willy-market-state",
+            icon: <Activity className="w-5 h-5 text-orange-500" />,
+            title: "Willy Market State (Bull vs. Bear)",
+            badge: "Market Phase Classification",
+            description: "Determines whether a security is in a Bull or Bear market phase by evaluating the current close price relative to the dynamic self-anchoring Willy VWAP baseline.",
+            bullets: [
+                { label: "🟢 Bull Market (Price > Willy VWAP)", text: "The security trades above the volume-weighted average price paid since the last market structure pivot, indicating that buyers are in control and the VWAP is acting as dynamic support." },
+                { label: "🔴 Bear Market (Price <= Willy VWAP)", text: "The price has broken below its volume-weighted fair value, turning the baseline into dynamic overhead resistance as recent buyers hold losing positions." }
+            ]
+        },
+        {
             id: "ranking-score",
             icon: <Gauge className="w-5 h-5 text-amber-500" />,
             title: "Composite Ranking Score",
@@ -319,6 +330,7 @@ export function StrategyGlossary() {
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
             (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query)) ||
+            (item.id === 'willy-market-state' && "Willy Market State Bull Bear VWAP Phase Classification".toLowerCase().includes(query)) ||
             (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query))
         );
     });
