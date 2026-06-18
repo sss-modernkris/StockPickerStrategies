@@ -5,7 +5,7 @@ import { API_BASE_URL } from '@/lib/api';
 import { TickerAnalysis } from '@/lib/types';
 import { ComparisonTable } from './ComparisonTable';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, Info } from 'lucide-react';
+import { Loader2, TrendingUp, Info, Check } from 'lucide-react';
 
 interface TopTickersPanelProps {
   analysisData: Record<string, TickerAnalysis>;
@@ -15,56 +15,74 @@ interface TopTickersPanelProps {
 const INDEXES = [
   { name: 'Dow 30', filename: 'DOW100.csv', displayName: 'Dow Jones 30' },
   { name: 'Nasdaq 100', filename: 'Nasdaq100.csv', displayName: 'Nasdaq 100' },
-  { name: 'S&P 100', filename: 'SP100.csv', displayName: 'S&P 100' }
+  { name: 'S&P 500', filename: 'SP100.csv', displayName: 'S&P 500' }
 ];
 
 export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTickersPanelProps) {
-  const [selectedFile, setSelectedFile] = useState<string>('DOW100.csv');
+  const [selectedFiles, setSelectedFiles] = useState<string[]>(['DOW100.csv']);
   const [indexTickers, setIndexTickers] = useState<string[]>([]);
   const [loadingTickers, setLoadingTickers] = useState<boolean>(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
 
-  // Use a ref to keep track of the active request file to prevent race conditions/overlapping states
-  const activeFileRef = useRef<string>(selectedFile);
+  // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
+  const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
 
-  // 1. Load the list of tickers for the selected index
+  // 1. Load the consolidated list of tickers for all selected indices
   useEffect(() => {
-    activeFileRef.current = selectedFile;
+    const sortedFilesKey = [...selectedFiles].sort().join(',');
+    activeFilesKeyRef.current = sortedFilesKey;
+
+    if (selectedFiles.length === 0) {
+      setIndexTickers([]);
+      setLoadingTickers(false);
+      setLoadingAnalysis(false);
+      return;
+    }
+
     setIndexTickers([]);
     setLoadingTickers(true);
     setLoadingAnalysis(false);
     setError(null);
     setProgress({ current: 0, total: 0 });
 
-    const fetchIndexTickers = async () => {
+    const fetchAllIndexTickers = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/portfolio?filename=${selectedFile}`);
-        if (!res.ok) {
-          throw new Error(`Failed to load index portfolio file: ${selectedFile}`);
-        }
-        const data = await res.json();
-        
-        // Ensure we only process if this is still the active file
-        if (activeFileRef.current !== selectedFile) return;
+        const promises = selectedFiles.map(async (file) => {
+          const res = await fetch(`${API_BASE_URL}/api/portfolio?filename=${file}`);
+          if (!res.ok) {
+            throw new Error(`Failed to load index portfolio file: ${file}`);
+          }
+          const data = await res.json();
+          return data.tickers || [];
+        });
 
-        if (data.tickers && data.tickers.length > 0) {
-          const uniqueTickers = Array.from(new Set(data.tickers as string[]));
-          setIndexTickers(uniqueTickers);
-        } else {
-          setIndexTickers([]);
-          setLoadingTickers(false);
-        }
+        const results = await Promise.all(promises);
+
+        // Ensure we only process if this is still the active combination
+        if (activeFilesKeyRef.current !== sortedFilesKey) return;
+
+        const allSymbols = new Set<string>();
+        results.forEach((tickers) => {
+          tickers.forEach((t: string) => {
+            if (t) {
+              allSymbols.add(t.trim().toUpperCase());
+            }
+          });
+        });
+
+        const uniqueTickers = Array.from(allSymbols).sort();
+        setIndexTickers(uniqueTickers);
       } catch (err: any) {
-        if (activeFileRef.current !== selectedFile) return;
+        if (activeFilesKeyRef.current !== sortedFilesKey) return;
         setError(err.message || "Failed to load index tickers.");
         setLoadingTickers(false);
       }
     };
 
-    fetchIndexTickers();
-  }, [selectedFile]);
+    fetchAllIndexTickers();
+  }, [selectedFiles]);
 
   // 2. Fetch analysis data in small chunks (e.g., 10 tickers) to avoid server timeout and heavy loads
   useEffect(() => {
@@ -73,6 +91,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     const unfetched = indexTickers.filter(t => !analysisData[t]);
     const totalCount = indexTickers.length;
     const fetchedCount = totalCount - unfetched.length;
+    const sortedFilesKey = [...selectedFiles].sort().join(',');
 
     setProgress({ current: fetchedCount, total: totalCount });
 
@@ -95,7 +114,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
       let currentProgress = fetchedCount;
 
       for (const chunk of chunks) {
-        if (!isSubscribed || activeFileRef.current !== selectedFile) break;
+        if (!isSubscribed || activeFilesKeyRef.current !== sortedFilesKey) break;
 
         try {
           const tickersParam = chunk.join(',');
@@ -105,7 +124,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           }
           const data = await res.json();
 
-          if (!isSubscribed || activeFileRef.current !== selectedFile) break;
+          if (!isSubscribed || activeFilesKeyRef.current !== sortedFilesKey) break;
 
           onUpdateAnalysisData(prev => ({
             ...prev,
@@ -116,14 +135,13 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           setProgress({ current: currentProgress, total: totalCount });
         } catch (err: any) {
           console.error("Error fetching chunk:", err);
-          // Don't completely halt, but record the error state if major
-          if (isSubscribed && activeFileRef.current === selectedFile) {
+          if (isSubscribed && activeFilesKeyRef.current === sortedFilesKey) {
             setError(`Warning: Some tickers failed to analyze. Details: ${err.message}`);
           }
         }
       }
 
-      if (isSubscribed && activeFileRef.current === selectedFile) {
+      if (isSubscribed && activeFilesKeyRef.current === sortedFilesKey) {
         setLoadingTickers(false);
         setLoadingAnalysis(false);
       }
@@ -134,9 +152,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     return () => {
       isSubscribed = false;
     };
-  }, [indexTickers, selectedFile, onUpdateAnalysisData, analysisData]);
+  }, [indexTickers, selectedFiles, onUpdateAnalysisData, analysisData]);
 
-  // Filter global analysisData to only show tickers belonging to the selected index
+  // Filter global analysisData to only show tickers belonging to the selected indexes
   const filteredData = indexTickers.reduce((acc, ticker) => {
     if (analysisData[ticker]) {
       acc[ticker] = analysisData[ticker];
@@ -144,7 +162,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     return acc;
   }, {} as Record<string, TickerAnalysis>);
 
-  const activeIndex = INDEXES.find(idx => idx.filename === selectedFile);
+  const activeIndexNames = selectedFiles
+    .map(file => INDEXES.find(idx => idx.filename === file)?.name)
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <div className="space-y-6">
@@ -156,22 +177,40 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             Index Selection
           </h2>
           <p className="text-sm text-muted-foreground">
-            Select a benchmark index to run comparative quantitative analyses on all components.
+            Select one or more benchmark indexes to run comparative quantitative analyses on all combined components.
           </p>
         </div>
 
-        <div className="flex bg-muted/60 p-1 rounded-lg border w-fit">
-          {INDEXES.map((idx) => (
-            <Button
-              key={idx.filename}
-              variant={selectedFile === idx.filename ? 'secondary' : 'ghost'}
-              onClick={() => setSelectedFile(idx.filename)}
-              size="sm"
-              className="rounded-md font-medium px-4"
-            >
-              {idx.name}
-            </Button>
-          ))}
+        <div className="flex bg-muted/60 p-1.5 rounded-lg border w-fit gap-1.5">
+          {INDEXES.map((idx) => {
+            const isSelected = selectedFiles.includes(idx.filename);
+            return (
+              <Button
+                key={idx.filename}
+                variant={isSelected ? 'secondary' : 'ghost'}
+                onClick={() => {
+                  setSelectedFiles(prev => {
+                    if (prev.includes(idx.filename)) {
+                      // Keep at least one selected to avoid empty views
+                      if (prev.length === 1) return prev;
+                      return prev.filter(f => f !== idx.filename);
+                    } else {
+                      return [...prev, idx.filename];
+                    }
+                  });
+                }}
+                size="sm"
+                className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${
+                  isSelected 
+                    ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {isSelected && <Check className="w-3.5 h-3.5" />}
+                {idx.name}
+              </Button>
+            );
+          })}
         </div>
       </div>
 
@@ -188,7 +227,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
           <div className="text-center space-y-1">
             <h3 className="font-semibold text-lg">
-              Analyzing {activeIndex?.displayName}...
+              Analyzing Combined Indexes ({activeIndexNames})...
             </h3>
             <p className="text-sm text-muted-foreground">
               Processed {progress.current} of {progress.total} tickers
@@ -201,7 +240,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             />
           </div>
           <span className="text-xs text-muted-foreground max-w-sm text-center">
-            Stocks are analyzed in consecutive batch chunks to prevent server time-outs. Existing cache is automatically reused.
+            Stocks are analyzed in consecutive batch chunks to prevent server timeouts. Existing cache is automatically reused.
           </span>
         </div>
       )}
@@ -215,7 +254,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
 
       {!loadingTickers && !loadingAnalysis && Object.keys(filteredData).length === 0 && (
         <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-xl bg-card/25 backdrop-blur-sm min-h-[300px] text-muted-foreground">
-          No tickers available to display.
+          No tickers available to display. Please select at least one index above.
         </div>
       )}
     </div>
