@@ -35,6 +35,12 @@ The application is engineered to meet the following functional and non-functiona
 ### F. Broker Integration
 *   **Interactive Brokers Gateway**: Securely connect to a local IB Gateway or TWS session using `ib_insync` to monitor account equity, cash balances, open orders, and active positions in a unified interface.
 
+### G. Benchmark Index Comparative Analysis (Top Tickers)
+*   **Index Multi-Select Support**: Load and compare constituents of major benchmark indices (`DOW100.csv` / Dow 30, `Nasdaq100.csv` / Nasdaq 100, and `SP100.csv` / S&P 500) using a multi-select toggle layout.
+*   **Set Union Merging**: Add/remove index selections dynamically, automatically performing a set union of all tickers across the selected indices.
+*   **Safe Chunked Loading**: Fetch analysis data in small, background-loaded consecutive chunks of 10 tickers to avoid Yahoo Finance query timeouts.
+*   **Quantitative Screener**: Execute a 5-layer screen filtering matching symbols (Willy Market = Bull, 1-mo backtest strategy value > $10,000, MACD Hist within ±0.5, MACD Slope > 0, and RSI between 30 and 70) and save candidates to `Top_Tickers_to_buy.csv` in the project root.
+
 ---
 
 ## 🎨 2. Design Factors & Aesthetics
@@ -167,3 +173,13 @@ Open [http://localhost:3000](http://localhost:3000) in your web browser.
 *   **Insight**: Log in with your Interactive Brokers gateway credentials. The screen retrieves your real-time buying power, net liquidation value, active orders, and live positions from TWS/IB Gateway.
 
 ![Brokers Page](images/brokers_new.png)
+
+#### 10. Top Tickers Analysis & Buy Screener
+*   **Action**: Select the *Top Tickers* tab. Click to toggle selection for **Dow 30**, **Nasdaq 100**, and **S&P 500**.
+*   **Screener Action**: Click the **Run Buy Screen** button. View the list of matching candidates in the glassmorphic container, then click **Save to Top_Tickers_to_buy.csv** to output the buy list to the workspace.
+
+![Top Tickers Page](images/top_tickers.png)
+
+![Buy Screener Active](images/top_tickers_screened.png)
+
+![Buy List CSV Saved Banner](images/top_tickers_saved.png)
