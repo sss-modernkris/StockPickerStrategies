@@ -315,6 +315,20 @@ export function StrategyGlossary() {
                 { label: "Strat Avg > 50%", text: "Requires the overall average score across all core quantitative strategies to be above 50%." },
                 { label: "Close Slope > 0", text: "Requires the short-term price trend (last 2 days) to be positive." }
             ]
+        },
+        {
+            id: "buy-screener",
+            icon: <Scale className="w-5 h-5 text-emerald-500" />,
+            title: "Top Tickers Buy Screener",
+            badge: "Screening Methodology",
+            description: "A strict 5-layer quantitative filtering logic applied to index constituents on the Top Tickers page to identify high-probability buy candidates, outputting matches to Top_Tickers_to_buy.csv.",
+            bullets: [
+                { label: "Willy Market = Bull", text: "Requires the security close price to be trading above its dynamic self-anchoring Willy VWAP baseline." },
+                { label: "Strategy Value > 10,000 (1-Mo)", text: "Simulates a 1-month backtest starting with $10,000. Requires the final strategy value to be greater than $10,000 (positive net return)." },
+                { label: "MACD Hist between -0.5 and 0.5", text: "Requires the MACD line to be in close proximity to the Signal line (indicating tight consolidation or an imminent/recent crossover)." },
+                { label: "MACD Slope > 0", text: "Ensures that the trajectory of the MACD line is positive and rising, verifying upward momentum." },
+                { label: "RSI between 30 and 70", text: "Requires stable, non-extreme relative strength levels, excluding both oversold structural collapses (<30) and overbought market tops (>70)." }
+            ]
         }
     ];
 
@@ -331,7 +345,8 @@ export function StrategyGlossary() {
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
             (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query)) ||
             (item.id === 'willy-market-state' && "Willy Market State Bull Bear VWAP Phase Classification".toLowerCase().includes(query)) ||
-            (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query))
+            (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query)) ||
+            (item.id === 'buy-screener' && "Buy Screener Top Tickers Filtering Selection Logic Metrics".toLowerCase().includes(query))
         );
     });
 
