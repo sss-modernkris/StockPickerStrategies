@@ -610,6 +610,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                 onChange={(e) => setBacktestPeriod(e.target.value)}
                                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer hover:bg-muted/55 transition-colors"
                             >
+                                <option value="1d">1 Day</option>
                                 <option value="2d">2 Days</option>
                                 <option value="1w">1 Week</option>
                                 <option value="2w">2 Weeks</option>
