@@ -51,7 +51,7 @@ export function formatDate(dateStr: string): string {
 export function runWillyBacktest(
     priceHistory?: PricePoint[],
     initialCapital: number = 10000,
-    backtestMonths: number = 4,
+    backtestPeriod: number | string = 4,
     customStartDate?: string
 ): BacktestResult {
     const defaultResult: BacktestResult = {
@@ -80,10 +80,42 @@ export function runWillyBacktest(
     if (customStartDate) {
         startDateStr = customStartDate;
     } else {
-        // Calculate the start date exactly backtestMonths prior
         const startDate = new Date(endDate);
-        startDate.setMonth(startDate.getMonth() - backtestMonths);
-        startDateStr = startDate.toISOString().split('T')[0];
+        if (typeof backtestPeriod === 'number') {
+            startDate.setMonth(startDate.getMonth() - backtestPeriod);
+            startDateStr = startDate.toISOString().split('T')[0];
+        } else if (typeof backtestPeriod === 'string') {
+            const match = backtestPeriod.match(/^(\d+)([dwm])$/);
+            if (match) {
+                const value = parseInt(match[1], 10);
+                const unit = match[2];
+                if (unit === 'd') {
+                    if (priceHistory && priceHistory.length > value) {
+                        startDateStr = priceHistory[priceHistory.length - 1 - value].date;
+                    } else {
+                        startDate.setDate(startDate.getDate() - value);
+                        startDateStr = startDate.toISOString().split('T')[0];
+                    }
+                } else if (unit === 'w') {
+                    startDate.setDate(startDate.getDate() - value * 7);
+                    startDateStr = startDate.toISOString().split('T')[0];
+                } else if (unit === 'm') {
+                    startDate.setMonth(startDate.getMonth() - value);
+                    startDateStr = startDate.toISOString().split('T')[0];
+                }
+            } else {
+                const parsed = parseInt(backtestPeriod, 10);
+                if (!isNaN(parsed)) {
+                    startDate.setMonth(startDate.getMonth() - parsed);
+                } else {
+                    startDate.setMonth(startDate.getMonth() - 4);
+                }
+                startDateStr = startDate.toISOString().split('T')[0];
+            }
+        } else {
+            startDate.setMonth(startDate.getMonth() - 4);
+            startDateStr = startDate.toISOString().split('T')[0];
+        }
     }
     const endDateStr = latestDateStr;
 
@@ -223,7 +255,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
     const [selectedRowTicker, setSelectedRowTicker] = useState<string | null>(null);
-    const [backtestPeriodMonths, setBacktestPeriodMonths] = useState<number>(4);
+    const [backtestPeriod, setBacktestPeriod] = useState<string | number>('4m');
     const [initialCapital, setInitialCapital] = useState<number>(10000);
     const [capitalInput, setCapitalInput] = useState<string>("10,000");
     const [rangeMode, setRangeMode] = useState<'period' | 'date'>('period');
@@ -272,7 +304,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         setXAxisDomain(null);
         setLeftAxisDomain(['auto', 'auto']);
         setRightAxisDomain(['auto', 'auto']);
-    }, [selectedRowTicker, backtestPeriodMonths, initialCapital, rangeMode, customStartDate]);
+    }, [selectedRowTicker, backtestPeriod, initialCapital, rangeMode, customStartDate]);
 
     // Helper to color strings like "75%"
     const getColorClass = (perc: number) => {
@@ -368,7 +400,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         const backtest = runWillyBacktest(
             priceHistory,
             initialCapital,
-            backtestPeriodMonths,
+            backtestPeriod,
             rangeMode === 'date' ? customStartDate : undefined
         );
 
@@ -574,15 +606,18 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-1 duration-200">
                             <label className="text-xs font-medium text-muted-foreground">Period:</label>
                             <select
-                                value={backtestPeriodMonths}
-                                onChange={(e) => setBacktestPeriodMonths(parseInt(e.target.value))}
+                                value={backtestPeriod}
+                                onChange={(e) => setBacktestPeriod(e.target.value)}
                                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer hover:bg-muted/55 transition-colors"
                             >
-                                <option value={1}>1 Month</option>
-                                <option value={3}>3 Months</option>
-                                <option value={4}>4 Months (Default)</option>
-                                <option value={6}>6 Months</option>
-                                <option value={12}>12 Months</option>
+                                <option value="2d">2 Days</option>
+                                <option value="1w">1 Week</option>
+                                <option value="2w">2 Weeks</option>
+                                <option value="1m">1 Month</option>
+                                <option value="3m">3 Months</option>
+                                <option value="4m">4 Months (Default)</option>
+                                <option value="6m">6 Months</option>
+                                <option value="12m">12 Months</option>
                             </select>
                         </div>
                     )}
