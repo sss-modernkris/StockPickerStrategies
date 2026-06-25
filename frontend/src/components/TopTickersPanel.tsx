@@ -187,8 +187,8 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
       const isBull = currentPrice > willyVwap;
       if (!isBull) return;
       
-      // 2. Strategy Value > 10000 (using 1-month backtest)
-      const backtest = runWillyBacktest(priceHistory, 10000, 1);
+      // 2. Strategy Value > 10000 (using 1-week backtest)
+      const backtest = runWillyBacktest(priceHistory, 10000, '1w');
       const isProfitable = backtest.finalValue > 10000;
       if (!isProfitable) return;
       

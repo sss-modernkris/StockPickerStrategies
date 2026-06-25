@@ -324,7 +324,7 @@ export function StrategyGlossary() {
             description: "A strict 5-layer quantitative filtering logic applied to index constituents on the Top Tickers page to identify high-probability buy candidates, outputting matches to Top_Tickers_to_buy.csv.",
             bullets: [
                 { label: "Willy Market = Bull", text: "Requires the security close price to be trading above its dynamic self-anchoring Willy VWAP baseline." },
-                { label: "Strategy Value > 10,000 (1-Mo)", text: "Simulates a 1-month backtest starting with $10,000. Requires the final strategy value to be greater than $10,000 (positive net return)." },
+                { label: "Strategy Value > 10,000 (1-Wk)", text: "Simulates a 1-week backtest starting with $10,000. Requires the final strategy value to be greater than $10,000 (positive net return)." },
                 { label: "MACD Hist between -0.5 and 0.5", text: "Requires the MACD line to be in close proximity to the Signal line (indicating tight consolidation or an imminent/recent crossover)." },
                 { label: "MACD Slope > 0", text: "Ensures that the trajectory of the MACD line is positive and rising, verifying upward momentum." },
                 { label: "RSI between 30 and 70", text: "Requires stable, non-extreme relative strength levels, excluding both oversold structural collapses (<30) and overbought market tops (>70)." }
