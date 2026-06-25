@@ -326,7 +326,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 Buy Screen Results
               </h3>
               <p className="text-xs text-muted-foreground">
-                Screened {indexTickers.length} tickers using Willy Bull, 1-mo Backtest &gt; $10k, MACD Hist |0.5|, MACD Slope &gt; 0, and RSI (30-70).
+                Screened {indexTickers.length} tickers using Willy Bull, 1-wk Backtest &gt; $10k, MACD Hist |0.5|, MACD Slope &gt; 0, and RSI (30-70).
               </p>
             </div>
             
