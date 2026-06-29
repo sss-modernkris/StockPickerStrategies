@@ -339,7 +339,7 @@ export function StrategyGlossary() {
             bullets: [
                 { label: "Step 1: Universe Selection", text: "Fetches the universe of stocks comprising the Dow 30, Nasdaq 100, and S&P 500 from the Top Tickers page (~170 tickers)." },
                 { label: "Step 2: Filter Universe", text: "For each trading day, filters down the universe to candidates matching the 5-point Top Tickers Buy Screener indicators." },
-                { label: "Step 3: Rank & Select Top 5", text: "Ranks the screened candidates by their 4-month rolling Willy backtest final value, selecting the top 5 candidates for trade execution." },
+                { label: "Step 3: Rank & Select Top 5", text: "Ranks the screened candidates by their 1-Wk Willy Backtest final value, selecting the top 5 candidates for trade execution." },
                 { label: "Step 4: Trade Execution (Entry & Exit)", text: "Simulates entering positions at 3:00 PM on T+1 with $2,000 per position (max $10,000 daily budget). Liquidates all positions at 11:00 AM on T+2." },
                 { label: "Step 5: ROI Calculation", text: "Accumulates daily gains/losses across the 30-day window to calculate Total Profit and ROI relative to the $10,000 max daily capital allocation." }
             ]

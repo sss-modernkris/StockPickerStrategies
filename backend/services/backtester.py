@@ -211,12 +211,8 @@ def execute_30d_backtest() -> dict:
             if rsi_T <= 30 or rsi_T >= 70:
                 continue
                 
-            # Calculate 4-month rolling Willy backtest ending on T for ranking
-            four_months_start = T - datetime.timedelta(days=120)
-            slice_4m = df.loc[four_months_start:T]
-            strat_val_4m = run_willy_backtest_py(slice_4m, 10000.0)
-            
-            selected_tickers.append((ticker, strat_val_4m))
+            # Rank by 1-week rolling Willy backtest value (strat_val_1w)
+            selected_tickers.append((ticker, strat_val_1w))
             
         # Sort and select top 5
         selected_tickers.sort(key=lambda x: x[1], reverse=True)

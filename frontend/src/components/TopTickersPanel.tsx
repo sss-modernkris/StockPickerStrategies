@@ -475,7 +475,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 30-Day Strategy Backtest Trade Ledger
               </h3>
               <p className="text-xs text-muted-foreground">
-                Chronological ledger of executed entries and exits based on the 10-Indicator Buy Screen (Top 5 Tickers ranked by 4M Strategy Value).
+                Chronological ledger of executed entries and exits based on the 10-Indicator Buy Screen (Top 5 Tickers ranked by 1-Wk Strategy Value).
               </p>
             </div>
             <div className="flex items-center gap-2">
