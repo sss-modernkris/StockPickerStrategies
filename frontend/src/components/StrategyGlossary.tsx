@@ -329,6 +329,20 @@ export function StrategyGlossary() {
                 { label: "MACD Slope > 0", text: "Ensures that the trajectory of the MACD line is positive and rising, verifying upward momentum." },
                 { label: "RSI between 30 and 70", text: "Requires stable, non-extreme relative strength levels, excluding both oversold structural collapses (<30) and overbought market tops (>70)." }
             ]
+        },
+        {
+            id: "backtest-30d",
+            icon: <Activity className="w-5 h-5 text-violet-500" />,
+            title: "30-Day Strategy Backtesting",
+            badge: "Historical Simulation",
+            description: "Runs a daily historical simulation looking back exactly 30 calendar days to evaluate the buy screener logic, trade execution, and cumulative ROI.",
+            bullets: [
+                { label: "Step 1: Universe Selection", text: "Fetches the universe of stocks comprising the Dow 30, Nasdaq 100, and S&P 500 from the Top Tickers page (~170 tickers)." },
+                { label: "Step 2: Filter Universe", text: "For each trading day, filters down the universe to candidates matching the 5-point Top Tickers Buy Screener indicators." },
+                { label: "Step 3: Rank & Select Top 5", text: "Ranks the screened candidates by their 4-month rolling Willy backtest final value, selecting the top 5 candidates for trade execution." },
+                { label: "Step 4: Trade Execution (Entry & Exit)", text: "Simulates entering positions at 3:00 PM on T+1 with $2,000 per position (max $10,000 daily budget). Liquidates all positions at 11:00 AM on T+2." },
+                { label: "Step 5: ROI Calculation", text: "Accumulates daily gains/losses across the 30-day window to calculate Total Profit and ROI relative to the $10,000 max daily capital allocation." }
+            ]
         }
     ];
 
@@ -346,7 +360,8 @@ export function StrategyGlossary() {
             (item.id === 'willy-vwap' && "WillyAlgo Indicator Dynamic Swing VWAP Volume Weighted Average Price".toLowerCase().includes(query)) ||
             (item.id === 'willy-market-state' && "Willy Market State Bull Bear VWAP Phase Classification".toLowerCase().includes(query)) ||
             (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query)) ||
-            (item.id === 'buy-screener' && "Buy Screener Top Tickers Filtering Selection Logic Metrics".toLowerCase().includes(query))
+            (item.id === 'buy-screener' && "Buy Screener Top Tickers Filtering Selection Logic Metrics".toLowerCase().includes(query)) ||
+            (item.id === 'backtest-30d' && "30-Day Strategy Backtesting Model Historical Simulation Universe Selection Trades ROI".toLowerCase().includes(query))
         );
     });
 
