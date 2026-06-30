@@ -431,7 +431,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm"
               >
                 {backtestLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                Run 30-Day Strategy Backtest
+                Run 30-Day Strategy 1 Backtest
               </Button>
               <span className="text-sm font-semibold text-muted-foreground font-mono">
                 Total Profit:{" "}
@@ -472,7 +472,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             <div className="space-y-1">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-500" />
-                30-Day Strategy Backtest Trade Ledger
+                30-Day Strategy 1 Backtest Trade Ledger
               </h3>
               <p className="text-xs text-muted-foreground">
                 Chronological ledger of executed entries and exits based on the 10-Indicator Buy Screen (Top 5 Tickers ranked by 1-Wk Strategy Value).

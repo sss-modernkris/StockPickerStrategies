@@ -333,7 +333,7 @@ export function StrategyGlossary() {
         {
             id: "backtest-30d",
             icon: <Activity className="w-5 h-5 text-violet-500" />,
-            title: "30-Day Strategy Backtesting",
+            title: "30-Day Strategy 1 Backtesting",
             badge: "Historical Simulation",
             description: "Runs a daily historical simulation looking back exactly 30 calendar days to evaluate the buy screener logic, trade execution, and cumulative ROI.",
             bullets: [
@@ -361,7 +361,7 @@ export function StrategyGlossary() {
             (item.id === 'willy-market-state' && "Willy Market State Bull Bear VWAP Phase Classification".toLowerCase().includes(query)) ||
             (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query)) ||
             (item.id === 'buy-screener' && "Buy Screener Top Tickers Filtering Selection Logic Metrics".toLowerCase().includes(query)) ||
-            (item.id === 'backtest-30d' && "30-Day Strategy Backtesting Model Historical Simulation Universe Selection Trades ROI".toLowerCase().includes(query))
+            (item.id === 'backtest-30d' && "30-Day Strategy 1 Backtesting Model Historical Simulation Universe Selection Trades ROI".toLowerCase().includes(query))
         );
     });
 
