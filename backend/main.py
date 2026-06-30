@@ -670,8 +670,16 @@ def save_analysis_report(req: SaveReportRequest):
 @app.get("/api/backtest-30d")
 def get_30d_backtest():
     try:
-        result = execute_30d_backtest()
+        result = execute_30d_backtest(strategy_num=1)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest execution failed: {str(e)}")
+
+@app.get("/api/backtest-30d/strategy2")
+def get_30d_backtest_strategy2():
+    try:
+        result = execute_30d_backtest(strategy_num=2)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest Strategy 2 execution failed: {str(e)}")
 

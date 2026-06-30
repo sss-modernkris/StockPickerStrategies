@@ -145,7 +145,7 @@ def get_backtest_data(tickers: list[str]) -> tuple[dict, pd.DataFrame, pd.DataFr
     
     return indicators, daily_data, data_30m
 
-def execute_30d_backtest() -> dict:
+def execute_30d_backtest(strategy_num: int = 1) -> dict:
     tickers = load_universe_tickers()
     indicators, daily_data, data_30m = get_backtest_data(tickers)
     
@@ -187,32 +187,46 @@ def execute_30d_backtest() -> dict:
             if pd.isna(close_T) or pd.isna(willy_vwap_T) or pd.isna(macd_hist_T) or pd.isna(macd_slope_T) or pd.isna(rsi_T):
                 continue
                 
-            # Screen Criteria
-            # 1. Willy Market = Bull (Price > Willy VWAP)
-            if close_T <= willy_vwap_T:
-                continue
+            if strategy_num == 1:
+                # Screen Criteria for Strategy 1
+                # 1. Willy Market = Bull (Price > Willy VWAP)
+                if close_T <= willy_vwap_T:
+                    continue
+                    
+                # 2. Strategy Value > 10,000 (1-week backtest of $10k initial capital ending on T)
+                one_week_start = T - datetime.timedelta(days=7)
+                slice_df = df.loc[one_week_start:T]
+                strat_val_1w = run_willy_backtest_py(slice_df, 10000.0)
+                if strat_val_1w <= 10000.0:
+                    continue
+                    
+                # 3. MACD Hist between -0.5 and 0.5
+                if macd_hist_T <= -0.5 or macd_hist_T >= 0.5:
+                    continue
+                    
+                # 4. MACD Slope > 0
+                if macd_slope_T <= 0:
+                    continue
+                    
+                # 5. RSI 14 between 30 and 70
+                if rsi_T <= 30 or rsi_T >= 70:
+                    continue
+                    
+                # Rank by 1-week rolling Willy backtest value (strat_val_1w)
+                selected_tickers.append((ticker, strat_val_1w))
+            else:
+                # Screen Criteria for Strategy 2
+                # 1. Willy Market = Bull (Price > Willy VWAP)
+                if close_T <= willy_vwap_T:
+                    continue
+                    
+                # We need strat_val_1w for ranking!
+                one_week_start = T - datetime.timedelta(days=7)
+                slice_df = df.loc[one_week_start:T]
+                strat_val_1w = run_willy_backtest_py(slice_df, 10000.0)
                 
-            # 2. Strategy Value > 10,000 (1-week backtest of $10k initial capital ending on T)
-            one_week_start = T - datetime.timedelta(days=7)
-            slice_df = df.loc[one_week_start:T]
-            strat_val_1w = run_willy_backtest_py(slice_df, 10000.0)
-            if strat_val_1w <= 10000.0:
-                continue
-                
-            # 3. MACD Hist between -0.5 and 0.5
-            if macd_hist_T <= -0.5 or macd_hist_T >= 0.5:
-                continue
-                
-            # 4. MACD Slope > 0
-            if macd_slope_T <= 0:
-                continue
-                
-            # 5. RSI 14 between 30 and 70
-            if rsi_T <= 30 or rsi_T >= 70:
-                continue
-                
-            # Rank by 1-week rolling Willy backtest value (strat_val_1w)
-            selected_tickers.append((ticker, strat_val_1w))
+                # Rank by 1-week rolling Willy backtest value (strat_val_1w)
+                selected_tickers.append((ticker, strat_val_1w))
             
         # Sort and select top 5
         selected_tickers.sort(key=lambda x: x[1], reverse=True)
