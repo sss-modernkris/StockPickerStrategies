@@ -683,3 +683,12 @@ def get_30d_backtest_strategy2():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Strategy 2 execution failed: {str(e)}")
 
+@app.get("/api/backtest-30d/strategy3")
+def get_30d_backtest_strategy3():
+    try:
+        result = execute_30d_backtest(strategy_num=3)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest Strategy 3 execution failed: {str(e)}")
+
+

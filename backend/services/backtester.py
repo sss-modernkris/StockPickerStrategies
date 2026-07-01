@@ -187,8 +187,8 @@ def execute_30d_backtest(strategy_num: int = 1) -> dict:
             if pd.isna(close_T) or pd.isna(willy_vwap_T) or pd.isna(macd_hist_T) or pd.isna(macd_slope_T) or pd.isna(rsi_T):
                 continue
                 
-            if strategy_num == 1:
-                # Screen Criteria for Strategy 1
+            if strategy_num in (1, 3):
+                # Screen Criteria for Strategy 1 & 3
                 # 1. Willy Market = Bull (Price > Willy VWAP)
                 if close_T <= willy_vwap_T:
                     continue
@@ -239,7 +239,10 @@ def execute_30d_backtest(strategy_num: int = 1) -> dict:
         for ticker, strat_val in top_5:
             # Target timestamps in 30m dataset
             buy_dt = pd.Timestamp(f"{T_plus_1_str} 15:00:00", tz='America/New_York')
-            sell_dt = pd.Timestamp(f"{T_plus_2_str} 11:00:00", tz='America/New_York')
+            if strategy_num == 3:
+                sell_dt = pd.Timestamp(f"{T_plus_2_str} 14:30:00", tz='America/New_York')
+            else:
+                sell_dt = pd.Timestamp(f"{T_plus_2_str} 11:00:00", tz='America/New_York')
             
             buy_price = None
             sell_price = None
