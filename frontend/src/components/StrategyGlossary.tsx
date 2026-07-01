@@ -356,6 +356,19 @@ export function StrategyGlossary() {
                 { label: "Step 3: Trade Execution (Entry & Exit)", text: "Simulates entering positions at 3:00 PM on T+1 with $2,000 per position (max $10,000 daily budget). Liquidates all positions at 11:00 AM on T+2." },
                 { label: "Step 4: ROI Calculation", text: "Accumulates daily gains/losses across the 30-day window to calculate Total Profit and ROI relative to the $10,000 max daily capital allocation." }
             ]
+        },
+        {
+            id: "backtest-30d-strategy3",
+            icon: <Activity className="w-5 h-5 text-teal-500" />,
+            title: "30-Day Strategy 3 Backtesting",
+            badge: "Historical Simulation (Timeline Shift)",
+            description: "Runs a daily historical simulation looking back exactly 30 calendar days using Strategy 1 filters but with a custom timeline exit shift.",
+            bullets: [
+                { label: "Step 1: Universe Selection", text: "Fetches the universe of stocks comprising the Dow 30, Nasdaq 100, and S&P 500 from the Top Tickers page (~170 tickers)." },
+                { label: "Step 2: Signal Filtering & Ranking", text: "Applies the exact same 10-indicator screener logic as Strategy 1 to filter down candidates, then ranks by 1-Wk Strategy Value to select the top 5." },
+                { label: "Step 3: Trade Execution (Entry & Exit)", text: "Simulates entering positions at 3:00 PM on T+1 with $2,000 per position (max $10,000 daily budget). Liquidates all positions at 2:50 PM on T+2 (holding for nearly 24 hours)." },
+                { label: "Step 4: ROI Calculation", text: "Accumulates daily gains/losses across the 30-day window to calculate Total Profit and ROI relative to the $10,000 max daily capital allocation." }
+            ]
         }
     ];
 
@@ -375,7 +388,8 @@ export function StrategyGlossary() {
             (item.id === 'ranking-score' && "Ranking Score Composite Comparison Metric".toLowerCase().includes(query)) ||
             (item.id === 'buy-screener' && "Buy Screener Top Tickers Filtering Selection Logic Metrics".toLowerCase().includes(query)) ||
             (item.id === 'backtest-30d' && "30-Day Strategy 1 Backtesting Model Historical Simulation Universe Selection Trades ROI".toLowerCase().includes(query)) ||
-            (item.id === 'backtest-30d-strategy2' && "30-Day Strategy 2 Backtesting Model Historical Simulation Universe Selection Trades ROI Aggressive Bull Market".toLowerCase().includes(query))
+            (item.id === 'backtest-30d-strategy2' && "30-Day Strategy 2 Backtesting Model Historical Simulation Universe Selection Trades ROI Aggressive Bull Market".toLowerCase().includes(query)) ||
+            (item.id === 'backtest-30d-strategy3' && "30-Day Strategy 3 Backtesting Model Historical Simulation Universe Selection Trades ROI Timeline Shift 2:50 PM".toLowerCase().includes(query))
         );
     });
 

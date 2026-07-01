@@ -56,6 +56,8 @@ def verify_glossary():
             print("SUCCESS: 30-Day Strategy 1 Backtesting Glossary card found!")
             page.wait_for_selector("text=30-Day Strategy 2 Backtesting", timeout=15000)
             print("SUCCESS: 30-Day Strategy 2 Backtesting Glossary card found!")
+            page.wait_for_selector("text=30-Day Strategy 3 Backtesting", timeout=15000)
+            print("SUCCESS: 30-Day Strategy 3 Backtesting Glossary card found!")
         except Exception as e:
             print("FAILURE: Glossary card not found or timed out: ", e)
             
