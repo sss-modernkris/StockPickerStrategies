@@ -22,49 +22,31 @@ def fetch_batch_history(tickers: List[str], period: str = "1y") -> Dict[str, Any
             return {"data": [], "error": "No data returned from Yahoo Finance."}
 
         results = []
-        
-        if len(tickers) == 1:
-            ticker = tickers[0]
-            # When downloading a single ticker, the columns are just 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'
-            # Drop NaN rows which might appear on holidays, etc.
-            valid_data = data['Close'].dropna()
+        if 'Close' not in data.columns:
+            return {"data": [], "error": "Close price data not available."}
             
-            history = []
-            for date, close_price in valid_data.items():
-                history.append({
-                    "date": date.strftime("%Y-%m-%d"),
-                    "close": float(close_price)
-                })
+        close_data = data['Close']
+        if isinstance(close_data, pd.Series):
+            close_data = pd.DataFrame({tickers[0]: close_data})
+            
+        for ticker in tickers:
+            if ticker in close_data.columns:
+                ticker_series = close_data[ticker]
+                if isinstance(ticker_series, pd.DataFrame):
+                    ticker_series = ticker_series.iloc[:, 0]
+                ticker_series = ticker_series.dropna()
                 
-            results.append({
-                "symbol": ticker,
-                "history": history
-            })
-        else:
-            # Handle MultiIndex columns (Price Type, Ticker)
-            # We just want the 'Close' column for each ticker
-            
-            # yfinance returns MultiIndex like: ('Close', 'AAPL'), ('Close', 'MSFT')
-            if 'Close' not in data.columns:
-               return {"data": [], "error": "Close price data not available."}
-               
-            close_data = data['Close']
-            
-            for ticker in tickers:
-                if ticker in close_data.columns:
-                    ticker_series = close_data[ticker].dropna()
-                    
-                    history = []
-                    for date, close_price in ticker_series.items():
-                        history.append({
-                            "date": date.strftime("%Y-%m-%d"),
-                            "close": float(close_price)
-                        })
-                        
-                    results.append({
-                        "symbol": ticker,
-                        "history": history
+                history = []
+                for date, close_price in ticker_series.items():
+                    history.append({
+                        "date": date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)[:10],
+                        "close": float(close_price)
                     })
+                    
+                results.append({
+                    "symbol": ticker,
+                    "history": history
+                })
 
         return {"data": results}
 

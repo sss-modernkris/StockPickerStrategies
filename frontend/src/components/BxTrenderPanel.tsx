@@ -2,19 +2,19 @@ import React, { useState } from 'react';
 import { PricePoint } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ComposedChart, Bar, Cell, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { 
-    TrendingUp, 
-    TrendingDown, 
-    Activity, 
-    AlertCircle, 
-    Info, 
-    Calendar, 
-    Zap, 
-    CheckCircle2, 
-    XCircle, 
-    BookOpen, 
-    ShieldAlert, 
-    ChevronRight, 
+import {
+    TrendingUp,
+    TrendingDown,
+    Activity,
+    AlertCircle,
+    Info,
+    Calendar,
+    Zap,
+    CheckCircle2,
+    XCircle,
+    BookOpen,
+    ShieldAlert,
+    ChevronRight,
     HelpCircle,
     ArrowUpRight,
     ArrowDownRight
@@ -53,7 +53,7 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
         const highPrice = p.high ?? p.close;
         const lowPrice = p.low ?? p.close;
         const isBullish = p.close >= openPrice;
-        
+
         return {
             date: p.date,
             open: openPrice,
@@ -138,31 +138,31 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                         <span>BX Trender Analytics</span>
                     </h2>
                     <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
-                        The BX Trender calculates short-term spreading momentum (RSI of 5/20 EMA spreads) layered over a long-term structural baseline (RSI of EMA 200). 
+                        The BX Trender calculates short-term spreading momentum (RSI of 5/20 EMA spreads) layered over a long-term structural baseline (RSI of EMA 200).
                         It is ideal for identifying trend exhaustion and capture breakouts.
                     </p>
                 </div>
                 <div className="flex bg-muted/50 p-1 rounded-lg border shrink-0">
-                    <Button 
-                        variant={timeRange === '3M' ? 'secondary' : 'ghost'} 
-                        onClick={() => setTimeRange('3M')} 
-                        size="sm" 
+                    <Button
+                        variant={timeRange === '3M' ? 'secondary' : 'ghost'}
+                        onClick={() => setTimeRange('3M')}
+                        size="sm"
                         className="h-8 text-xs font-semibold px-3"
                     >
                         3 Months
                     </Button>
-                    <Button 
-                        variant={timeRange === '6M' ? 'secondary' : 'ghost'} 
-                        onClick={() => setTimeRange('6M')} 
-                        size="sm" 
+                    <Button
+                        variant={timeRange === '6M' ? 'secondary' : 'ghost'}
+                        onClick={() => setTimeRange('6M')}
+                        size="sm"
                         className="h-8 text-xs font-semibold px-3"
                     >
                         6 Months
                     </Button>
-                    <Button 
-                        variant={timeRange === '12M' ? 'secondary' : 'ghost'} 
-                        onClick={() => setTimeRange('12M')} 
-                        size="sm" 
+                    <Button
+                        variant={timeRange === '12M' ? 'secondary' : 'ghost'}
+                        onClick={() => setTimeRange('12M')}
+                        size="sm"
                         className="h-8 text-xs font-semibold px-3"
                     >
                         12 Months (Full)
@@ -172,7 +172,7 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
 
             {/* Core Visualization charts */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
-                
+
                 {/* Main Candlestick Chart (7 Columns) */}
                 <div className="xl:col-span-7 bg-card border rounded-lg p-5 shadow-sm flex flex-col gap-4">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b pb-2">
@@ -183,8 +183,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={chartDisplayData}>
                                 <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                <XAxis 
-                                    dataKey="date" 
+                                <XAxis
+                                    dataKey="date"
                                     tickFormatter={(dateStr) => {
                                         const d = new Date(dateStr);
                                         return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -192,18 +192,19 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                     tick={{ fontSize: 10 }}
                                     stroke="#6b7280"
                                 />
-                                <YAxis 
+                                <YAxis
                                     domain={['auto', 'auto']}
                                     tickFormatter={(val) => `$${val.toFixed(2)}`}
                                     tick={{ fontSize: 10 }}
                                     stroke="#6b7280"
                                 />
-                                <Tooltip 
+                                <Tooltip
                                     contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                                     labelFormatter={(label) => `Date: ${label}`}
-                                    formatter={(value: any, name?: string) => {
-                                        if (!name || name === 'wick' || name === 'body') return null;
-                                        return [`$${parseFloat(value).toFixed(2)}`, name.toUpperCase()];
+                                    formatter={(value: any, name?: string | number) => {
+                                        const nameStr = name?.toString();
+                                        if (!nameStr || nameStr === 'wick' || nameStr === 'body') return null;
+                                        return [`$${parseFloat(value).toFixed(2)}`, nameStr.toUpperCase()];
                                     }}
                                 />
                                 {/* Candlestick Wick (Low to High) */}
@@ -229,8 +230,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={chartDisplayData}>
                                 <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                <XAxis 
-                                    dataKey="date" 
+                                <XAxis
+                                    dataKey="date"
                                     tickFormatter={(dateStr) => {
                                         const d = new Date(dateStr);
                                         return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -238,22 +239,22 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                     tick={{ fontSize: 10 }}
                                     stroke="#6b7280"
                                 />
-                                <YAxis 
+                                <YAxis
                                     domain={[-55, 55]}
                                     tick={{ fontSize: 10 }}
                                     stroke="#6b7280"
                                 />
-                                <Tooltip 
+                                <Tooltip
                                     contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                                     labelFormatter={(label) => `Date: ${label}`}
-                                    formatter={(value: any, name?: string) => {
-                                        const labelName = name === 'bx_short' ? 'Short-Term' : 'Long-Term';
+                                    formatter={(value: any, name?: string | number) => {
+                                        const labelName = name?.toString() === 'bx_short' ? 'Short-Term' : 'Long-Term';
                                         return [`${parseFloat(value).toFixed(2)}`, labelName];
                                     }}
                                 />
                                 <Legend wrapperStyle={{ fontSize: 11 }} />
                                 <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="3 3" strokeWidth={1} label={{ value: 'Zero Line', fill: '#6b7280', fontSize: 9, position: 'insideTopLeft' }} />
-                                
+
                                 {/* Background Long-Term Xtrender Histogram */}
                                 <Bar dataKey="bx_long" barSize={8} name="bx_long">
                                     {chartDisplayData.map((entry, index) => {
@@ -261,14 +262,14 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                         return <Cell key={`cell-long-${index}`} fill={fillCol} />;
                                     })}
                                 </Bar>
-                                
+
                                 {/* Solid Short-Term Xtrender Oscillating Line */}
-                                <Line 
-                                    type="monotone" 
-                                    name="bx_short" 
-                                    dataKey="bx_short" 
-                                    stroke="#f59e0b" 
-                                    strokeWidth={2} 
+                                <Line
+                                    type="monotone"
+                                    name="bx_short"
+                                    dataKey="bx_short"
+                                    stroke="#f59e0b"
+                                    strokeWidth={2}
                                     dot={false}
                                     isAnimationActive={false}
                                 />
@@ -345,44 +346,40 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                     <div className="flex flex-wrap gap-1.5 bg-muted/30 p-1 rounded-lg border">
                         <button
                             onClick={() => setActiveGuideTab('signals')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
-                                activeGuideTab === 'signals'
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${activeGuideTab === 'signals'
                                     ? 'bg-secondary text-secondary-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                            }`}
+                                }`}
                         >
                             <Zap className="w-3.5 h-3.5" />
                             Core Decision Signals
                         </button>
                         <button
                             onClick={() => setActiveGuideTab('checklist')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
-                                activeGuideTab === 'checklist'
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${activeGuideTab === 'checklist'
                                     ? 'bg-secondary text-secondary-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                            }`}
+                                }`}
                         >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Trader's Audit Flow
                         </button>
                         <button
                             onClick={() => setActiveGuideTab('math')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
-                                activeGuideTab === 'math'
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${activeGuideTab === 'math'
                                     ? 'bg-secondary text-secondary-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                            }`}
+                                }`}
                         >
                             <Activity className="w-3.5 h-3.5" />
                             Mathematical Framework
                         </button>
                         <button
                             onClick={() => setActiveGuideTab('risk')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
-                                activeGuideTab === 'risk'
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${activeGuideTab === 'risk'
                                     ? 'bg-secondary text-secondary-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                            }`}
+                                }`}
                         >
                             <ShieldAlert className="w-3.5 h-3.5" />
                             Risk & Invalidation
@@ -395,7 +392,7 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                     {activeGuideTab === 'signals' && (
                         <div className="space-y-6">
                             <p className="text-xs text-muted-foreground max-w-4xl">
-                                The BX Trender uses a dual-momentum regime to classify four distinct stages in an asset's cycle. 
+                                The BX Trender uses a dual-momentum regime to classify four distinct stages in an asset's cycle.
                                 Always confirm short-term triggers with the primary trend (Long-Term background histogram) before making final buy/sell decisions.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -494,7 +491,7 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             Assess the Primary Regime (Background Histogram)
                                         </h4>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                            Check if the background bar is <strong className="text-green-500">Green</strong> or <strong className="text-red-500">Red</strong>. 
+                                            Check if the background bar is <strong className="text-green-500">Green</strong> or <strong className="text-red-500">Red</strong>.
                                             Green signifies a bullish environment where buy signals represent highly profitable breakouts. Red indicates a bearish regime where capital should be primarily in cash, or focused on hedging.
                                         </p>
                                     </div>
@@ -510,8 +507,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             Identify Crossover Trigger Events
                                         </h4>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                            Consult the <strong className="text-foreground">Crossover Signal Logs</strong> table. 
-                                            Has the orange line recently crossed above the 0 mark (creating a BUY signal) or below the 0 mark (creating a SELL signal)? 
+                                            Consult the <strong className="text-foreground">Crossover Signal Logs</strong> table.
+                                            Has the orange line recently crossed above the 0 mark (creating a BUY signal) or below the 0 mark (creating a SELL signal)?
                                             Or has it crossed the long-term baseline (ACCUMULATE / CAUTION)? Recent crossover occurrences represent entry and exit windows.
                                         </p>
                                     </div>
@@ -528,8 +525,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded font-mono font-normal text-muted-foreground">Short-Term Amplitude</span>
                                         </h4>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                            Observe the absolute height/depth of the Short-Term line (orange). 
-                                            If the orange line is in extreme zones (above <strong className="text-foreground">+40</strong> or below <strong className="text-foreground">-40</strong>), the current move is highly mature. 
+                                            Observe the absolute height/depth of the Short-Term line (orange).
+                                            If the orange line is in extreme zones (above <strong className="text-foreground">+40</strong> or below <strong className="text-foreground">-40</strong>), the current move is highly mature.
                                             A downward hook from $+45$ is highly indicative of trend fatigue, even in a strong macro bull market.
                                         </p>
                                     </div>
@@ -545,8 +542,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             Verify Stop-Loss and Exit Alignment
                                         </h4>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                            Establish the invalidation parameters before entering a trade. 
-                                            If buying, your strict stop-loss should trigger if the Short-Term line closes back below the Zero Line or the baseline. 
+                                            Establish the invalidation parameters before entering a trade.
+                                            If buying, your strict stop-loss should trigger if the Short-Term line closes back below the Zero Line or the baseline.
                                             Adhering to these indicators protects portfolio equity during whipsaw periods.
                                         </p>
                                     </div>
@@ -572,7 +569,7 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             Spread = EMA(Close, 5) - EMA(Close, 20)
                                         </div>
                                         <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                                            Calculates the differential between the fast 5-period and medium 20-period Exponential Moving Averages. 
+                                            Calculates the differential between the fast 5-period and medium 20-period Exponential Moving Averages.
                                             This captures intermediate shifting price momentum before it affects primary trend structures.
                                         </p>
                                     </div>
@@ -591,8 +588,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             ShortTerm = RSI(Spread, 14) - 50
                                         </div>
                                         <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                                            Feeds the raw EMA Spread into a 14-period Relative Strength Index (RSI). 
-                                            Subtracting 50 centers the bounds precisely from <strong className="text-foreground">-50</strong> to <strong className="text-foreground">+50</strong>. 
+                                            Feeds the raw EMA Spread into a 14-period Relative Strength Index (RSI).
+                                            Subtracting 50 centers the bounds precisely from <strong className="text-foreground">-50</strong> to <strong className="text-foreground">+50</strong>.
                                             This isolates high-probability breakout momentum while neutralizing the price scale of the stock.
                                         </p>
                                     </div>
@@ -611,8 +608,8 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                                             LongTerm = RSI(EMA(Close, 200), 14) - 50
                                         </div>
                                         <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                                            Calculates a 14-period RSI directly over the major 200-period Exponential Moving Average (EMA 200). 
-                                            Subtracting 50 centers the output. 
+                                            Calculates a 14-period RSI directly over the major 200-period Exponential Moving Average (EMA 200).
+                                            Subtracting 50 centers the output.
                                             This creates a macro structural regime filter, which determines if the primary market trend is positive or negative.
                                         </p>
                                     </div>
@@ -627,7 +624,7 @@ export function BxTrenderPanel({ priceHistory, symbol }: BxTrenderPanelProps) {
                     {activeGuideTab === 'risk' && (
                         <div className="space-y-6">
                             <p className="text-xs text-muted-foreground max-w-4xl font-sans">
-                                Even the most precise quantitative oscillators generate false breakout signals in choppy markets. 
+                                Even the most precise quantitative oscillators generate false breakout signals in choppy markets.
                                 Apply these systematic risk management rules to preserve capital and ensure high-probability trades.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs leading-relaxed">

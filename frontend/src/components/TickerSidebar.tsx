@@ -63,17 +63,17 @@ export function TickerSidebar({
                     <h2 className="font-bold text-lg tracking-tight">Strategic Alpha</h2>
                 </div>
                 <div className="text-[10px] text-muted-foreground font-mono pl-8">
-                    v20260530
+                    v20260703
                 </div>
             </div>
 
             <div className="p-4 border-b space-y-2 bg-muted/30">
                 <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold uppercase text-muted-foreground">Portfolio Source</label>
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-4 w-4" 
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4"
                         onClick={() => onLoadPortfolio(portfolioFilename)}
                         title="Reload current portfolio"
                     >
