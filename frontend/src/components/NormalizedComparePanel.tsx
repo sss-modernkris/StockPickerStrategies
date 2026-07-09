@@ -22,6 +22,20 @@ import {
 } from "@/components/ui/table";
 import { TickerHistory, TickerAnalysis } from '@/lib/types';
 import { API_BASE_URL } from '@/lib/api';
+import { runWillyBacktest } from './ComparisonTable';
+
+const mapPeriodToBacktestPeriod = (p: string): string => {
+    switch (p) {
+        case '1wk': return '1w';
+        case '2wk': return '2w';
+        case '1mo': return '1m';
+        case '3mo': return '3m';
+        case '6mo': return '6m';
+        case '1y': return '12m';
+        case '5y': return '60m';
+        default: return '4m';
+    }
+};
 
 interface NormalizedComparePanelProps {
     availableTickers: string[];
@@ -148,6 +162,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let macdHist: number | null = null;
             let macdRel: number | null = null;
             let rsi: number | null = null;
+            let strategyValue: number | null = null;
 
             // Formatted string representations for UI
             let mlAlphaStr = 'N/A';
@@ -155,6 +170,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let macdHistStr = 'N/A';
             let macdRelStr = 'N/A';
             let rsiStr = 'N/A';
+            let strategyValueStr = 'N/A';
 
             if (tData) {
                 if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
@@ -182,6 +198,10 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         rsi = latestPoint.rsi_14;
                         rsiStr = rsi.toFixed(2);
                     }
+                    
+                    const backtest = runWillyBacktest(tData.price_history, 10000, mapPeriodToBacktestPeriod(period));
+                    strategyValue = backtest.finalValue;
+                    strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 }
             }
 
@@ -196,7 +216,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 macdRel,
                 macdRelStr,
                 rsi,
-                rsiStr
+                rsiStr,
+                strategyValue,
+                strategyValueStr
             };
         });
 
@@ -349,6 +371,28 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 </div>
             </CardHeader>
             <CardContent>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b pb-4 border-muted-foreground/10">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                if (selectedTickers.length === availableTickers.length) {
+                                    onSelectTickers([]);
+                                } else {
+                                    onSelectTickers([...availableTickers]);
+                                }
+                            }}
+                            className="rounded-lg font-semibold text-primary hover:bg-primary/10"
+                        >
+                            {selectedTickers.length === availableTickers.length ? "Deselect All" : "Select All"}
+                        </Button>
+                        <span className="text-xs text-muted-foreground ml-2">
+                            {selectedTickers.length} of {availableTickers.length} selected
+                        </span>
+                    </div>
+                </div>
+
                 <div className="mb-6 flex flex-wrap gap-2">
                     {availableTickers.map(ticker => {
                         const isSelected = selectedTickers.includes(ticker);
@@ -493,6 +537,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('strategyValue')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Strategy Value ($)
+                                            {SortIcon('strategyValue')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('macdHist')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             MACD Hist
                                             {SortIcon('macdHist')}
@@ -524,6 +574,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </TableCell>
                                         <TableCell className="text-right font-mono">{row.mlAlphaStr}</TableCell>
                                         <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
+                                        <TableCell className="text-right font-mono font-semibold">{row.strategyValueStr}</TableCell>
                                         <TableCell className={`text-right font-mono ${row.macdHist !== null && row.macdHist > 0 ? 'text-emerald-500' : row.macdHist !== null && row.macdHist < 0 ? 'text-red-500' : ''}`}>
                                             {row.macdHistStr}
                                         </TableCell>

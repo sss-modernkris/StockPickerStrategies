@@ -31,6 +31,30 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [screenRun, setScreenRun] = useState<boolean>(false);
   const [screenSaveStatus, setScreenSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
+  // Backtesting state variables
+  const [backtestLoading, setBacktestLoading] = useState<boolean>(false);
+  const [backtestResult, setBacktestResult] = useState<any>(null);
+  const [showLedger, setShowLedger] = useState<boolean>(false);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+  const [csvSaving, setCsvSaving] = useState<boolean>(false);
+  const [csvSaveSuccess, setCsvSaveSuccess] = useState<boolean>(false);
+
+  // Strategy 2 State variables
+  const [backtest2Loading, setBacktest2Loading] = useState<boolean>(false);
+  const [backtest2Result, setBacktest2Result] = useState<any>(null);
+  const [showLedger2, setShowLedger2] = useState<boolean>(false);
+  const [backtest2Error, setBacktest2Error] = useState<string | null>(null);
+  const [csvSaving2, setCsvSaving2] = useState<boolean>(false);
+  const [csvSaveSuccess2, setCsvSaveSuccess2] = useState<boolean>(false);
+
+  // Strategy 3 State variables
+  const [backtest3Loading, setBacktest3Loading] = useState<boolean>(false);
+  const [backtest3Result, setBacktest3Result] = useState<any>(null);
+  const [showLedger3, setShowLedger3] = useState<boolean>(false);
+  const [backtest3Error, setBacktest3Error] = useState<string | null>(null);
+  const [csvSaving3, setCsvSaving3] = useState<boolean>(false);
+  const [csvSaveSuccess3, setCsvSaveSuccess3] = useState<boolean>(false);
+
   // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
   const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
 
@@ -244,6 +268,288 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     }
   };
 
+  const run30DayBacktest = async () => {
+    setBacktestLoading(true);
+    setBacktestError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d`);
+      if (!res.ok) {
+        throw new Error(`Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestResult(data);
+      setShowLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestError(err.message || "Failed to run 30-day backtest.");
+    } finally {
+      setBacktestLoading(false);
+    }
+  };
+
+  const saveBacktestLedgerCsv = async () => {
+    if (!backtestResult || !backtestResult.trades || backtestResult.trades.length === 0) return;
+    
+    setCsvSaving(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Buy Price",
+        "Sell Price",
+        "Shares",
+        "Profit",
+        "Daily Profit"
+      ];
+      
+      const rows: string[] = [];
+      backtestResult.trades.forEach((day: any) => {
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date,
+            day.buy_date,
+            day.sell_date,
+            "N/A",
+            "0",
+            "0",
+            "0",
+            "0",
+            day.daily_profit.toFixed(2)
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.buy_price.toFixed(2),
+              t.sell_price.toFixed(2),
+              t.shares.toFixed(2),
+              t.profit.toFixed(2),
+              day.daily_profit.toFixed(2)
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+      
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+      
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: 'Backtest_Ledger.csv',
+          content: csvContent
+        })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Failed to save CSV (Status ${res.status})`);
+      }
+      
+      setCsvSaveSuccess(true);
+      setTimeout(() => setCsvSaveSuccess(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSaving(false);
+    }
+  };
+
+  const run30DayBacktest2 = async () => {
+    setBacktest2Loading(true);
+    setBacktest2Error(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/strategy2`);
+      if (!res.ok) {
+        throw new Error(`Backtest Strategy 2 failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktest2Result(data);
+      setShowLedger2(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktest2Error(err.message || "Failed to run Strategy 2 backtest.");
+    } finally {
+      setBacktest2Loading(false);
+    }
+  };
+
+  const saveBacktestLedgerCsv2 = async () => {
+    if (!backtest2Result || !backtest2Result.trades || backtest2Result.trades.length === 0) return;
+    
+    setCsvSaving2(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Buy Price",
+        "Sell Price",
+        "Shares",
+        "Profit",
+        "Daily Profit"
+      ];
+      
+      const rows: string[] = [];
+      backtest2Result.trades.forEach((day: any) => {
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date,
+            day.buy_date,
+            day.sell_date,
+            "N/A",
+            "0",
+            "0",
+            "0",
+            "0",
+            day.daily_profit.toFixed(2)
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.buy_price.toFixed(2),
+              t.sell_price.toFixed(2),
+              t.shares.toFixed(2),
+              t.profit.toFixed(2),
+              day.daily_profit.toFixed(2)
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+      
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+      
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: 'Backtest_Ledger_Strategy2.csv',
+          content: csvContent
+        })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Failed to save CSV (Status ${res.status})`);
+      }
+      
+      setCsvSaveSuccess2(true);
+      setTimeout(() => setCsvSaveSuccess2(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Strategy 2 backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSaving2(false);
+    }
+  };
+
+  const run30DayBacktest3 = async () => {
+    setBacktest3Loading(true);
+    setBacktest3Error(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/strategy3`);
+      if (!res.ok) {
+        throw new Error(`Backtest Strategy 3 failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktest3Result(data);
+      setShowLedger3(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktest3Error(err.message || "Failed to run Strategy 3 backtest.");
+    } finally {
+      setBacktest3Loading(false);
+    }
+  };
+
+  const saveBacktestLedgerCsv3 = async () => {
+    if (!backtest3Result || !backtest3Result.trades || backtest3Result.trades.length === 0) return;
+    
+    setCsvSaving3(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Buy Price",
+        "Sell Price",
+        "Shares",
+        "Profit",
+        "Daily Profit"
+      ];
+      
+      const rows: string[] = [];
+      backtest3Result.trades.forEach((day: any) => {
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date,
+            day.buy_date,
+            day.sell_date,
+            "N/A",
+            "0",
+            "0",
+            "0",
+            "0",
+            day.daily_profit.toFixed(2)
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.buy_price.toFixed(2),
+              t.sell_price.toFixed(2),
+              t.shares.toFixed(2),
+              t.profit.toFixed(2),
+              day.daily_profit.toFixed(2)
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+      
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+      
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: 'Backtest_Ledger_Strategy3.csv',
+          content: csvContent
+        })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Failed to save CSV (Status ${res.status})`);
+      }
+      
+      setCsvSaveSuccess3(true);
+      setTimeout(() => setCsvSaveSuccess3(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Strategy 3 backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSaving3(false);
+    }
+  };
+
   // Filter global analysisData to only show tickers belonging to the selected indexes
   const filteredData = indexTickers.reduce((acc, ticker) => {
     if (analysisData[ticker]) {
@@ -260,62 +566,465 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   return (
     <div className="space-y-6">
       {/* Index Selector Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border bg-card/40 backdrop-blur-md shadow-sm">
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            Index Selection
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Select one or more benchmark indexes to run comparative quantitative analyses on all combined components.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-fit">
-          <div className="flex bg-muted/60 p-1.5 rounded-lg border gap-1.5">
-            {INDEXES.map((idx) => {
-              const isSelected = selectedFiles.includes(idx.filename);
-              return (
-                <Button
-                  key={idx.filename}
-                  variant={isSelected ? 'secondary' : 'ghost'}
-                  onClick={() => {
-                    setSelectedFiles(prev => {
-                      if (prev.includes(idx.filename)) {
-                        // Keep at least one selected to avoid empty views
-                        if (prev.length === 1) return prev;
-                        return prev.filter(f => f !== idx.filename);
-                      } else {
-                        return [...prev, idx.filename];
-                      }
-                    });
-                  }}
-                  size="sm"
-                  className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${
-                    isSelected 
-                      ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {isSelected && <Check className="w-3.5 h-3.5" />}
-                  {idx.name}
-                </Button>
-              );
-            })}
+      <div className="flex flex-col gap-4 p-4 rounded-xl border bg-card/40 backdrop-blur-md shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Index Selection
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Select one or more benchmark indexes to run comparative quantitative analyses on all combined components.
+            </p>
           </div>
 
-          {!loadingTickers && !loadingAnalysis && indexTickers.length > 0 && (
-            <Button
-              onClick={runScreen}
-              size="sm"
-              variant="outline"
-              className="rounded-md border-primary/30 hover:bg-primary/10 text-primary font-bold px-4 shadow-sm"
-            >
-              Run Buy Screen
-            </Button>
-          )}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-fit">
+            <div className="flex bg-muted/60 p-1.5 rounded-lg border gap-1.5">
+              {INDEXES.map((idx) => {
+                const isSelected = selectedFiles.includes(idx.filename);
+                return (
+                  <Button
+                    key={idx.filename}
+                    variant={isSelected ? 'secondary' : 'ghost'}
+                    onClick={() => {
+                      setSelectedFiles(prev => {
+                        if (prev.includes(idx.filename)) {
+                          // Keep at least one selected to avoid empty views
+                          if (prev.length === 1) return prev;
+                          return prev.filter(f => f !== idx.filename);
+                        } else {
+                          return [...prev, idx.filename];
+                        }
+                      });
+                    }}
+                    size="sm"
+                    className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${
+                      isSelected 
+                        ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3.5 h-3.5" />}
+                    {idx.name}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {!loadingTickers && !loadingAnalysis && indexTickers.length > 0 && (
+              <Button
+                onClick={runScreen}
+                size="sm"
+                variant="outline"
+                className="rounded-md border-primary/30 hover:bg-primary/10 text-primary font-bold px-4 shadow-sm"
+              >
+                Run Buy Screen
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* 30-Day Strategy Backtesting Controls */}
+        {indexTickers.length > 0 && (
+          <div className="border-t pt-3 mt-1 border-muted-foreground/10 space-y-3">
+            {/* Strategy 1 Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={run30DayBacktest}
+                  disabled={backtestLoading}
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm w-full sm:w-auto"
+                >
+                  {backtestLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                  {backtestLoading ? "Running Backtest..." : "Run 30-Day Strategy 1 Backtest"}
+                </Button>
+                <span className="text-sm font-semibold text-muted-foreground font-mono">
+                  Total Profit:{" "}
+                  <span className={backtestResult ? (backtestResult.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    ${backtestResult ? backtestResult.total_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </span>{" "}
+                  (
+                  <span className={backtestResult ? (backtestResult.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtestResult ? backtestResult.roi_pct.toFixed(2) : "0.00"}%
+                  </span>
+                  )
+                </span>
+              </div>
+              {backtestResult && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowLedger(!showLedger)}
+                  size="sm"
+                  className="rounded-md font-semibold text-primary hover:bg-primary/10 self-end sm:self-auto"
+                >
+                  {showLedger ? "Hide Trade Ledger" : "Show Trade Ledger"}
+                </Button>
+              )}
+            </div>
+
+            {/* Strategy 2 Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-muted-foreground/5">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={run30DayBacktest2}
+                  disabled={backtest2Loading}
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm w-full sm:w-auto"
+                >
+                  {backtest2Loading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                  {backtest2Loading ? "Running Backtest..." : "Run 30-Day Strategy 2 Backtest"}
+                </Button>
+                <span className="text-sm font-semibold text-muted-foreground font-mono">
+                  ROI:{" "}
+                  <span className={backtest2Result ? (backtest2Result.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtest2Result ? (backtest2Result.total_profit >= 0 ? "+" : "-") : ""}${backtest2Result ? Math.abs(backtest2Result.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </span>{" "}
+                  (
+                  <span className={backtest2Result ? (backtest2Result.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtest2Result ? (backtest2Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest2Result ? Math.abs(backtest2Result.roi_pct).toFixed(1) : "0.0"}%
+                  </span>
+                  )
+                </span>
+              </div>
+              {backtest2Result && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowLedger2(!showLedger2)}
+                  size="sm"
+                  className="rounded-md font-semibold text-primary hover:bg-primary/10 self-end sm:self-auto"
+                >
+                  {showLedger2 ? "Hide Trade Ledger" : "Show Trade Ledger"}
+                </Button>
+              )}
+            </div>
+
+            {/* Strategy 3 Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-muted-foreground/5">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={run30DayBacktest3}
+                  disabled={backtest3Loading}
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm w-full sm:w-auto"
+                >
+                  {backtest3Loading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                  {backtest3Loading ? "Running Backtest..." : "Run 30-Day Strategy 3 Backtest"}
+                </Button>
+                <span className="text-sm font-semibold text-muted-foreground font-mono">
+                  ROI:{" "}
+                  <span className={backtest3Result ? (backtest3Result.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtest3Result ? (backtest3Result.total_profit >= 0 ? "+" : "-") : ""}${backtest3Result ? Math.abs(backtest3Result.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </span>{" "}
+                  (
+                  <span className={backtest3Result ? (backtest3Result.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtest3Result ? (backtest3Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest3Result ? Math.abs(backtest3Result.roi_pct).toFixed(1) : "0.0"}%
+                  </span>
+                  )
+                </span>
+              </div>
+              {backtest3Result && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowLedger3(!showLedger3)}
+                  size="sm"
+                  className="rounded-md font-semibold text-primary hover:bg-primary/10 self-end sm:self-auto"
+                >
+                  {showLedger3 ? "Hide Trade Ledger" : "Show Trade Ledger"}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {backtestError && (
+        <div className="bg-destructive/10 text-destructive border border-destructive/20 p-4 rounded-lg flex items-start gap-3">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestError}</div>
+        </div>
+      )}
+
+      {showLedger && backtestResult && (
+        <div className="p-5 rounded-xl border bg-card/60 backdrop-blur-md shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-muted-foreground/10">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Check className="w-5 h-5 text-green-500" />
+                30-Day Strategy 1 Backtest Trade Ledger
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Chronological ledger of executed entries and exits based on the 10-Indicator Buy Screen (Top 5 Tickers ranked by 1-Wk Strategy Value).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveBacktestLedgerCsv}
+                disabled={csvSaving}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccess 
+                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                }`}
+              >
+                {csvSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccess ? 'Saved successfully!' : 'Save to Backtest_Ledger.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-lg border">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-muted/70 sticky top-0 z-10 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="p-3 font-semibold border-b">Screen Date</th>
+                  <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
+                  <th className="p-3 font-semibold border-b">Exit Date (11:00 AM)</th>
+                  <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Daily Return</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border bg-card/50 flex flex-col gap-0.5 shadow-xs"
+                          >
+                            <span className="font-bold text-primary">{t.ticker}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Buy: ${t.buy_price.toFixed(2)} | Sell: ${t.sell_price.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Shares: {t.shares.toFixed(2)}
+                            </span>
+                            <span className={`font-semibold font-mono ${t.profit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                              {t.profit >= 0 ? "+" : ""}${t.profit.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                        {day.tickers.length === 0 && (
+                          <span className="text-xs text-muted-foreground italic">No tickers matched screens on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtest2Error && (
+        <div className="bg-destructive/10 text-destructive border border-destructive/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtest2Error}</div>
+        </div>
+      )}
+
+      {showLedger2 && backtest2Result && (
+        <div className="p-5 rounded-xl border bg-card/60 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-muted-foreground/10">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Check className="w-5 h-5 text-green-500" />
+                30-Day Strategy 2 Backtest Trade Ledger
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Chronological ledger of executed entries and exits based on Strategy 2 (Willy Market == Bull, ranked by 1-Wk Strategy Value).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveBacktestLedgerCsv2}
+                disabled={csvSaving2}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccess2 
+                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                }`}
+              >
+                {csvSaving2 && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccess2 ? 'Saved successfully!' : 'Save to Backtest_Ledger.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowLedger2(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-lg border">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-muted/70 sticky top-0 z-10 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="p-3 font-semibold border-b">Screen Date</th>
+                  <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
+                  <th className="p-3 font-semibold border-b">Exit Date (11:00 AM)</th>
+                  <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Daily Return</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtest2Result.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border bg-card/50 flex flex-col gap-0.5 shadow-xs"
+                          >
+                            <span className="font-bold text-primary">{t.ticker}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Buy: ${t.buy_price.toFixed(2)} | Sell: ${t.sell_price.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Shares: {t.shares.toFixed(2)}
+                            </span>
+                            <span className={`font-semibold font-mono ${t.profit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                              {t.profit >= 0 ? "+" : ""}${t.profit.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                        {day.tickers.length === 0 && (
+                          <span className="text-xs text-muted-foreground italic">No tickers matched screens on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtest3Error && (
+        <div className="bg-destructive/10 text-destructive border border-destructive/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtest3Error}</div>
+        </div>
+      )}
+
+      {showLedger3 && backtest3Result && (
+        <div className="p-5 rounded-xl border bg-card/60 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-muted-foreground/10">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Check className="w-5 h-5 text-green-500" />
+                30-Day Strategy 3 Backtest Trade Ledger
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Chronological ledger of executed entries and exits based on Strategy 3 (Strategy 1 filters, exit at 2:50 PM on T+2).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveBacktestLedgerCsv3}
+                disabled={csvSaving3}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccess3 
+                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                }`}
+              >
+                {csvSaving3 && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccess3 ? 'Saved successfully!' : 'Save to Backtest_Ledger_Strategy3.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowLedger3(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-lg border">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-muted/70 sticky top-0 z-10 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="p-3 font-semibold border-b">Screen Date</th>
+                  <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
+                  <th className="p-3 font-semibold border-b">Exit Date (2:50 PM)</th>
+                  <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Daily Return</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtest3Result.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border bg-card/50 flex flex-col gap-0.5 shadow-xs"
+                          >
+                            <span className="font-bold text-primary">{t.ticker}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Buy: ${t.buy_price.toFixed(2)} | Sell: ${t.sell_price.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Shares: {t.shares.toFixed(2)}
+                            </span>
+                            <span className={`font-semibold font-mono ${t.profit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                              {t.profit >= 0 ? "+" : ""}${t.profit.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                        {day.tickers.length === 0 && (
+                          <span className="text-xs text-muted-foreground italic">No tickers matched screens on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {screenRun && (
         <div className="p-5 rounded-xl border bg-card/60 backdrop-blur-md shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">

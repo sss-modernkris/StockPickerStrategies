@@ -7,6 +7,7 @@ from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, 
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
+from services.backtester import execute_30d_backtest
 import csv
 import os
 import json
@@ -665,4 +666,29 @@ def save_analysis_report(req: SaveReportRequest):
         return {"status": "success", "message": f"Successfully saved analysis report to {safe_filename}", "filepath": output_path}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write markdown report: {str(e)}")
+
+@app.get("/api/backtest-30d")
+def get_30d_backtest():
+    try:
+        result = execute_30d_backtest(strategy_num=1)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest execution failed: {str(e)}")
+
+@app.get("/api/backtest-30d/strategy2")
+def get_30d_backtest_strategy2():
+    try:
+        result = execute_30d_backtest(strategy_num=2)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest Strategy 2 execution failed: {str(e)}")
+
+@app.get("/api/backtest-30d/strategy3")
+def get_30d_backtest_strategy3():
+    try:
+        result = execute_30d_backtest(strategy_num=3)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest Strategy 3 execution failed: {str(e)}")
+
 
