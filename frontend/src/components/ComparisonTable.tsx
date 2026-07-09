@@ -51,7 +51,7 @@ export function formatDate(dateStr: string): string {
 export function runWillyBacktest(
     priceHistory?: PricePoint[],
     initialCapital: number = 10000,
-    backtestMonths: number = 4,
+    backtestPeriod: number | string = 4,
     customStartDate?: string
 ): BacktestResult {
     const defaultResult: BacktestResult = {
@@ -80,10 +80,42 @@ export function runWillyBacktest(
     if (customStartDate) {
         startDateStr = customStartDate;
     } else {
-        // Calculate the start date exactly backtestMonths prior
         const startDate = new Date(endDate);
-        startDate.setMonth(startDate.getMonth() - backtestMonths);
-        startDateStr = startDate.toISOString().split('T')[0];
+        if (typeof backtestPeriod === 'number') {
+            startDate.setMonth(startDate.getMonth() - backtestPeriod);
+            startDateStr = startDate.toISOString().split('T')[0];
+        } else if (typeof backtestPeriod === 'string') {
+            const match = backtestPeriod.match(/^(\d+)([dwm])$/);
+            if (match) {
+                const value = parseInt(match[1], 10);
+                const unit = match[2];
+                if (unit === 'd') {
+                    if (priceHistory && priceHistory.length > value) {
+                        startDateStr = priceHistory[priceHistory.length - 1 - value].date;
+                    } else {
+                        startDate.setDate(startDate.getDate() - value);
+                        startDateStr = startDate.toISOString().split('T')[0];
+                    }
+                } else if (unit === 'w') {
+                    startDate.setDate(startDate.getDate() - value * 7);
+                    startDateStr = startDate.toISOString().split('T')[0];
+                } else if (unit === 'm') {
+                    startDate.setMonth(startDate.getMonth() - value);
+                    startDateStr = startDate.toISOString().split('T')[0];
+                }
+            } else {
+                const parsed = parseInt(backtestPeriod, 10);
+                if (!isNaN(parsed)) {
+                    startDate.setMonth(startDate.getMonth() - parsed);
+                } else {
+                    startDate.setMonth(startDate.getMonth() - 4);
+                }
+                startDateStr = startDate.toISOString().split('T')[0];
+            }
+        } else {
+            startDate.setMonth(startDate.getMonth() - 4);
+            startDateStr = startDate.toISOString().split('T')[0];
+        }
     }
     const endDateStr = latestDateStr;
 
@@ -223,7 +255,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
     const [selectedRowTicker, setSelectedRowTicker] = useState<string | null>(null);
-    const [backtestPeriodMonths, setBacktestPeriodMonths] = useState<number>(4);
+    const [backtestPeriod, setBacktestPeriod] = useState<string | number>('4m');
     const [initialCapital, setInitialCapital] = useState<number>(10000);
     const [capitalInput, setCapitalInput] = useState<string>("10,000");
     const [rangeMode, setRangeMode] = useState<'period' | 'date'>('period');
@@ -272,7 +304,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         setXAxisDomain(null);
         setLeftAxisDomain(['auto', 'auto']);
         setRightAxisDomain(['auto', 'auto']);
-    }, [selectedRowTicker, backtestPeriodMonths, initialCapital, rangeMode, customStartDate]);
+    }, [selectedRowTicker, backtestPeriod, initialCapital, rangeMode, customStartDate]);
 
     // Helper to color strings like "75%"
     const getColorClass = (perc: number) => {
@@ -355,6 +387,11 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             rec = (currentPrice > willyVwap && closeSlopeRaw > 0) ? 'Hold' : 'Sell';
         }
 
+        let willyMarket = "N/A";
+        if (currentPrice !== null && willyVwap !== null) {
+            willyMarket = currentPrice > willyVwap ? 'Bull' : 'Bear';
+        }
+
         let willyVwapRatio = data.technical_indicators?.willy_vwap_ratio ?? null;
         if (willyVwapRatio === null && currentPrice !== null && willyVwap !== null && willyVwap !== 0) {
             willyVwapRatio = currentPrice / willyVwap;
@@ -363,7 +400,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         const backtest = runWillyBacktest(
             priceHistory,
             initialCapital,
-            backtestPeriodMonths,
+            backtestPeriod,
             rangeMode === 'date' ? customStartDate : undefined
         );
 
@@ -373,6 +410,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             strat_avg: stratAvg,
             ranking: ranking,
             rec: rec,
+            willy_market: willyMarket,
             close_price: currentPrice,
             close_slope: closeSlopeStr,
             close_slope_raw: closeSlopeRaw,
@@ -413,6 +451,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'rec') {
             valA = a.rec;
             valB = b.rec;
+        } else if (sortKey === 'willy_market') {
+            valA = a.willy_market;
+            valB = b.willy_market;
         } else if (sortKey === 'close_price') {
             valA = a.close_price ?? -99999;
             valB = b.close_price ?? -99999;
@@ -470,7 +511,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const handleExportCsv = async () => {
         setIsExporting(true);
         const headers = [
-            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
+            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
             "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
         ];
 
@@ -481,6 +522,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.strat_avg.toFixed(1),
                 row.ranking,
                 row.rec,
+                row.willy_market,
                 row.strategy_value.toFixed(2),
                 row.strategy_return.toFixed(2),
                 row.bh_return.toFixed(2),
@@ -564,15 +606,19 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-1 duration-200">
                             <label className="text-xs font-medium text-muted-foreground">Period:</label>
                             <select
-                                value={backtestPeriodMonths}
-                                onChange={(e) => setBacktestPeriodMonths(parseInt(e.target.value))}
+                                value={backtestPeriod}
+                                onChange={(e) => setBacktestPeriod(e.target.value)}
                                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer hover:bg-muted/55 transition-colors"
                             >
-                                <option value={1}>1 Month</option>
-                                <option value={3}>3 Months</option>
-                                <option value={4}>4 Months (Default)</option>
-                                <option value={6}>6 Months</option>
-                                <option value={12}>12 Months</option>
+                                <option value="1d">1 Day</option>
+                                <option value="2d">2 Days</option>
+                                <option value="1w">1 Week</option>
+                                <option value="2w">2 Weeks</option>
+                                <option value="1m">1 Month</option>
+                                <option value="3m">3 Months</option>
+                                <option value="4m">4 Months (Default)</option>
+                                <option value="6m">6 Months</option>
+                                <option value="12m">12 Months</option>
                             </select>
                         </div>
                     )}
@@ -670,6 +716,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             Rec {renderSortIcon("rec")}
                         </TableHead>
                         <TableHead
+                            className="font-bold text-orange-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('willy_market')}
+                        >
+                            Willy Market {renderSortIcon("willy_market")}
+                        </TableHead>
+                        <TableHead
                             className="font-bold text-amber-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('strategy_value')}
                         >
@@ -744,7 +796,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 <TableBody>
                     {sortedData.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={STRATEGY_NAMES.length + 15} className="text-center py-10 text-muted-foreground">
+                            <TableCell colSpan={STRATEGY_NAMES.length + 16} className="text-center py-10 text-muted-foreground">
                                 No data loaded yet. Select stocks from the sidebar.
                             </TableCell>
                         </TableRow>
@@ -773,6 +825,11 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className={`text-center font-bold ${row.rec === 'Hold' ? 'text-green-500' : row.rec === 'Sell' ? 'text-red-500' : 'text-muted-foreground'}`}>
                                         {row.rec}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${row.willy_market === 'Bull' ? 'bg-green-500/15 text-green-500 border border-green-500/30' : row.willy_market === 'Bear' ? 'bg-red-500/15 text-red-500 border border-red-500/30' : 'bg-muted text-muted-foreground'}`}>
+                                            {row.willy_market === 'Bull' ? '🟢 Bull' : row.willy_market === 'Bear' ? '🔴 Bear' : 'N/A'}
+                                        </span>
                                     </TableCell>
                                     <TableCell className="text-center font-mono font-bold text-amber-500 bg-amber-500/5">
                                         ${row.strategy_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

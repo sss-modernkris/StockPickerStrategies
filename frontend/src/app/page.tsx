@@ -15,6 +15,7 @@ import { PaperStudyPanel } from '@/components/PaperStudyPanel';
 import { BrokersPanel } from '@/components/BrokersPanel';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { BxTrenderPanel } from '@/components/BxTrenderPanel';
+import { TopTickersPanel } from '@/components/TopTickersPanel';
 import { TickerAnalysis } from '@/lib/types';
 import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx' | 'top-tickers'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -164,6 +165,7 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold tracking-tight">
                   {viewMode === 'dashboard' && currentData.symbol}
                   {viewMode === 'table' && 'Comparison Table'}
+                  {viewMode === 'top-tickers' && 'Top Tickers Analysis'}
                   {viewMode === 'normalized-compare' && 'Relative Performance Analytics'}
                   {viewMode === 'technical' && `${currentData.symbol} Technical Indicators`}
                   {viewMode === 'advanced-charts' && `${currentData.symbol} Advanced Charts`}
@@ -177,6 +179,7 @@ export default function Dashboard() {
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
                   {viewMode === 'table' && 'Compare quant metrics across all loaded stocks'}
+                  {viewMode === 'top-tickers' && 'Compare quant metrics for Dow 30, Nasdaq 100, and S&P 100 constituents'}
                   {viewMode === 'normalized-compare' && 'Visualize relative growth on a level playing field, indexing all selected assets to a baseline of 100.'}
                   {viewMode === 'technical' && 'Price action, momentum, moving averages, and volume data'}
                   {viewMode === 'advanced-charts' && 'Deep dive into MACD, Relative Strength, and trend alignment across varying moving averages.'}
@@ -194,6 +197,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} onClick={() => setViewMode('table')} size="sm" className="rounded-md">
                   <TableProperties className="w-4 h-4 mr-2" /> Comparison
+                </Button>
+                <Button variant={viewMode === 'top-tickers' ? 'secondary' : 'ghost'} onClick={() => setViewMode('top-tickers')} size="sm" className="rounded-md">
+                  <ClipboardList className="w-4 h-4 mr-2" /> Top Tickers
                 </Button>
                 <Button variant={viewMode === 'normalized-compare' ? 'secondary' : 'ghost'} onClick={() => setViewMode('normalized-compare')} size="sm" className="rounded-md">
                   <TrendingUp className="w-4 h-4 mr-2" /> Compare Charts
@@ -228,6 +234,12 @@ export default function Dashboard() {
             {viewMode === 'table' && (
               <div className="h-[calc(100vh-190px)] min-h-[1050px] mt-2">
                 <ComparisonTable analysisData={filteredAnalysisData} />
+              </div>
+            )}
+
+            {viewMode === 'top-tickers' && (
+              <div className="mt-2">
+                <TopTickersPanel analysisData={analysisData} onUpdateAnalysisData={setAnalysisData} />
               </div>
             )}
 
