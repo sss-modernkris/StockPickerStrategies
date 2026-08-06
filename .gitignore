@@ -32,4 +32,6 @@ Thumbs.db
 # local dev files
 _data/
 _config/
-*.csv
+Backtest_Ledger*.csv
+CompTable_*.csv
+Top_Tickers_*.csv
