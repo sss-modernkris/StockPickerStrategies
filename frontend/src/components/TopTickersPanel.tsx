@@ -301,11 +301,20 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Sell Price",
         "Shares",
         "Profit",
-        "Daily Profit"
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily Profit ($)",
+        "Daily Profit (%)"
       ];
       
       const rows: string[] = [];
       backtestResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+        
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -316,7 +325,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             "0",
             "0",
             "0",
-            day.daily_profit.toFixed(2)
+            dowRet,
+            spRet,
+            ndxRet,
+            day.daily_profit.toFixed(2),
+            dailyProfitPct
           ].map(v => `"${v}"`).join(","));
         } else {
           day.tickers.forEach((t: any) => {
@@ -329,7 +342,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               t.sell_price.toFixed(2),
               t.shares.toFixed(2),
               t.profit.toFixed(2),
-              day.daily_profit.toFixed(2)
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
             ].map(v => `"${v}"`).join(","));
           });
         }
@@ -395,11 +412,20 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Sell Price",
         "Shares",
         "Profit",
-        "Daily Profit"
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily Profit ($)",
+        "Daily Profit (%)"
       ];
       
       const rows: string[] = [];
       backtest2Result.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+        
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -410,7 +436,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             "0",
             "0",
             "0",
-            day.daily_profit.toFixed(2)
+            dowRet,
+            spRet,
+            ndxRet,
+            day.daily_profit.toFixed(2),
+            dailyProfitPct
           ].map(v => `"${v}"`).join(","));
         } else {
           day.tickers.forEach((t: any) => {
@@ -423,7 +453,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               t.sell_price.toFixed(2),
               t.shares.toFixed(2),
               t.profit.toFixed(2),
-              day.daily_profit.toFixed(2)
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
             ].map(v => `"${v}"`).join(","));
           });
         }
@@ -489,11 +523,20 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Sell Price",
         "Shares",
         "Profit",
-        "Daily Profit"
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily Profit ($)",
+        "Daily Profit (%)"
       ];
       
       const rows: string[] = [];
       backtest3Result.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+        
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -504,7 +547,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             "0",
             "0",
             "0",
-            day.daily_profit.toFixed(2)
+            dowRet,
+            spRet,
+            ndxRet,
+            day.daily_profit.toFixed(2),
+            dailyProfitPct
           ].map(v => `"${v}"`).join(","));
         } else {
           day.tickers.forEach((t: any) => {
@@ -517,7 +564,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               t.sell_price.toFixed(2),
               t.shares.toFixed(2),
               t.profit.toFixed(2),
-              day.daily_profit.toFixed(2)
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
             ].map(v => `"${v}"`).join(","));
           });
         }
@@ -649,6 +700,22 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     {backtestResult ? backtestResult.roi_pct.toFixed(2) : "0.00"}%
                   </span>
                   )
+                  {backtestResult && (
+                    <span className="text-muted-foreground/60 font-normal">
+                      {" "}| Benchmarks: Dow{" "}
+                      <span className={(backtestResult.dow_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtestResult.dow_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtestResult.dow_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                      {" "}• S&P{" "}
+                      <span className={(backtestResult.sp_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtestResult.sp_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtestResult.sp_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                      {" "}• Nasdaq{" "}
+                      <span className={(backtestResult.nasdaq_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtestResult.nasdaq_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtestResult.nasdaq_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                    </span>
+                  )}
                 </span>
               </div>
               {backtestResult && (
@@ -685,6 +752,22 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     {backtest2Result ? (backtest2Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest2Result ? Math.abs(backtest2Result.roi_pct).toFixed(1) : "0.0"}%
                   </span>
                   )
+                  {backtest2Result && (
+                    <span className="text-muted-foreground/60 font-normal">
+                      {" "}| Benchmarks: Dow{" "}
+                      <span className={(backtest2Result.dow_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtest2Result.dow_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest2Result.dow_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                      {" "}• S&P{" "}
+                      <span className={(backtest2Result.sp_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtest2Result.sp_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest2Result.sp_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                      {" "}• Nasdaq{" "}
+                      <span className={(backtest2Result.nasdaq_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtest2Result.nasdaq_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest2Result.nasdaq_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                    </span>
+                  )}
                 </span>
               </div>
               {backtest2Result && (
@@ -721,6 +804,22 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     {backtest3Result ? (backtest3Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest3Result ? Math.abs(backtest3Result.roi_pct).toFixed(1) : "0.0"}%
                   </span>
                   )
+                  {backtest3Result && (
+                    <span className="text-muted-foreground/60 font-normal">
+                      {" "}| Benchmarks: Dow{" "}
+                      <span className={(backtest3Result.dow_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtest3Result.dow_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest3Result.dow_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                      {" "}• S&P{" "}
+                      <span className={(backtest3Result.sp_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtest3Result.sp_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest3Result.sp_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                      {" "}• Nasdaq{" "}
+                      <span className={(backtest3Result.nasdaq_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
+                        {(backtest3Result.nasdaq_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest3Result.nasdaq_roi_pct ?? 0).toFixed(2)}%
+                      </span>
+                    </span>
+                  )}
                 </span>
               </div>
               {backtest3Result && (
@@ -790,6 +889,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
                   <th className="p-3 font-semibold border-b">Exit Date (11:00 AM)</th>
                   <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Dow Jones 30</th>
+                  <th className="p-3 font-semibold border-b text-right">S&P 500</th>
+                  <th className="p-3 font-semibold border-b text-right">Nasdaq 100</th>
                   <th className="p-3 font-semibold border-b text-right">Daily Return</th>
                 </tr>
               </thead>
@@ -823,8 +925,17 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                         )}
                       </div>
                     </td>
+                    <td className={`p-3 text-right font-mono ${day.dow_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.dow_return >= 0 ? "+" : ""}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.sp_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.sp_return >= 0 ? "+" : ""}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.nasdaq_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.nasdaq_return >= 0 ? "+" : ""}{day.nasdaq_return.toFixed(2)}%
+                    </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
                     </td>
                   </tr>
                 ))}
@@ -886,6 +997,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
                   <th className="p-3 font-semibold border-b">Exit Date (11:00 AM)</th>
                   <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Dow Jones 30</th>
+                  <th className="p-3 font-semibold border-b text-right">S&P 500</th>
+                  <th className="p-3 font-semibold border-b text-right">Nasdaq 100</th>
                   <th className="p-3 font-semibold border-b text-right">Daily Return</th>
                 </tr>
               </thead>
@@ -919,8 +1033,17 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                         )}
                       </div>
                     </td>
+                    <td className={`p-3 text-right font-mono ${day.dow_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.dow_return >= 0 ? "+" : ""}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.sp_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.sp_return >= 0 ? "+" : ""}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.nasdaq_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.nasdaq_return >= 0 ? "+" : ""}{day.nasdaq_return.toFixed(2)}%
+                    </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
                     </td>
                   </tr>
                 ))}
@@ -982,6 +1105,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
                   <th className="p-3 font-semibold border-b">Exit Date (2:50 PM)</th>
                   <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Dow Jones 30</th>
+                  <th className="p-3 font-semibold border-b text-right">S&P 500</th>
+                  <th className="p-3 font-semibold border-b text-right">Nasdaq 100</th>
                   <th className="p-3 font-semibold border-b text-right">Daily Return</th>
                 </tr>
               </thead>
@@ -1015,8 +1141,17 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                         )}
                       </div>
                     </td>
+                    <td className={`p-3 text-right font-mono ${day.dow_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.dow_return >= 0 ? "+" : ""}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.sp_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.sp_return >= 0 ? "+" : ""}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.nasdaq_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.nasdaq_return >= 0 ? "+" : ""}{day.nasdaq_return.toFixed(2)}%
+                    </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
                     </td>
                   </tr>
                 ))}

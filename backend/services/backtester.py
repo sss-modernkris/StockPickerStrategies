@@ -156,6 +156,14 @@ def execute_30d_backtest(strategy_num: int = 1) -> dict:
     all_dates = sorted(list(daily_data.index))
     trading_days = [d for d in all_dates if d.date() >= start_date]
     
+    # Download index data for benchmarking
+    index_symbols = ['^DJI', '^GSPC', '^NDX']
+    try:
+        index_data = yf.download(index_symbols, period="1y", interval="1d", progress=False)
+    except Exception as e:
+        print(f"[BACKTEST] Error downloading index data: {e}")
+        index_data = pd.DataFrame()
+
     trades_ledger = []
     total_profit = 0.0
     
@@ -277,19 +285,73 @@ def execute_30d_backtest(strategy_num: int = 1) -> dict:
                 })
                 
         total_profit += daily_profit
+
+        # Calculate daily index returns
+        dow_ret = 0.0
+        sp_ret = 0.0
+        nasdaq_ret = 0.0
+        
+        if not index_data.empty:
+            try:
+                if T_plus_1 in index_data.index and T_plus_2 in index_data.index:
+                    for symbol, name in [('^DJI', 'dow'), ('^GSPC', 'sp'), ('^NDX', 'nasdaq')]:
+                        p_start = index_data.loc[T_plus_1, ('Close', symbol)]
+                        p_end = index_data.loc[T_plus_2, ('Close', symbol)]
+                        if pd.notna(p_start) and pd.notna(p_end) and p_start > 0:
+                            val = float((p_end - p_start) / p_start * 100.0)
+                            if name == 'dow': dow_ret = val
+                            elif name == 'sp': sp_ret = val
+                            elif name == 'nasdaq': nasdaq_ret = val
+            except Exception as e:
+                print(f"[BACKTEST] Error calculating index returns for {T_str}: {e}")
         
         trades_ledger.append({
             "screen_date": T_str,
             "buy_date": T_plus_1_str,
             "sell_date": T_plus_2_str,
             "tickers": traded_items,
-            "daily_profit": float(daily_profit)
+            "daily_profit": float(daily_profit),
+            "dow_return": dow_ret,
+            "sp_return": sp_ret,
+            "nasdaq_return": nasdaq_ret
         })
         
     roi_pct = (total_profit / 10000.0) * 100.0
+
+    # Calculate overall index ROI over the entire backtest window
+    dow_overall = 0.0
+    sp_overall = 0.0
+    nasdaq_overall = 0.0
+    
+    if not index_data.empty:
+        valid_days = []
+        for T in trading_days:
+            idx = all_dates.index(T)
+            if idx + 2 >= len(all_dates):
+                continue
+            valid_days.append((all_dates[idx + 1], all_dates[idx + 2]))
+            
+        if valid_days:
+            first_entry = valid_days[0][0]
+            last_exit = valid_days[-1][1]
+            try:
+                if first_entry in index_data.index and last_exit in index_data.index:
+                    for symbol, name in [('^DJI', 'dow'), ('^GSPC', 'sp'), ('^NDX', 'nasdaq')]:
+                        p_start = index_data.loc[first_entry, ('Close', symbol)]
+                        p_end = index_data.loc[last_exit, ('Close', symbol)]
+                        if pd.notna(p_start) and pd.notna(p_end) and p_start > 0:
+                            val = float((p_end - p_start) / p_start * 100.0)
+                            if name == 'dow': dow_overall = val
+                            elif name == 'sp': sp_overall = val
+                            elif name == 'nasdaq': nasdaq_overall = val
+            except Exception as e:
+                print(f"[BACKTEST] Error calculating overall index returns: {e}")
     
     return {
         "total_profit": float(total_profit),
         "roi_pct": float(roi_pct),
+        "dow_roi_pct": dow_overall,
+        "sp_roi_pct": sp_overall,
+        "nasdaq_roi_pct": nasdaq_overall,
         "trades": trades_ledger
     }
