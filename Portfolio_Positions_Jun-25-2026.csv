@@ -1,0 +1,8 @@
+﻿Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+Z33896077,Individual,CSX,CSX CORP COM USD1,50,$47.45 ,$1.39 ,"$2,372.25 ",$1.37 ,0.05%,$1.37 ,0.05%,9.26%,"$2,370.88 ",$47.42 ,Margin
+Z33896077,Individual,FAST,FASTENAL COM STK USD0.01,75,$47.00 ,$0.74 ,"$3,524.62 ",($0.38),-0.02%,($21.74),-0.62%,13.76%,"$3,546.36 ",$47.28 ,Margin
+Z33896077,Individual,GILD,GILEAD SCIENCES INC COM USD0.001,20,$125.40 ,$0.24 ,"$2,508.00 ",($0.40),-0.02%,($0.40),-0.02%,9.79%,"$2,508.40 ",$125.42 ,Margin
+Z33896077,Individual,KDP,KEURIG DR PEPPER INC COM,100,$32.14 ,$0.74 ,"$3,213.50 ",$73.50 ,2.34%,$41.00 ,1.29%,12.55%,"$3,172.50 ",$31.73 ,Margin
+Z33896077,Individual,MO,ALTRIA GROUP INC,50,$73.09 ,$1.02 ,"$3,654.50 ",$51.00 ,1.41%,$55.00 ,1.52%,14.27%,"$3,599.50 ",$71.99 ,Margin
+Z33896077,Individual,MRK,MERCK &CO. INC COM,20,$124.09 ,$3.49 ,"$2,481.80 ",$3.10 ,0.12%,$3.10 ,0.12%,9.69%,"$2,478.70 ",$123.94 ,Margin
+Z33896077,Individual,WBD,WARNER BROS DISCOVERY INC COM SER A,100,$27.11 ,($0.09),"$2,711.00 ",$4.49 ,0.16%,$4.49 ,0.16%,10.58%,"$2,706.51 ",$27.07 ,Margin

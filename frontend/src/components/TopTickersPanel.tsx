@@ -32,6 +32,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [screenSaveStatus, setScreenSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // Backtesting state variables
+  const [backtestPeriod, setBacktestPeriod] = useState<'1w' | '1m' | '3m' | '6m' | '1y'>('1m');
   const [backtestLoading, setBacktestLoading] = useState<boolean>(false);
   const [backtestResult, setBacktestResult] = useState<any>(null);
   const [showLedger, setShowLedger] = useState<boolean>(false);
@@ -57,6 +58,25 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
 
   // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
   const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
+
+  const run30DayBacktest = async () => {
+    setBacktestLoading(true);
+    setBacktestError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d?period=${backtestPeriod}`);
+      if (!res.ok) {
+        throw new Error(`Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestResult(data);
+      setShowLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestError(err.message || "Failed to run backtest.");
+    } finally {
+      setBacktestLoading(false);
+    }
+  };
 
   // 1. Load the consolidated list of tickers for all selected indices
   useEffect(() => {
@@ -193,58 +213,58 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const runScreen = () => {
     setError(null);
     setScreenSaveStatus('idle');
-    
+
     const results: string[] = [];
-    
+
     indexTickers.forEach(ticker => {
       const data = analysisData[ticker];
       if (!data || data.error) return;
-      
+
       const priceHistory = data.price_history;
       if (!priceHistory || priceHistory.length === 0) return;
-      
+
       const currentPrice = priceHistory[priceHistory.length - 1].close;
       const willyVwap = data.technical_indicators?.willy_vwap ?? null;
       if (currentPrice === null || currentPrice === undefined || willyVwap === null) return;
-      
+
       // 1. Willy Market = Bull (Price > Willy VWAP)
       const isBull = currentPrice > willyVwap;
       if (!isBull) return;
-      
+
       // 2. Strategy Value > 10000 (using 1-week backtest)
       const backtest = runWillyBacktest(priceHistory, 10000, '1w');
       const isProfitable = backtest.finalValue > 10000;
       if (!isProfitable) return;
-      
+
       // 3. MACD Hist > -0.5 and < 0.5 (MACD Hist = Line - Signal)
       const macdLine = data.technical_indicators?.macd_line ?? null;
       const macdSignal = data.technical_indicators?.macd_signal ?? null;
       if (macdLine === null || macdSignal === null) return;
       const macdHist = macdLine - macdSignal;
       if (macdHist <= -0.5 || macdHist >= 0.5) return;
-      
+
       // 4. MACD Slope > 0
       const macdSlope = data.technical_indicators?.macd_slope ?? null;
       if (macdSlope === null || macdSlope <= 0) return;
-      
+
       // 5. RSI > 30 and < 70 (RSI 14)
       const rsi = data.technical_indicators?.rsi_14 ?? null;
       if (rsi === null || rsi <= 30 || rsi >= 70) return;
-      
+
       results.push(ticker);
     });
-    
+
     setScreenedTickers(results);
     setScreenRun(true);
   };
 
   const saveScreenedTickers = async () => {
     if (screenedTickers.length === 0) return;
-    
+
     setScreenSaveStatus('saving');
     try {
       const csvContent = "Symbol\n" + screenedTickers.join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -255,11 +275,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setScreenSaveStatus('saved');
     } catch (err: any) {
       console.error("Save screen error:", err);
@@ -268,28 +288,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     }
   };
 
-  const run30DayBacktest = async () => {
-    setBacktestLoading(true);
-    setBacktestError(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/backtest-30d`);
-      if (!res.ok) {
-        throw new Error(`Backtest failed (Status ${res.status})`);
-      }
-      const data = await res.json();
-      setBacktestResult(data);
-      setShowLedger(true);
-    } catch (err: any) {
-      console.error(err);
-      setBacktestError(err.message || "Failed to run 30-day backtest.");
-    } finally {
-      setBacktestLoading(false);
-    }
-  };
-
   const saveBacktestLedgerCsv = async () => {
     if (!backtestResult || !backtestResult.trades || backtestResult.trades.length === 0) return;
-    
+
     setCsvSaving(true);
     try {
       const headers = [
@@ -307,14 +308,14 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Daily Profit ($)",
         "Daily Profit (%)"
       ];
-      
+
       const rows: string[] = [];
       backtestResult.trades.forEach((day: any) => {
         const dowRet = (day.dow_return ?? 0.0).toFixed(2);
         const spRet = (day.sp_return ?? 0.0).toFixed(2);
         const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
         const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
-        
+
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -351,9 +352,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           });
         }
       });
-      
+
       const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -364,11 +365,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setCsvSaveSuccess(true);
       setTimeout(() => setCsvSaveSuccess(false), 3000);
     } catch (err: any) {
@@ -383,7 +384,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     setBacktest2Loading(true);
     setBacktest2Error(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/strategy2`);
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/strategy2?period=${backtestPeriod}`);
       if (!res.ok) {
         throw new Error(`Backtest Strategy 2 failed (Status ${res.status})`);
       }
@@ -400,7 +401,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
 
   const saveBacktestLedgerCsv2 = async () => {
     if (!backtest2Result || !backtest2Result.trades || backtest2Result.trades.length === 0) return;
-    
+
     setCsvSaving2(true);
     try {
       const headers = [
@@ -418,14 +419,14 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Daily Profit ($)",
         "Daily Profit (%)"
       ];
-      
+
       const rows: string[] = [];
       backtest2Result.trades.forEach((day: any) => {
         const dowRet = (day.dow_return ?? 0.0).toFixed(2);
         const spRet = (day.sp_return ?? 0.0).toFixed(2);
         const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
         const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
-        
+
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -462,9 +463,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           });
         }
       });
-      
+
       const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -475,11 +476,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setCsvSaveSuccess2(true);
       setTimeout(() => setCsvSaveSuccess2(false), 3000);
     } catch (err: any) {
@@ -494,7 +495,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     setBacktest3Loading(true);
     setBacktest3Error(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/strategy3`);
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/strategy3?period=${backtestPeriod}`);
       if (!res.ok) {
         throw new Error(`Backtest Strategy 3 failed (Status ${res.status})`);
       }
@@ -511,7 +512,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
 
   const saveBacktestLedgerCsv3 = async () => {
     if (!backtest3Result || !backtest3Result.trades || backtest3Result.trades.length === 0) return;
-    
+
     setCsvSaving3(true);
     try {
       const headers = [
@@ -529,14 +530,14 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Daily Profit ($)",
         "Daily Profit (%)"
       ];
-      
+
       const rows: string[] = [];
       backtest3Result.trades.forEach((day: any) => {
         const dowRet = (day.dow_return ?? 0.0).toFixed(2);
         const spRet = (day.sp_return ?? 0.0).toFixed(2);
         const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
         const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
-        
+
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -573,9 +574,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           });
         }
       });
-      
+
       const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -586,11 +587,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setCsvSaveSuccess3(true);
       setTimeout(() => setCsvSaveSuccess3(false), 3000);
     } catch (err: any) {
@@ -649,11 +650,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                       });
                     }}
                     size="sm"
-                    className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${
-                      isSelected 
-                        ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30' 
+                    className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${isSelected
+                        ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {isSelected && <Check className="w-3.5 h-3.5" />}
                     {idx.name}
@@ -675,9 +675,38 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           </div>
         </div>
 
-        {/* 30-Day Strategy Backtesting Controls */}
+        {/* Strategy Backtesting Controls */}
         {indexTickers.length > 0 && (
           <div className="border-t pt-3 mt-1 border-muted-foreground/10 space-y-3">
+            {/* Timeframe Selector */}
+            <div className="flex items-center justify-between gap-3 flex-wrap bg-muted/30 p-2 rounded-lg border border-muted-foreground/10">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono">
+                Strategy Backtest Timeframe:
+              </span>
+              <div className="flex bg-muted/80 p-1 rounded-md border gap-1">
+                {[
+                  { label: '1 Wk', value: '1w' },
+                  { label: '1 Mo', value: '1m' },
+                  { label: '3 Mo', value: '3m' },
+                  { label: '6 Mo', value: '6m' },
+                  { label: '1 Yr', value: '1y' }
+                ].map((tf) => (
+                  <Button
+                    key={tf.value}
+                    variant={backtestPeriod === tf.value ? 'secondary' : 'ghost'}
+                    onClick={() => setBacktestPeriod(tf.value as any)}
+                    size="sm"
+                    className={`h-7 px-3 text-xs font-bold rounded-sm transition-all ${backtestPeriod === tf.value
+                        ? 'bg-primary text-primary-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                  >
+                    {tf.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             {/* Strategy 1 Row */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
@@ -688,31 +717,25 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm w-full sm:w-auto"
                 >
                   {backtestLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                  {backtestLoading ? "Running Backtest..." : "Run 30-Day Strategy 1 Backtest"}
+                  {backtestLoading ? "Running Backtest..." : `Run ${backtestPeriod.toUpperCase()} Strategy 1 Backtest`}
                 </Button>
-                <span className="text-sm font-semibold text-muted-foreground font-mono">
-                  Total Profit:{" "}
-                  <span className={backtestResult ? (backtestResult.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
-                    ${backtestResult ? backtestResult.total_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
-                  </span>{" "}
-                  (
-                  <span className={backtestResult ? (backtestResult.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
-                    {backtestResult ? backtestResult.roi_pct.toFixed(2) : "0.00"}%
+                <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                  <span>
+                    Total Profit:{" "}
+                    <span className={backtestResult ? (backtestResult.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                      ${backtestResult ? backtestResult.total_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                    </span>{" "}
+                    (
+                    <span className={backtestResult ? (backtestResult.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                      {backtestResult ? backtestResult.roi_pct.toFixed(2) : "0.00"}%
+                    </span>
+                    )
                   </span>
-                  )
-                  {backtestResult && (
-                    <span className="text-muted-foreground/60 font-normal">
-                      {" "}| Benchmarks: Dow{" "}
-                      <span className={(backtestResult.dow_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtestResult.dow_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtestResult.dow_roi_pct ?? 0).toFixed(2)}%
-                      </span>
-                      {" "}• S&P{" "}
-                      <span className={(backtestResult.sp_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtestResult.sp_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtestResult.sp_roi_pct ?? 0).toFixed(2)}%
-                      </span>
-                      {" "}• Nasdaq{" "}
-                      <span className={(backtestResult.nasdaq_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtestResult.nasdaq_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtestResult.nasdaq_roi_pct ?? 0).toFixed(2)}%
+                  {backtestResult && backtestResult.sp500_pct_change !== undefined && (
+                    <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                      S&P 500:{" "}
+                      <span className={backtestResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                        {backtestResult.sp500_pct_change >= 0 ? "+" : ""}{backtestResult.sp500_pct_change.toFixed(2)}%
                       </span>
                     </span>
                   )}
@@ -740,31 +763,25 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm w-full sm:w-auto"
                 >
                   {backtest2Loading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                  {backtest2Loading ? "Running Backtest..." : "Run 30-Day Strategy 2 Backtest"}
+                  {backtest2Loading ? "Running Backtest..." : `Run ${backtestPeriod.toUpperCase()} Strategy 2 Backtest`}
                 </Button>
-                <span className="text-sm font-semibold text-muted-foreground font-mono">
-                  ROI:{" "}
-                  <span className={backtest2Result ? (backtest2Result.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
-                    {backtest2Result ? (backtest2Result.total_profit >= 0 ? "+" : "-") : ""}${backtest2Result ? Math.abs(backtest2Result.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
-                  </span>{" "}
-                  (
-                  <span className={backtest2Result ? (backtest2Result.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
-                    {backtest2Result ? (backtest2Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest2Result ? Math.abs(backtest2Result.roi_pct).toFixed(1) : "0.0"}%
+                <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                  <span>
+                    ROI:{" "}
+                    <span className={backtest2Result ? (backtest2Result.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                      {backtest2Result ? (backtest2Result.total_profit >= 0 ? "+" : "-") : ""}${backtest2Result ? Math.abs(backtest2Result.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                    </span>{" "}
+                    (
+                    <span className={backtest2Result ? (backtest2Result.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                      {backtest2Result ? (backtest2Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest2Result ? Math.abs(backtest2Result.roi_pct).toFixed(1) : "0.0"}%
+                    </span>
+                    )
                   </span>
-                  )
-                  {backtest2Result && (
-                    <span className="text-muted-foreground/60 font-normal">
-                      {" "}| Benchmarks: Dow{" "}
-                      <span className={(backtest2Result.dow_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtest2Result.dow_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest2Result.dow_roi_pct ?? 0).toFixed(2)}%
-                      </span>
-                      {" "}• S&P{" "}
-                      <span className={(backtest2Result.sp_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtest2Result.sp_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest2Result.sp_roi_pct ?? 0).toFixed(2)}%
-                      </span>
-                      {" "}• Nasdaq{" "}
-                      <span className={(backtest2Result.nasdaq_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtest2Result.nasdaq_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest2Result.nasdaq_roi_pct ?? 0).toFixed(2)}%
+                  {backtest2Result && backtest2Result.sp500_pct_change !== undefined && (
+                    <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                      S&P 500:{" "}
+                      <span className={backtest2Result.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                        {backtest2Result.sp500_pct_change >= 0 ? "+" : ""}{backtest2Result.sp500_pct_change.toFixed(2)}%
                       </span>
                     </span>
                   )}
@@ -792,31 +809,25 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-md shadow-sm w-full sm:w-auto"
                 >
                   {backtest3Loading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                  {backtest3Loading ? "Running Backtest..." : "Run 30-Day Strategy 3 Backtest"}
+                  {backtest3Loading ? "Running Backtest..." : `Run ${backtestPeriod.toUpperCase()} Strategy 3 Backtest`}
                 </Button>
-                <span className="text-sm font-semibold text-muted-foreground font-mono">
-                  ROI:{" "}
-                  <span className={backtest3Result ? (backtest3Result.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
-                    {backtest3Result ? (backtest3Result.total_profit >= 0 ? "+" : "-") : ""}${backtest3Result ? Math.abs(backtest3Result.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
-                  </span>{" "}
-                  (
-                  <span className={backtest3Result ? (backtest3Result.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
-                    {backtest3Result ? (backtest3Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest3Result ? Math.abs(backtest3Result.roi_pct).toFixed(1) : "0.0"}%
+                <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                  <span>
+                    ROI:{" "}
+                    <span className={backtest3Result ? (backtest3Result.total_profit >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                      {backtest3Result ? (backtest3Result.total_profit >= 0 ? "+" : "-") : ""}${backtest3Result ? Math.abs(backtest3Result.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                    </span>{" "}
+                    (
+                    <span className={backtest3Result ? (backtest3Result.roi_pct >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                      {backtest3Result ? (backtest3Result.roi_pct >= 0 ? "+" : "-") : ""}{backtest3Result ? Math.abs(backtest3Result.roi_pct).toFixed(1) : "0.0"}%
+                    </span>
+                    )
                   </span>
-                  )
-                  {backtest3Result && (
-                    <span className="text-muted-foreground/60 font-normal">
-                      {" "}| Benchmarks: Dow{" "}
-                      <span className={(backtest3Result.dow_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtest3Result.dow_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest3Result.dow_roi_pct ?? 0).toFixed(2)}%
-                      </span>
-                      {" "}• S&P{" "}
-                      <span className={(backtest3Result.sp_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtest3Result.sp_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest3Result.sp_roi_pct ?? 0).toFixed(2)}%
-                      </span>
-                      {" "}• Nasdaq{" "}
-                      <span className={(backtest3Result.nasdaq_roi_pct ?? 0) >= 0 ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
-                        {(backtest3Result.nasdaq_roi_pct ?? 0) >= 0 ? "+" : ""}{(backtest3Result.nasdaq_roi_pct ?? 0).toFixed(2)}%
+                  {backtest3Result && backtest3Result.sp500_pct_change !== undefined && (
+                    <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                      S&P 500:{" "}
+                      <span className={backtest3Result.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                        {backtest3Result.sp500_pct_change >= 0 ? "+" : ""}{backtest3Result.sp500_pct_change.toFixed(2)}%
                       </span>
                     </span>
                   )}
@@ -861,11 +872,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 onClick={saveBacktestLedgerCsv}
                 disabled={csvSaving}
                 size="sm"
-                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
-                  csvSaveSuccess 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${csvSaveSuccess
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+                  }`}
               >
                 {csvSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                 {csvSaveSuccess ? 'Saved successfully!' : 'Save to Backtest_Ledger.csv'}
@@ -969,11 +979,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 onClick={saveBacktestLedgerCsv2}
                 disabled={csvSaving2}
                 size="sm"
-                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
-                  csvSaveSuccess2 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${csvSaveSuccess2
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+                  }`}
               >
                 {csvSaving2 && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                 {csvSaveSuccess2 ? 'Saved successfully!' : 'Save to Backtest_Ledger.csv'}
@@ -1077,11 +1086,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 onClick={saveBacktestLedgerCsv3}
                 disabled={csvSaving3}
                 size="sm"
-                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
-                  csvSaveSuccess3 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${csvSaveSuccess3
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+                  }`}
               >
                 {csvSaving3 && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                 {csvSaveSuccess3 ? 'Saved successfully!' : 'Save to Backtest_Ledger_Strategy3.csv'}
@@ -1173,7 +1181,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 Screened {indexTickers.length} tickers using Willy Bull, 1-wk Backtest &gt; $10k, MACD Hist |0.5|, MACD Slope &gt; 0, and RSI (30-70).
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <Button
                 onClick={saveScreenedTickers}
@@ -1201,8 +1209,8 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           {screenedTickers.length > 0 ? (
             <div className="flex flex-wrap gap-2 pt-1">
               {screenedTickers.map(ticker => (
-                <span 
-                  key={ticker} 
+                <span
+                  key={ticker}
                   className="px-2.5 py-1 rounded-md text-xs font-bold bg-green-500/10 text-green-500 border border-green-500/20"
                 >
                   {ticker}
@@ -1218,7 +1226,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           {screenSaveStatus === 'saved' && (
             <div className="text-xs font-semibold text-green-500 flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 p-2.5 rounded-lg w-fit">
               <Check className="w-4 h-4" />
-              File saved successfully as Top_Tickers_to_buy.csv in project root!
+              Saved to Top_Tickers_to_buy.csv & dispatched email to modernkris@gmail.com!
             </div>
           )}
         </div>
@@ -1244,8 +1252,8 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             </p>
           </div>
           <div className="w-64 bg-muted h-2 rounded-full overflow-hidden">
-            <div 
-              className="bg-primary h-full transition-all duration-300 ease-out" 
+            <div
+              className="bg-primary h-full transition-all duration-300 ease-out"
               style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
             />
           </div>

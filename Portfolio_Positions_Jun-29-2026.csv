@@ -1,0 +1,8 @@
+﻿Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+Z33896077,Individual,ABBV,ABBVIE INC COM USD0.01,20,$254.31 ,$0.96 ,"$5,086.20 ",$19.20 ,0.37%,$183.65 ,3.74%,19.35%,"$4,902.55 ",$245.13 ,Margin
+Z33896077,Individual,BMY,BRISTOL-MYERS SQUIBB CO COM,40,$58.56 ,$1.04 ,"$2,342.40 ",$23.80 ,1.02%,$18.35 ,0.78%,8.91%,"$2,324.05 ",$58.10 ,Margin
+Z33896077,Individual,CSX,CSX CORP COM USD1,50,$48.01 ,$0.35 ,"$2,400.50 ",$5.25 ,0.21%,$1.07 ,0.04%,9.13%,"$2,399.43 ",$47.99 ,Margin
+Z33896077,Individual,KHC,KRAFT HEINZ CO COM,100,$24.19 ,$0.49 ,"$2,419.00 ",$1.01 ,0.04%,($0.03),-0.01%,9.20%,"$2,419.03 ",$24.19 ,Margin
+Z33896077,Individual,KO,COCA-COLA CO,25,$82.65 ,$0.02 ,"$2,066.25 ",$6.87 ,0.33%,($15.30),-0.74%,7.86%,"$2,081.55 ",$83.26 ,Margin
+Z33896077,Individual,SPCX,SPACE EXPL TECHNOLOGIES CORP CL A,20,$164.19 ,$10.96 ,"$3,283.80 ",$219.20 ,7.15%,$66.43 ,2.06%,12.49%,"$3,217.37 ",$160.87 ,Margin
+Z33896077,Individual,TSLA,TESLA INC COM,16,$411.84 ,$32.13 ,"$6,589.44 ",$514.08 ,8.46%,$491.76 ,8.06%,25.07%,"$6,097.68 ",$381.11 ,Margin

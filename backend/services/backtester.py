@@ -91,8 +91,10 @@ def get_backtest_data(tickers: list[str]) -> tuple[dict, pd.DataFrame, pd.DataFr
 
     print(f"[BACKTEST] Downloading data for {len(tickers)} tickers...")
     
+    download_tickers = sorted(list(set(tickers + ["^GSPC"])))
+    
     # 1. Download daily data
-    daily_data = yf.download(tickers, period="1y", interval="1d", progress=False)
+    daily_data = yf.download(download_tickers, period="2y", interval="1d", progress=False)
     
     # 2. Download 30m data
     data_30m = yf.download(tickers, period="1mo", interval="30m", progress=False)
@@ -145,25 +147,26 @@ def get_backtest_data(tickers: list[str]) -> tuple[dict, pd.DataFrame, pd.DataFr
     
     return indicators, daily_data, data_30m
 
-def execute_30d_backtest(strategy_num: int = 1) -> dict:
+def execute_30d_backtest(strategy_num: int = 1, period: str = "1m") -> dict:
     tickers = load_universe_tickers()
     indicators, daily_data, data_30m = get_backtest_data(tickers)
     
-    # Define the 30 calendar days window
+    PERIOD_DAYS_MAP = {
+        "1w": 7,
+        "1m": 30,
+        "3m": 90,
+        "6m": 180,
+        "1y": 365
+    }
+    lookback_days = PERIOD_DAYS_MAP.get(period.lower(), 30)
+    
+    # Define the calendar lookback window
     today = datetime.datetime.now().date()
-    start_date = today - datetime.timedelta(days=30)
+    start_date = today - datetime.timedelta(days=lookback_days)
     
     all_dates = sorted(list(daily_data.index))
     trading_days = [d for d in all_dates if d.date() >= start_date]
     
-    # Download index data for benchmarking
-    index_symbols = ['^DJI', '^GSPC', '^NDX']
-    try:
-        index_data = yf.download(index_symbols, period="1y", interval="1d", progress=False)
-    except Exception as e:
-        print(f"[BACKTEST] Error downloading index data: {e}")
-        index_data = pd.DataFrame()
-
     trades_ledger = []
     total_profit = 0.0
     
@@ -317,41 +320,29 @@ def execute_30d_backtest(strategy_num: int = 1) -> dict:
         })
         
     roi_pct = (total_profit / 10000.0) * 100.0
-
-    # Calculate overall index ROI over the entire backtest window
-    dow_overall = 0.0
-    sp_overall = 0.0
-    nasdaq_overall = 0.0
     
-    if not index_data.empty:
-        valid_days = []
-        for T in trading_days:
-            idx = all_dates.index(T)
-            if idx + 2 >= len(all_dates):
-                continue
-            valid_days.append((all_dates[idx + 1], all_dates[idx + 2]))
+    sp500_pct_change = 0.0
+    try:
+        if len(trading_days) > 0 and '^GSPC' in daily_data['Close'].columns:
+            first_day = trading_days[0]
+            last_day = pd.Timestamp(trades_ledger[-1]["sell_date"]) if trades_ledger else trading_days[-1]
             
-        if valid_days:
-            first_entry = valid_days[0][0]
-            last_exit = valid_days[-1][1]
-            try:
-                if first_entry in index_data.index and last_exit in index_data.index:
-                    for symbol, name in [('^DJI', 'dow'), ('^GSPC', 'sp'), ('^NDX', 'nasdaq')]:
-                        p_start = index_data.loc[first_entry, ('Close', symbol)]
-                        p_end = index_data.loc[last_exit, ('Close', symbol)]
-                        if pd.notna(p_start) and pd.notna(p_end) and p_start > 0:
-                            val = float((p_end - p_start) / p_start * 100.0)
-                            if name == 'dow': dow_overall = val
-                            elif name == 'sp': sp_overall = val
-                            elif name == 'nasdaq': nasdaq_overall = val
-            except Exception as e:
-                print(f"[BACKTEST] Error calculating overall index returns: {e}")
+            sp500_closes = daily_data['Close']['^GSPC'].dropna()
+            
+            start_series = sp500_closes[sp500_closes.index <= first_day]
+            sp500_start = float(start_series.iloc[-1]) if not start_series.empty else float(sp500_closes.iloc[0])
+            
+            end_series = sp500_closes[sp500_closes.index <= last_day]
+            sp500_end = float(end_series.iloc[-1]) if not end_series.empty else float(sp500_closes.iloc[-1])
+            
+            if sp500_start > 0:
+                sp500_pct_change = float(((sp500_end - sp500_start) / sp500_start) * 100.0)
+    except Exception as e:
+        print(f"[BACKTEST] Error calculating S&P 500 % change: {e}")
     
     return {
         "total_profit": float(total_profit),
         "roi_pct": float(roi_pct),
-        "dow_roi_pct": dow_overall,
-        "sp_roi_pct": sp_overall,
-        "nasdaq_roi_pct": nasdaq_overall,
+        "sp500_pct_change": float(sp500_pct_change),
         "trades": trades_ledger
     }

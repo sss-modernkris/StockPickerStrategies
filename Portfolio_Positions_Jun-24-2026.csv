@@ -1,0 +1,10 @@
+﻿Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+Z33896077,Individual,AMGN,AMGEN INC,6,$351.97 ,$4.96 ,"$2,111.82 ",($3.06),-0.15%,($3.06),-0.15%,8.30%,"$2,114.88 ",$352.48 ,Margin
+Z33896077,Individual,JNJ,JOHNSON &JOHNSON COM,10,$240.34 ,$1.26 ,"$2,403.40 ",$12.60 ,0.52%,$34.25 ,1.44%,9.45%,"$2,369.15 ",$236.92 ,Margin
+Z33896077,Individual,KDP,KEURIG DR PEPPER INC COM,100,$31.65 ,$0.78 ,"$3,164.50 ",($8.00),-0.26%,($8.00),-0.26%,12.44%,"$3,172.50 ",$31.73 ,Margin
+Z33896077,Individual,KO,COCA-COLA CO,25,$81.47 ,$1.16 ,"$2,036.62 ",$0.37 ,0.01%,$0.37 ,0.01%,8.01%,"$2,036.25 ",$81.45 ,Margin
+Z33896077,Individual,LIN,LINDE PLC COM EUR0.001,4,$521.08 ,$8.82 ,"$2,084.32 ",($2.64),-0.13%,($2.64),-0.13%,8.19%,"$2,086.96 ",$521.74 ,Margin
+Z33896077,Individual,MDLZ,MONDELEZ INTL INC COM NPV,25,$62.06 ,$1.00 ,"$1,551.37 ",($4.26),-0.28%,($4.26),-0.28%,6.10%,"$1,555.63 ",$62.23 ,Margin
+Z33896077,Individual,MO,ALTRIA GROUP INC,50,$71.99 ,$0.38 ,"$3,599.49 ",($0.01),-0.01%,($0.01),-0.01%,14.15%,"$3,599.50 ",$71.99 ,Margin
+Z33896077,Individual,SBUX,STARBUCKS CORP COM USD0.001,10,$103.45 ,$2.40 ,"$1,034.50 ",$0.20 ,0.01%,$0.20 ,0.01%,4.07%,"$1,034.30 ",$103.43 ,Margin
+Z33896077,Individual,WMT,WALMART INC COM,20,$119.66 ,$0.24 ,"$2,393.10 ",$4.70 ,0.19%,$2.50 ,0.10%,9.41%,"$2,390.60 ",$119.53 ,Margin

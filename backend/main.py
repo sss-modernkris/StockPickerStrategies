@@ -9,6 +9,7 @@ from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
 from services.rh_client import RHClient
 from services.backtester import execute_30d_backtest
+from services.email_service import send_email_with_attachment
 import csv
 import os
 import json
@@ -75,7 +76,31 @@ def save_csv(req: SaveCsvRequest):
         filepath = os.path.join(BASE_DIR, safe_filename)
         with open(filepath, "w", encoding="utf-8", newline="") as f:
             f.write(req.content)
-        return {"status": "success", "message": f"Successfully saved to {filepath}"}
+
+        email_sent = False
+        email_msg = ""
+        if safe_filename == "Top_Tickers_to_buy.csv":
+            target_email = "modernkris@gmail.com"
+            subject = "Top Tickers Buy Screen Results - Top_Tickers_to_buy.csv"
+            body = (
+                "Hello,\n\n"
+                "Attached is the latest Top_Tickers_to_buy.csv generated from your Strategic Alpha Dashboard (Top Tickers tab).\n\n"
+                "Best regards,\n"
+                "Strategic Alpha Quant Engine"
+            )
+            email_sent, email_msg = send_email_with_attachment(
+                to_email=target_email,
+                subject=subject,
+                body=body,
+                file_path=filepath
+            )
+
+        return {
+            "status": "success",
+            "message": f"Successfully saved to {filepath}",
+            "email_sent": email_sent,
+            "email_message": email_msg
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -739,25 +764,25 @@ def save_analysis_report(req: SaveReportRequest):
         raise HTTPException(status_code=500, detail=f"Failed to write markdown report: {str(e)}")
 
 @app.get("/api/backtest-30d")
-def get_30d_backtest():
+def get_30d_backtest(period: str = "1m"):
     try:
-        result = execute_30d_backtest(strategy_num=1)
+        result = execute_30d_backtest(strategy_num=1, period=period)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest execution failed: {str(e)}")
 
 @app.get("/api/backtest-30d/strategy2")
-def get_30d_backtest_strategy2():
+def get_30d_backtest_strategy2(period: str = "1m"):
     try:
-        result = execute_30d_backtest(strategy_num=2)
+        result = execute_30d_backtest(strategy_num=2, period=period)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Strategy 2 execution failed: {str(e)}")
 
 @app.get("/api/backtest-30d/strategy3")
-def get_30d_backtest_strategy3():
+def get_30d_backtest_strategy3(period: str = "1m"):
     try:
-        result = execute_30d_backtest(strategy_num=3)
+        result = execute_30d_backtest(strategy_num=3, period=period)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Strategy 3 execution failed: {str(e)}")
