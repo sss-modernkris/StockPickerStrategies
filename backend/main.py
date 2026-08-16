@@ -8,7 +8,7 @@ from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
 from services.rh_client import RHClient
-from services.backtester import execute_30d_backtest
+from services.backtester import execute_30d_backtest, execute_options_backtest
 from services.email_service import send_email_with_attachment
 import csv
 import os
@@ -74,6 +74,7 @@ def save_csv(req: SaveCsvRequest):
     try:
         safe_filename = os.path.basename(req.filename)
         filepath = os.path.join(BASE_DIR, safe_filename)
+        print(f"Saving to: {filepath}")
         with open(filepath, "w", encoding="utf-8", newline="") as f:
             f.write(req.content)
 
@@ -786,5 +787,26 @@ def get_30d_backtest_strategy3(period: str = "1m"):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Strategy 3 execution failed: {str(e)}")
+
+
+@app.get("/api/backtest-30d/options")
+def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
+    """
+    Options backtesting endpoint.
+    Uses Strategy 1 screening (5 filters, top-5 by 1-wk strategy value).
+    Buys ATM weekly CALL options priced via Black-Scholes.
+    
+    Query params:
+      period:    '1w', '1m', '3m', '6m', '1y'
+      exit_mode: 'intraday' (exit T+2 11AM via BS repricing)
+                 'expiry'   (hold to weekly expiry ~7 days, intrinsic value)
+    """
+    if exit_mode not in ('intraday', 'expiry'):
+        exit_mode = 'intraday'
+    try:
+        result = execute_options_backtest(period=period, exit_mode=exit_mode)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Options backtest execution failed: {str(e)}")
 
 

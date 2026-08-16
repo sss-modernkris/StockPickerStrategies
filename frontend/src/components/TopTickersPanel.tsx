@@ -56,6 +56,15 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [csvSaving3, setCsvSaving3] = useState<boolean>(false);
   const [csvSaveSuccess3, setCsvSaveSuccess3] = useState<boolean>(false);
 
+  // Options Strategy State variables
+  const [backtestOptionsLoading, setBacktestOptionsLoading] = useState<boolean>(false);
+  const [backtestOptionsResult, setBacktestOptionsResult] = useState<any>(null);
+  const [showOptionsLedger, setShowOptionsLedger] = useState<boolean>(false);
+  const [backtestOptionsError, setBacktestOptionsError] = useState<string | null>(null);
+  const [csvSavingOptions, setCsvSavingOptions] = useState<boolean>(false);
+  const [csvSaveSuccessOptions, setCsvSaveSuccessOptions] = useState<boolean>(false);
+  const [optionsExitMode, setOptionsExitMode] = useState<'intraday' | 'expiry'>('intraday');
+
   // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
   const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
 
@@ -510,6 +519,25 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     }
   };
 
+  const runOptionsBacktest = async () => {
+    setBacktestOptionsLoading(true);
+    setBacktestOptionsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/options?period=${backtestPeriod}&exit_mode=${optionsExitMode}`);
+      if (!res.ok) {
+        throw new Error(`Options Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestOptionsResult(data);
+      setShowOptionsLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestOptionsError(err.message || "Failed to run Options backtest.");
+    } finally {
+      setBacktestOptionsLoading(false);
+    }
+  };
+
   const saveBacktestLedgerCsv3 = async () => {
     if (!backtest3Result || !backtest3Result.trades || backtest3Result.trades.length === 0) return;
 
@@ -599,6 +627,99 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
       setError(`Failed to save Strategy 3 backtest ledger CSV: ${err.message}`);
     } finally {
       setCsvSaving3(false);
+    }
+  };
+
+  const saveOptionsBacktestCsv = async () => {
+    if (!backtestOptionsResult || !backtestOptionsResult.trades || backtestOptionsResult.trades.length === 0) return;
+
+    setCsvSavingOptions(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Strike",
+        "Expiry Date",
+        "Underlying Entry",
+        "Underlying Exit",
+        "Underlying Move (%)",
+        "Entry Premium",
+        "Exit Premium",
+        "Contracts",
+        "Cost of Position",
+        "Exit Value",
+        "Option P&L ($)",
+        "Leverage Multiple",
+        "IV Used",
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily P&L ($)",
+        "Daily P&L (%)"
+      ];
+
+      const rows: string[] = [];
+      backtestOptionsResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date, day.buy_date, day.sell_date,
+            "N/A", "0", "N/A", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+            dowRet, spRet, ndxRet, day.daily_profit.toFixed(2), dailyProfitPct
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.strike.toFixed(2),
+              t.expiry_date,
+              t.underlying_entry.toFixed(2),
+              t.underlying_exit.toFixed(2),
+              t.underlying_pct_change.toFixed(2),
+              t.entry_premium.toFixed(4),
+              t.exit_premium.toFixed(4),
+              t.contracts,
+              t.cost_of_position.toFixed(2),
+              t.exit_value.toFixed(2),
+              t.profit.toFixed(2),
+              t.leverage_multiple.toFixed(4),
+              (t.iv_used * 100).toFixed(1) + "%",
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'Backtest_Ledger_Options.csv', content: csvContent })
+      });
+
+      if (!res.ok) throw new Error(`Failed to save CSV (Status ${res.status})`);
+
+      setCsvSaveSuccessOptions(true);
+      setTimeout(() => setCsvSaveSuccessOptions(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Options backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSavingOptions(false);
     }
   };
 
@@ -843,6 +964,81 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   {showLedger3 ? "Hide Trade Ledger" : "Show Trade Ledger"}
                 </Button>
               )}
+            </div>
+
+            {/* Options Strategy Row */}
+            <div className="flex flex-col gap-2 pt-3 border-t-2 border-amber-500/20 mt-1">
+              {/* Exit Mode Toggle */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80 font-mono">Options Exit:</span>
+                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5">
+                  {[{ label: 'T+2 Intraday (BS)', value: 'intraday' }, { label: 'Hold to Expiry', value: 'expiry' }].map((mode) => (
+                    <Button
+                      key={mode.value}
+                      variant={optionsExitMode === mode.value ? 'secondary' : 'ghost'}
+                      onClick={() => setOptionsExitMode(mode.value as 'intraday' | 'expiry')}
+                      size="sm"
+                      className={`h-6 px-2.5 text-xs font-bold rounded-sm transition-all ${
+                        optionsExitMode === mode.value
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {mode.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {/* Options run row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={runOptionsBacktest}
+                    disabled={backtestOptionsLoading}
+                    size="sm"
+                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-md shadow-sm w-full sm:w-auto"
+                  >
+                    {backtestOptionsLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                    {backtestOptionsLoading ? "Running Options..." : `Run ${backtestPeriod.toUpperCase()} Options Backtest (Calls)`}
+                  </Button>
+                  <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                    <span>
+                      Options P&L:{" "}
+                      <span className={backtestOptionsResult ? (backtestOptionsResult.total_profit >= 0 ? "text-amber-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestOptionsResult ? (backtestOptionsResult.total_profit >= 0 ? "+" : "-") : ""}${backtestOptionsResult ? Math.abs(backtestOptionsResult.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                      </span>{" "}
+                      (
+                      <span className={backtestOptionsResult ? (backtestOptionsResult.roi_pct >= 0 ? "text-amber-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestOptionsResult ? (backtestOptionsResult.roi_pct >= 0 ? "+" : "-") : ""}{backtestOptionsResult ? Math.abs(backtestOptionsResult.roi_pct).toFixed(1) : "0.0"}%
+                      </span>
+                      )
+                    </span>
+                    {backtestOptionsResult && backtestOptionsResult.sp500_pct_change !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        S&P 500:{" "}
+                        <span className={backtestOptionsResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                          {backtestOptionsResult.sp500_pct_change >= 0 ? "+" : ""}{backtestOptionsResult.sp500_pct_change.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
+                    {backtestOptionsResult && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal text-amber-500/80">
+                        Mode: {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to Expiry' : 'T+2 Intraday'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {backtestOptionsResult && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowOptionsLedger(!showOptionsLedger)}
+                    size="sm"
+                    className="rounded-md font-semibold text-amber-500 hover:bg-amber-500/10 self-end sm:self-auto"
+                  >
+                    {showOptionsLedger ? "Hide Options Ledger" : "Show Options Ledger"}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1160,6 +1356,139 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
                       {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtestOptionsError && (
+        <div className="bg-amber-500/10 text-amber-400 border border-amber-500/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestOptionsError}</div>
+        </div>
+      )}
+
+      {showOptionsLedger && backtestOptionsResult && (
+        <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-amber-500/20">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-amber-400">
+                <Check className="w-5 h-5 text-amber-400" />
+                Options Backtest Ledger — ATM Weekly Calls
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Black-Scholes synthetic pricing. Same Strategy 1 screening (5 filters). $2,000/position. Exit mode:{" "}
+                <span className="font-bold text-amber-500">
+                  {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to weekly expiry (intrinsic value at T+7)' : 'Intraday T+2 11:00 AM (BS re-priced)'}
+                </span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveOptionsBacktestCsv}
+                disabled={csvSavingOptions}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccessOptions
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
+              >
+                {csvSavingOptions && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccessOptions ? 'Saved!' : 'Save to Backtest_Ledger_Options.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowOptionsLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-amber-500/20">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-amber-500/10 sticky top-0 z-10 text-xs uppercase text-amber-400/80">
+                <tr>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Screen Date</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Entry Date</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Exit Date</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Options Traded</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">Dow</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">S&P</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">Nasdaq</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">Daily P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestOptionsResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-amber-500/5 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers && day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border border-amber-500/20 bg-amber-500/5 flex flex-col gap-0.5 shadow-xs min-w-[120px]"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-amber-400">{t.ticker}</span>
+                              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-mono">
+                                ${t.strike} C
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Exp: {t.expiry_date}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Prem: ${t.entry_premium.toFixed(2)} → ${t.exit_premium.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t.contracts}x contracts · IV: {(t.iv_used * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Stock: {t.underlying_pct_change >= 0 ? '+' : ''}{t.underlying_pct_change.toFixed(2)}%
+                            </span>
+                            <span className={`font-semibold font-mono text-xs ${
+                              t.profit >= 0 ? 'text-amber-400' : 'text-red-500'
+                            }`}>
+                              {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
+                              {' '}({t.leverage_multiple >= 0 ? '+' : ''}{(t.leverage_multiple * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        ))}
+                        {(!day.tickers || day.tickers.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">No options traded on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.dow_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.dow_return >= 0 ? '+' : ''}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.sp_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.sp_return >= 0 ? '+' : ''}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.nasdaq_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.nasdaq_return >= 0 ? '+' : ''}{day.nasdaq_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${
+                      day.daily_profit >= 0 ? 'text-amber-400' : 'text-red-500'
+                    }`}>
+                      {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
                     </td>
                   </tr>
                 ))}
