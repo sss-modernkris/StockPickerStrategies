@@ -132,3 +132,24 @@ class PortfolioAnalysisResponse(BaseModel):
 
 class SaveReportRequest(BaseModel):
     filename: str
+
+class CallOptionIndicatorDetail(BaseModel):
+    positive: bool
+    value_str: str
+    details: str
+
+class TickerCallStats(BaseModel):
+    symbol: str
+    index_source: str
+    stock_price: float
+    positive_count: int
+    total_indicators: int = 14
+    score_pct: float
+    indicators: Dict[str, CallOptionIndicatorDetail]
+
+class CallOptionStatsResponse(BaseModel):
+    timestamp: str
+    total_tickers: int
+    items: List[TickerCallStats]
+    status: str = "success"
+

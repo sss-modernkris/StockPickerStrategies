@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '@/lib/api';
 import { TickerAnalysis } from '@/lib/types';
 import { ComparisonTable, runWillyBacktest } from './ComparisonTable';
+import { CallOptionStatsModal } from './CallOptionStatsModal';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, Info, Check } from 'lucide-react';
+import { Loader2, TrendingUp, Info, Check, Flame } from 'lucide-react';
 
 interface TopTickersPanelProps {
   analysisData: Record<string, TickerAnalysis>;
@@ -23,6 +24,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [indexTickers, setIndexTickers] = useState<string[]>([]);
   const [loadingTickers, setLoadingTickers] = useState<boolean>(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
+  const [showCallStatsModal, setShowCallStatsModal] = useState<boolean>(false);
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
 
@@ -838,9 +840,24 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <>Get Options Data</>
                 )}
               </Button>
+
+              <Button
+                onClick={() => setShowCallStatsModal(true)}
+                size="sm"
+                variant="outline"
+                className="rounded-md border-amber-500/40 hover:bg-amber-500/10 text-amber-400 font-bold px-4 shadow-sm flex items-center gap-1.5"
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                Call Option Stats
+              </Button>
             </div>
           </div>
         </div>
+
+        <CallOptionStatsModal
+          isOpen={showCallStatsModal}
+          onClose={() => setShowCallStatsModal(false)}
+        />
 
         {/* Options Data Feedback Banner */}
         {optionsDataLoading && (
