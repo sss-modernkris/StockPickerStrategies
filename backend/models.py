@@ -113,6 +113,7 @@ class PortfolioSummaryResponse(BaseModel):
     holdings: List[HoldingModel]
     transactions: List[TransactionResponse]
     ib_orders: Optional[List[IBOrderModel]] = []
+    rh_orders: Optional[List[IBOrderModel]] = []
 
 class StockAnalysisItem(BaseModel):
     symbol: str

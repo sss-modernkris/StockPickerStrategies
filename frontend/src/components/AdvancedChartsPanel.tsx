@@ -18,11 +18,11 @@ const formatValue = (val: number | undefined | null) => {
 const CustomTooltip = ({ active, payload, label }: { active?: boolean, payload?: { color: string; name: string; value: number }[], label?: string }) => {
     if (active && payload && payload.length) {
         return (
-            <div className="bg-background/95 border p-3 rounded-lg shadow-xl backdrop-blur-sm z-50">
-                <p className="font-semibold mb-2 text-foreground">{label}</p>
+            <div className="bg-transparent border border-white/20 p-3 rounded-lg pointer-events-none z-50">
+                <p className="font-semibold mb-2 text-foreground drop-shadow-md">{label}</p>
                 <div className="space-y-1">
                     {payload.map((entry: { color: string; name: string; value: number }, index: number) => (
-                        <div key={index} className="flex items-center justify-between gap-4 text-sm">
+                        <div key={index} className="flex items-center justify-between gap-4 text-sm drop-shadow-md">
                             <div className="flex items-center gap-2">
                                 <div
                                     className="w-2 h-2 rounded-full"
@@ -32,7 +32,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean, payload?:
                                     {entry.name}
                                 </span>
                             </div>
-                            <span className="font-mono">{formatValue(entry.value)}</span>
+                            <span className="font-mono text-foreground font-semibold">{formatValue(entry.value)}</span>
                         </div>
                     ))}
                 </div>

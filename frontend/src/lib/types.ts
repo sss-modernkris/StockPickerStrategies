@@ -87,6 +87,7 @@ export interface IBOrder {
   order_id: number;
   account: string;
   symbol: string;
+  ticker?: string;
   action: string;
   total_quantity: number;
   filled: number;
@@ -104,6 +105,7 @@ export interface PortfolioSummary {
   holdings: Holding[];
   transactions: Transaction[];
   ib_orders?: IBOrder[];
+  rh_orders?: IBOrder[];
 }
 export interface IBData {
   cash_available: number;

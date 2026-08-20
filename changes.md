@@ -1,8 +1,12 @@
-# Project Changes Summary (v20260411)
+# Project Changes Summary (v20260820)
 
-This document summarizes the enhancements and synchronization tasks completed during this development session, focused on both the **Strategic Alpha Dashboard** and the **Financial ETL Pipeline**.
+This document summarizes the enhancements and synchronization tasks completed for the **Strategic Alpha Dashboard**.
 
-## 1. Strategic Alpha Dashboard (411x)
+## 1. Release v20260820 Updates
+- **Version Tag Update**: Updated system version to `v20260820` across `README.md`, `TickerSidebar.tsx`, `page.tsx`, and project documentation.
+- **Options Data & Option Greeks Engine**: Enhanced `get_options_data` in Top Tickers tab to calculate and save full Option Greeks (Delta, Gamma, Theta, Vega, Rho for Call & Put across 1W, 2W, and 3W expirations) to `OptionsData.csv`.
+
+## 2. Strategic Alpha Dashboard (411x)
 
 ### Feature Synchronizations (from v405)
 - **Paper Study Page**: Restored full feature parity, including the interactive transaction ledger and color-coded P&L tracking. Stripped all Interactive Brokers (IB) dependencies to maintain a standalone simulation environment.

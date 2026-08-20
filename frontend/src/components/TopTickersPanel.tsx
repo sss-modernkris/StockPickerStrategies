@@ -56,6 +56,42 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [csvSaving3, setCsvSaving3] = useState<boolean>(false);
   const [csvSaveSuccess3, setCsvSaveSuccess3] = useState<boolean>(false);
 
+  // Options Strategy State variables
+  const [backtestOptionsLoading, setBacktestOptionsLoading] = useState<boolean>(false);
+  const [backtestOptionsResult, setBacktestOptionsResult] = useState<any>(null);
+  const [showOptionsLedger, setShowOptionsLedger] = useState<boolean>(false);
+  const [backtestOptionsError, setBacktestOptionsError] = useState<string | null>(null);
+  const [csvSavingOptions, setCsvSavingOptions] = useState<boolean>(false);
+  const [csvSaveSuccessOptions, setCsvSaveSuccessOptions] = useState<boolean>(false);
+  const [optionsExitMode, setOptionsExitMode] = useState<'intraday' | 'expiry'>('intraday');
+
+  // Options Data Generator State Variables
+  const [optionsDataLoading, setOptionsDataLoading] = useState<boolean>(false);
+  const [optionsDataResult, setOptionsDataResult] = useState<any>(null);
+  const [optionsDataError, setOptionsDataError] = useState<string | null>(null);
+
+  const fetchOptionsData = async () => {
+    setOptionsDataLoading(true);
+    setOptionsDataError(null);
+    setOptionsDataResult(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/get-options-data`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || `Request failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      setOptionsDataResult(data);
+    } catch (err: any) {
+      console.error("Options data fetch error:", err);
+      setOptionsDataError(err.message || "Failed to fetch options data.");
+    } finally {
+      setOptionsDataLoading(false);
+    }
+  };
+
   // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
   const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
 
@@ -213,58 +249,58 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const runScreen = () => {
     setError(null);
     setScreenSaveStatus('idle');
-    
+
     const results: string[] = [];
-    
+
     indexTickers.forEach(ticker => {
       const data = analysisData[ticker];
       if (!data || data.error) return;
-      
+
       const priceHistory = data.price_history;
       if (!priceHistory || priceHistory.length === 0) return;
-      
+
       const currentPrice = priceHistory[priceHistory.length - 1].close;
       const willyVwap = data.technical_indicators?.willy_vwap ?? null;
       if (currentPrice === null || currentPrice === undefined || willyVwap === null) return;
-      
+
       // 1. Willy Market = Bull (Price > Willy VWAP)
       const isBull = currentPrice > willyVwap;
       if (!isBull) return;
-      
+
       // 2. Strategy Value > 10000 (using 1-week backtest)
       const backtest = runWillyBacktest(priceHistory, 10000, '1w');
       const isProfitable = backtest.finalValue > 10000;
       if (!isProfitable) return;
-      
+
       // 3. MACD Hist > -0.5 and < 0.5 (MACD Hist = Line - Signal)
       const macdLine = data.technical_indicators?.macd_line ?? null;
       const macdSignal = data.technical_indicators?.macd_signal ?? null;
       if (macdLine === null || macdSignal === null) return;
       const macdHist = macdLine - macdSignal;
       if (macdHist <= -0.5 || macdHist >= 0.5) return;
-      
+
       // 4. MACD Slope > 0
       const macdSlope = data.technical_indicators?.macd_slope ?? null;
       if (macdSlope === null || macdSlope <= 0) return;
-      
+
       // 5. RSI > 30 and < 70 (RSI 14)
       const rsi = data.technical_indicators?.rsi_14 ?? null;
       if (rsi === null || rsi <= 30 || rsi >= 70) return;
-      
+
       results.push(ticker);
     });
-    
+
     setScreenedTickers(results);
     setScreenRun(true);
   };
 
   const saveScreenedTickers = async () => {
     if (screenedTickers.length === 0) return;
-    
+
     setScreenSaveStatus('saving');
     try {
       const csvContent = "Symbol\n" + screenedTickers.join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -275,11 +311,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setScreenSaveStatus('saved');
     } catch (err: any) {
       console.error("Save screen error:", err);
@@ -290,7 +326,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
 
   const saveBacktestLedgerCsv = async () => {
     if (!backtestResult || !backtestResult.trades || backtestResult.trades.length === 0) return;
-    
+
     setCsvSaving(true);
     try {
       const headers = [
@@ -302,11 +338,20 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Sell Price",
         "Shares",
         "Profit",
-        "Daily Profit"
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily Profit ($)",
+        "Daily Profit (%)"
       ];
-      
+
       const rows: string[] = [];
       backtestResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -317,7 +362,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             "0",
             "0",
             "0",
-            day.daily_profit.toFixed(2)
+            dowRet,
+            spRet,
+            ndxRet,
+            day.daily_profit.toFixed(2),
+            dailyProfitPct
           ].map(v => `"${v}"`).join(","));
         } else {
           day.tickers.forEach((t: any) => {
@@ -330,14 +379,18 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               t.sell_price.toFixed(2),
               t.shares.toFixed(2),
               t.profit.toFixed(2),
-              day.daily_profit.toFixed(2)
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
             ].map(v => `"${v}"`).join(","));
           });
         }
       });
-      
+
       const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -348,11 +401,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setCsvSaveSuccess(true);
       setTimeout(() => setCsvSaveSuccess(false), 3000);
     } catch (err: any) {
@@ -384,7 +437,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
 
   const saveBacktestLedgerCsv2 = async () => {
     if (!backtest2Result || !backtest2Result.trades || backtest2Result.trades.length === 0) return;
-    
+
     setCsvSaving2(true);
     try {
       const headers = [
@@ -396,11 +449,20 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Sell Price",
         "Shares",
         "Profit",
-        "Daily Profit"
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily Profit ($)",
+        "Daily Profit (%)"
       ];
-      
+
       const rows: string[] = [];
       backtest2Result.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -411,7 +473,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             "0",
             "0",
             "0",
-            day.daily_profit.toFixed(2)
+            dowRet,
+            spRet,
+            ndxRet,
+            day.daily_profit.toFixed(2),
+            dailyProfitPct
           ].map(v => `"${v}"`).join(","));
         } else {
           day.tickers.forEach((t: any) => {
@@ -424,14 +490,18 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               t.sell_price.toFixed(2),
               t.shares.toFixed(2),
               t.profit.toFixed(2),
-              day.daily_profit.toFixed(2)
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
             ].map(v => `"${v}"`).join(","));
           });
         }
       });
-      
+
       const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -442,11 +512,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setCsvSaveSuccess2(true);
       setTimeout(() => setCsvSaveSuccess2(false), 3000);
     } catch (err: any) {
@@ -476,9 +546,28 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     }
   };
 
+  const runOptionsBacktest = async () => {
+    setBacktestOptionsLoading(true);
+    setBacktestOptionsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/options?period=${backtestPeriod}&exit_mode=${optionsExitMode}`);
+      if (!res.ok) {
+        throw new Error(`Options Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestOptionsResult(data);
+      setShowOptionsLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestOptionsError(err.message || "Failed to run Options backtest.");
+    } finally {
+      setBacktestOptionsLoading(false);
+    }
+  };
+
   const saveBacktestLedgerCsv3 = async () => {
     if (!backtest3Result || !backtest3Result.trades || backtest3Result.trades.length === 0) return;
-    
+
     setCsvSaving3(true);
     try {
       const headers = [
@@ -490,11 +579,20 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
         "Sell Price",
         "Shares",
         "Profit",
-        "Daily Profit"
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily Profit ($)",
+        "Daily Profit (%)"
       ];
-      
+
       const rows: string[] = [];
       backtest3Result.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
         if (!day.tickers || day.tickers.length === 0) {
           rows.push([
             day.screen_date,
@@ -505,7 +603,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             "0",
             "0",
             "0",
-            day.daily_profit.toFixed(2)
+            dowRet,
+            spRet,
+            ndxRet,
+            day.daily_profit.toFixed(2),
+            dailyProfitPct
           ].map(v => `"${v}"`).join(","));
         } else {
           day.tickers.forEach((t: any) => {
@@ -518,14 +620,18 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               t.sell_price.toFixed(2),
               t.shares.toFixed(2),
               t.profit.toFixed(2),
-              day.daily_profit.toFixed(2)
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
             ].map(v => `"${v}"`).join(","));
           });
         }
       });
-      
+
       const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
-      
+
       const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
         method: 'POST',
         headers: {
@@ -536,11 +642,11 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           content: csvContent
         })
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to save CSV (Status ${res.status})`);
       }
-      
+
       setCsvSaveSuccess3(true);
       setTimeout(() => setCsvSaveSuccess3(false), 3000);
     } catch (err: any) {
@@ -548,6 +654,99 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
       setError(`Failed to save Strategy 3 backtest ledger CSV: ${err.message}`);
     } finally {
       setCsvSaving3(false);
+    }
+  };
+
+  const saveOptionsBacktestCsv = async () => {
+    if (!backtestOptionsResult || !backtestOptionsResult.trades || backtestOptionsResult.trades.length === 0) return;
+
+    setCsvSavingOptions(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Strike",
+        "Expiry Date",
+        "Underlying Entry",
+        "Underlying Exit",
+        "Underlying Move (%)",
+        "Entry Premium",
+        "Exit Premium",
+        "Contracts",
+        "Cost of Position",
+        "Exit Value",
+        "Option P&L ($)",
+        "Leverage Multiple",
+        "IV Used",
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily P&L ($)",
+        "Daily P&L (%)"
+      ];
+
+      const rows: string[] = [];
+      backtestOptionsResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date, day.buy_date, day.sell_date,
+            "N/A", "0", "N/A", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+            dowRet, spRet, ndxRet, day.daily_profit.toFixed(2), dailyProfitPct
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.strike.toFixed(2),
+              t.expiry_date,
+              t.underlying_entry.toFixed(2),
+              t.underlying_exit.toFixed(2),
+              t.underlying_pct_change.toFixed(2),
+              t.entry_premium.toFixed(4),
+              t.exit_premium.toFixed(4),
+              t.contracts,
+              t.cost_of_position.toFixed(2),
+              t.exit_value.toFixed(2),
+              t.profit.toFixed(2),
+              t.leverage_multiple.toFixed(4),
+              (t.iv_used * 100).toFixed(1) + "%",
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'Backtest_Ledger_Options.csv', content: csvContent })
+      });
+
+      if (!res.ok) throw new Error(`Failed to save CSV (Status ${res.status})`);
+
+      setCsvSaveSuccessOptions(true);
+      setTimeout(() => setCsvSaveSuccessOptions(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Options backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSavingOptions(false);
     }
   };
 
@@ -599,11 +798,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                       });
                     }}
                     size="sm"
-                    className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${
-                      isSelected 
-                        ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30' 
+                    className={`rounded-md font-semibold px-4 transition-all flex items-center gap-1.5 ${isSelected
+                        ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm hover:bg-primary/30'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {isSelected && <Check className="w-3.5 h-3.5" />}
                     {idx.name}
@@ -612,18 +810,78 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               })}
             </div>
 
-            {!loadingTickers && !loadingAnalysis && indexTickers.length > 0 && (
+            <div className="flex items-center gap-2">
+              {!loadingTickers && !loadingAnalysis && indexTickers.length > 0 && (
+                <Button
+                  onClick={runScreen}
+                  size="sm"
+                  variant="outline"
+                  className="rounded-md border-primary/30 hover:bg-primary/10 text-primary font-bold px-4 shadow-sm"
+                >
+                  Run Buy Screen
+                </Button>
+              )}
+
               <Button
-                onClick={runScreen}
+                onClick={fetchOptionsData}
+                disabled={optionsDataLoading}
                 size="sm"
                 variant="outline"
-                className="rounded-md border-primary/30 hover:bg-primary/10 text-primary font-bold px-4 shadow-sm"
+                className="rounded-md border-indigo-500/40 hover:bg-indigo-500/10 text-indigo-400 font-bold px-4 shadow-sm flex items-center gap-2"
               >
-                Run Buy Screen
+                {optionsDataLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Fetching Options Data...
+                  </>
+                ) : (
+                  <>Get Options Data</>
+                )}
               </Button>
-            )}
+            </div>
           </div>
         </div>
+
+        {/* Options Data Feedback Banner */}
+        {optionsDataLoading && (
+          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-indigo-300 text-sm flex items-center gap-3 animate-pulse">
+            <Loader2 className="w-4 h-4 animate-spin text-indigo-400 flex-shrink-0" />
+            <span>Fetching 1W, 2W, and 3W Call & Put options data for Dow 30, Nasdaq 100, and S&P 500 constituents...</span>
+          </div>
+        )}
+
+        {optionsDataResult && (
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-sm flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>
+                <strong>{optionsDataResult.message}</strong> Saved to <code className="bg-emerald-950/60 px-1.5 py-0.5 rounded font-mono text-xs text-emerald-200">OptionsData.csv</code> at {optionsDataResult.timestamp}.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOptionsDataResult(null)}
+              className="h-6 px-2 text-xs text-emerald-400 hover:text-emerald-200"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {optionsDataError && (
+          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm flex items-center justify-between gap-3">
+            <span><strong>Options Data Error:</strong> {optionsDataError}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOptionsDataError(null)}
+              className="h-6 px-2 text-xs text-destructive hover:text-destructive/80"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
 
         {/* Strategy Backtesting Controls */}
         {indexTickers.length > 0 && (
@@ -646,11 +904,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     variant={backtestPeriod === tf.value ? 'secondary' : 'ghost'}
                     onClick={() => setBacktestPeriod(tf.value as any)}
                     size="sm"
-                    className={`h-7 px-3 text-xs font-bold rounded-sm transition-all ${
-                      backtestPeriod === tf.value
+                    className={`h-7 px-3 text-xs font-bold rounded-sm transition-all ${backtestPeriod === tf.value
                         ? 'bg-primary text-primary-foreground shadow-xs'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {tf.label}
                   </Button>
@@ -795,6 +1052,81 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 </Button>
               )}
             </div>
+
+            {/* Options Strategy Row */}
+            <div className="flex flex-col gap-2 pt-3 border-t-2 border-amber-500/20 mt-1">
+              {/* Exit Mode Toggle */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80 font-mono">Options Exit:</span>
+                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5">
+                  {[{ label: 'T+2 Intraday (BS)', value: 'intraday' }, { label: 'Hold to Expiry', value: 'expiry' }].map((mode) => (
+                    <Button
+                      key={mode.value}
+                      variant={optionsExitMode === mode.value ? 'secondary' : 'ghost'}
+                      onClick={() => setOptionsExitMode(mode.value as 'intraday' | 'expiry')}
+                      size="sm"
+                      className={`h-6 px-2.5 text-xs font-bold rounded-sm transition-all ${
+                        optionsExitMode === mode.value
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {mode.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {/* Options run row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={runOptionsBacktest}
+                    disabled={backtestOptionsLoading}
+                    size="sm"
+                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-md shadow-sm w-full sm:w-auto"
+                  >
+                    {backtestOptionsLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                    {backtestOptionsLoading ? "Running Options..." : `Run ${backtestPeriod.toUpperCase()} Options Backtest (Calls)`}
+                  </Button>
+                  <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                    <span>
+                      Options P&L:{" "}
+                      <span className={backtestOptionsResult ? (backtestOptionsResult.total_profit >= 0 ? "text-amber-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestOptionsResult ? (backtestOptionsResult.total_profit >= 0 ? "+" : "-") : ""}${backtestOptionsResult ? Math.abs(backtestOptionsResult.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                      </span>{" "}
+                      (
+                      <span className={backtestOptionsResult ? (backtestOptionsResult.roi_pct >= 0 ? "text-amber-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestOptionsResult ? (backtestOptionsResult.roi_pct >= 0 ? "+" : "-") : ""}{backtestOptionsResult ? Math.abs(backtestOptionsResult.roi_pct).toFixed(1) : "0.0"}%
+                      </span>
+                      )
+                    </span>
+                    {backtestOptionsResult && backtestOptionsResult.sp500_pct_change !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        S&P 500:{" "}
+                        <span className={backtestOptionsResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                          {backtestOptionsResult.sp500_pct_change >= 0 ? "+" : ""}{backtestOptionsResult.sp500_pct_change.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
+                    {backtestOptionsResult && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal text-amber-500/80">
+                        Mode: {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to Expiry' : 'T+2 Intraday'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {backtestOptionsResult && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowOptionsLedger(!showOptionsLedger)}
+                    size="sm"
+                    className="rounded-md font-semibold text-amber-500 hover:bg-amber-500/10 self-end sm:self-auto"
+                  >
+                    {showOptionsLedger ? "Hide Options Ledger" : "Show Options Ledger"}
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -823,11 +1155,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 onClick={saveBacktestLedgerCsv}
                 disabled={csvSaving}
                 size="sm"
-                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
-                  csvSaveSuccess 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${csvSaveSuccess
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+                  }`}
               >
                 {csvSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                 {csvSaveSuccess ? 'Saved successfully!' : 'Save to Backtest_Ledger.csv'}
@@ -851,6 +1182,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
                   <th className="p-3 font-semibold border-b">Exit Date (11:00 AM)</th>
                   <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Dow Jones 30</th>
+                  <th className="p-3 font-semibold border-b text-right">S&P 500</th>
+                  <th className="p-3 font-semibold border-b text-right">Nasdaq 100</th>
                   <th className="p-3 font-semibold border-b text-right">Daily Return</th>
                 </tr>
               </thead>
@@ -884,8 +1218,17 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                         )}
                       </div>
                     </td>
+                    <td className={`p-3 text-right font-mono ${day.dow_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.dow_return >= 0 ? "+" : ""}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.sp_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.sp_return >= 0 ? "+" : ""}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.nasdaq_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.nasdaq_return >= 0 ? "+" : ""}{day.nasdaq_return.toFixed(2)}%
+                    </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
                     </td>
                   </tr>
                 ))}
@@ -919,11 +1262,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 onClick={saveBacktestLedgerCsv2}
                 disabled={csvSaving2}
                 size="sm"
-                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
-                  csvSaveSuccess2 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${csvSaveSuccess2
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+                  }`}
               >
                 {csvSaving2 && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                 {csvSaveSuccess2 ? 'Saved successfully!' : 'Save to Backtest_Ledger.csv'}
@@ -947,6 +1289,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
                   <th className="p-3 font-semibold border-b">Exit Date (11:00 AM)</th>
                   <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Dow Jones 30</th>
+                  <th className="p-3 font-semibold border-b text-right">S&P 500</th>
+                  <th className="p-3 font-semibold border-b text-right">Nasdaq 100</th>
                   <th className="p-3 font-semibold border-b text-right">Daily Return</th>
                 </tr>
               </thead>
@@ -980,8 +1325,17 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                         )}
                       </div>
                     </td>
+                    <td className={`p-3 text-right font-mono ${day.dow_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.dow_return >= 0 ? "+" : ""}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.sp_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.sp_return >= 0 ? "+" : ""}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.nasdaq_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.nasdaq_return >= 0 ? "+" : ""}{day.nasdaq_return.toFixed(2)}%
+                    </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
                     </td>
                   </tr>
                 ))}
@@ -1015,11 +1369,10 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 onClick={saveBacktestLedgerCsv3}
                 disabled={csvSaving3}
                 size="sm"
-                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
-                  csvSaveSuccess3 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${csvSaveSuccess3
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+                  }`}
               >
                 {csvSaving3 && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                 {csvSaveSuccess3 ? 'Saved successfully!' : 'Save to Backtest_Ledger_Strategy3.csv'}
@@ -1043,6 +1396,9 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                   <th className="p-3 font-semibold border-b">Entry Date (3:00 PM)</th>
                   <th className="p-3 font-semibold border-b">Exit Date (2:50 PM)</th>
                   <th className="p-3 font-semibold border-b">Tickers Traded & Details</th>
+                  <th className="p-3 font-semibold border-b text-right">Dow Jones 30</th>
+                  <th className="p-3 font-semibold border-b text-right">S&P 500</th>
+                  <th className="p-3 font-semibold border-b text-right">Nasdaq 100</th>
                   <th className="p-3 font-semibold border-b text-right">Daily Return</th>
                 </tr>
               </thead>
@@ -1076,8 +1432,150 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                         )}
                       </div>
                     </td>
+                    <td className={`p-3 text-right font-mono ${day.dow_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.dow_return >= 0 ? "+" : ""}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.sp_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.sp_return >= 0 ? "+" : ""}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${day.nasdaq_return >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {day.nasdaq_return >= 0 ? "+" : ""}{day.nasdaq_return.toFixed(2)}%
+                    </td>
                     <td className={`p-3 text-right font-mono font-bold ${day.daily_profit >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)}
+                      {day.daily_profit >= 0 ? "+" : ""}${day.daily_profit.toFixed(2)} ({day.daily_profit >= 0 ? "+" : ""}{((day.daily_profit / 10000.0) * 100.0).toFixed(2)}%)
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtestOptionsError && (
+        <div className="bg-amber-500/10 text-amber-400 border border-amber-500/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestOptionsError}</div>
+        </div>
+      )}
+
+      {showOptionsLedger && backtestOptionsResult && (
+        <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-amber-500/20">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-amber-400">
+                <Check className="w-5 h-5 text-amber-400" />
+                Options Backtest Ledger — ATM Weekly Calls
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Black-Scholes synthetic pricing. Same Strategy 1 screening (5 filters). $2,000/position. Exit mode:{" "}
+                <span className="font-bold text-amber-500">
+                  {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to weekly expiry (intrinsic value at T+7)' : 'Intraday T+2 11:00 AM (BS re-priced)'}
+                </span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveOptionsBacktestCsv}
+                disabled={csvSavingOptions}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccessOptions
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
+              >
+                {csvSavingOptions && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccessOptions ? 'Saved!' : 'Save to Backtest_Ledger_Options.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowOptionsLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-amber-500/20">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-amber-500/10 sticky top-0 z-10 text-xs uppercase text-amber-400/80">
+                <tr>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Screen Date</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Entry Date</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Exit Date</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20">Options Traded</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">Dow</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">S&P</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">Nasdaq</th>
+                  <th className="p-3 font-semibold border-b border-amber-500/20 text-right">Daily P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestOptionsResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-amber-500/5 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers && day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border border-amber-500/20 bg-amber-500/5 flex flex-col gap-0.5 shadow-xs min-w-[120px]"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-amber-400">{t.ticker}</span>
+                              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-mono">
+                                ${t.strike} C
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Exp: {t.expiry_date}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Prem: ${t.entry_premium.toFixed(2)} → ${t.exit_premium.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t.contracts}x contracts · IV: {(t.iv_used * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Stock: {t.underlying_pct_change >= 0 ? '+' : ''}{t.underlying_pct_change.toFixed(2)}%
+                            </span>
+                            <span className={`font-semibold font-mono text-xs ${
+                              t.profit >= 0 ? 'text-amber-400' : 'text-red-500'
+                            }`}>
+                              {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
+                              {' '}({t.leverage_multiple >= 0 ? '+' : ''}{(t.leverage_multiple * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        ))}
+                        {(!day.tickers || day.tickers.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">No options traded on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.dow_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.dow_return >= 0 ? '+' : ''}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.sp_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.sp_return >= 0 ? '+' : ''}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.nasdaq_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.nasdaq_return >= 0 ? '+' : ''}{day.nasdaq_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${
+                      day.daily_profit >= 0 ? 'text-amber-400' : 'text-red-500'
+                    }`}>
+                      {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -1099,7 +1597,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                 Screened {indexTickers.length} tickers using Willy Bull, 1-wk Backtest &gt; $10k, MACD Hist |0.5|, MACD Slope &gt; 0, and RSI (30-70).
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <Button
                 onClick={saveScreenedTickers}
@@ -1127,8 +1625,8 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           {screenedTickers.length > 0 ? (
             <div className="flex flex-wrap gap-2 pt-1">
               {screenedTickers.map(ticker => (
-                <span 
-                  key={ticker} 
+                <span
+                  key={ticker}
                   className="px-2.5 py-1 rounded-md text-xs font-bold bg-green-500/10 text-green-500 border border-green-500/20"
                 >
                   {ticker}
@@ -1170,8 +1668,8 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             </p>
           </div>
           <div className="w-64 bg-muted h-2 rounded-full overflow-hidden">
-            <div 
-              className="bg-primary h-full transition-all duration-300 ease-out" 
+            <div
+              className="bg-primary h-full transition-all duration-300 ease-out"
               style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
             />
           </div>

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,7 +7,9 @@ from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, 
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
-from services.backtester import execute_30d_backtest
+from services.rh_client import RHClient
+from services.backtester import execute_30d_backtest, execute_options_backtest
+from services.options_service import generate_and_save_options_data
 from services.email_service import send_email_with_attachment
 import csv
 import os
@@ -73,6 +75,7 @@ def save_csv(req: SaveCsvRequest):
     try:
         safe_filename = os.path.basename(req.filename)
         filepath = os.path.join(BASE_DIR, safe_filename)
+        print(f"Saving to: {filepath}")
         with open(filepath, "w", encoding="utf-8", newline="") as f:
             f.write(req.content)
 
@@ -114,6 +117,15 @@ class IBDataResponse(BaseModel):
     orders: List[IBOrderModel]
 
 ib_control = IBClient()
+rh_control = RHClient()
+
+class RHConnectRequest(BaseModel):
+    mcp_url: str = "https://agent.robinhood.com/mcp/trading"
+    simulate: bool = False
+
+class RHControlsRequest(BaseModel):
+    paused: Optional[bool] = None
+    budget_limit: Optional[float] = None
 
 @app.get("/api/ib/config")
 def get_ib_config():
@@ -147,6 +159,53 @@ def get_ib_data():
         return data
     else:
         raise HTTPException(status_code=400, detail="Not connected to Interactive Brokers")
+
+@app.get("/api/rh/config")
+def get_rh_config():
+    return {
+        "is_connected": rh_control.is_connected(),
+        "mcp_url": rh_control.mcp_url,
+        "is_simulated": rh_control.is_simulated,
+        "paused": rh_control.paused,
+        "budget_limit": rh_control.budget_limit
+    }
+
+@app.post("/api/rh/connect")
+def rh_connect(req: RHConnectRequest):
+    success, msg = rh_control.connect(mcp_url=req.mcp_url, simulate=req.simulate)
+    if success:
+        return {"status": "success", "message": msg}
+    else:
+        raise HTTPException(status_code=500, detail=msg)
+
+@app.post("/api/rh/disconnect")
+def rh_disconnect():
+    rh_control.disconnect()
+    return {"status": "success", "message": "Disconnected from Robinhood Agentic AI"}
+
+@app.get("/api/rh/data")
+def get_rh_data():
+    data = rh_control.get_portfolio_summary()
+    if data:
+        return data
+    else:
+        raise HTTPException(status_code=400, detail="Not connected to Robinhood Agentic AI")
+
+@app.post("/api/rh/order")
+def place_rh_order(ticker: str, action: str, quantity: float, price: float):
+    success, msg = rh_control.place_order(ticker, action, quantity, price)
+    if success:
+        return {"status": "success", "message": msg}
+    else:
+        raise HTTPException(status_code=400, detail=msg)
+
+@app.post("/api/rh/controls")
+def update_rh_controls(req: RHControlsRequest):
+    success, msg = rh_control.update_controls(paused=req.paused, budget_limit=req.budget_limit)
+    if success:
+        return {"status": "success", "message": msg}
+    else:
+        raise HTTPException(status_code=400, detail=msg)
 
 @app.get("/api/portfolio")
 def get_portfolio_tickers(filename: str = "portfolio.csv"):
@@ -362,13 +421,19 @@ def get_paper_study(filename: str = "PaperStudy.csv"):
     if ib_control.is_connected():
         ib_orders = ib_control.get_orders()
 
+    # Fetch Robinhood orders if connected
+    rh_orders = []
+    if rh_control.is_connected():
+        rh_orders = rh_control.get_orders()
+
     return PortfolioSummaryResponse(
         current_cash=current_cash,
         invested_capital=invested_capital,
         total_equity=total_equity,
         holdings=holdings_list,
         transactions=transactions,
-        ib_orders=ib_orders
+        ib_orders=ib_orders,
+        rh_orders=rh_orders
     )
 
 @app.post("/api/paper-study")
@@ -452,6 +517,14 @@ def add_paper_study_transaction(tx: TransactionModel):
             raise HTTPException(status_code=500, detail=f"IB Order Failed: {msg}")
         ib_msg = f" (IB Order: {msg})"
 
+    # If Robinhood is connected, attempt to place a real order for BUY/SELL
+    rh_msg = ""
+    if rh_control.is_connected() and tx_type in ['buy', 'sell']:
+        success, msg = rh_control.place_order(ticker, tx_type.upper(), abs(tx.quantity), tx.price)
+        if not success:
+            raise HTTPException(status_code=500, detail=f"Robinhood Order Failed: {msg}")
+        rh_msg = f" (Robinhood Order: {msg})"
+
     try:
         with open(target_path, mode='a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
@@ -459,7 +532,7 @@ def add_paper_study_transaction(tx: TransactionModel):
                 writer.writerow(['Date', 'Symbol', 'Quantity', 'Price', 'Total Cost', 'Current Close Price', 'Total Current Value', 'Cash Available'])
             
             writer.writerow([current_date, ticker, quantity, tx.price, total_cost, curr_price, total_val, new_cash])
-        return {"status": "success", "message": f"Transaction added successfully{ib_msg}"}
+        return {"status": "success", "message": f"Transaction added successfully{ib_msg}{rh_msg}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -715,5 +788,43 @@ def get_30d_backtest_strategy3(period: str = "1m"):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Strategy 3 execution failed: {str(e)}")
+
+
+@app.get("/api/backtest-30d/options")
+def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
+    """
+    Options backtesting endpoint.
+    Uses Strategy 1 screening (5 filters, top-5 by 1-wk strategy value).
+    Buys ATM weekly CALL options priced via Black-Scholes.
+    
+    Query params:
+      period:    '1w', '1m', '3m', '6m', '1y'
+      exit_mode: 'intraday' (exit T+2 11AM via BS repricing)
+                 'expiry'   (hold to weekly expiry ~7 days, intrinsic value)
+    """
+    if exit_mode not in ('intraday', 'expiry'):
+        exit_mode = 'intraday'
+    try:
+        result = execute_options_backtest(period=period, exit_mode=exit_mode)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Options backtest execution failed: {str(e)}")
+
+
+@app.post("/api/get-options-data")
+@app.get("/api/get-options-data")
+def get_options_data():
+    """
+    Fetches 1W, 2W, and 3W Call & Put options data for all tickers in Dow 30, Nasdaq 100, and S&P 500.
+    Logs output in Format A schema to OptionsData.csv.
+    """
+    try:
+        res = generate_and_save_options_data()
+        if res.get("status") == "error":
+            raise HTTPException(status_code=500, detail=res.get("message"))
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate options data: {str(e)}")
+
 
 
