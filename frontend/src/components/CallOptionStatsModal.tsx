@@ -265,14 +265,14 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
             </div>
           ) : (
             <div className="border border-border rounded-lg overflow-hidden shadow-xs">
-              <div className="overflow-x-auto max-h-[calc(90vh-230px)] overflow-y-auto">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="bg-muted/80 sticky top-0 z-20 text-[11px] font-mono uppercase text-muted-foreground backdrop-blur-md">
+              <div className="overflow-x-auto max-h-[calc(90vh-230px)] overflow-y-auto custom-scrollbar">
+                <table className="w-full text-xs text-left border-collapse min-w-[1650px]">
+                  <thead className="bg-muted/90 sticky top-0 z-40 text-[11px] font-mono uppercase text-muted-foreground backdrop-blur-md">
                     <tr>
-                      {/* FIRST COLUMN: How many indicators are +ve for call options */}
+                      {/* FIRST COLUMN: How many indicators are +ve for call options (Sticky Left) */}
                       <th
                         onClick={() => handleSort('positive_count')}
-                        className="p-3 font-bold border-b border-r border-amber-500/30 text-amber-400 cursor-pointer hover:bg-amber-500/10 transition-colors text-center w-28 bg-amber-500/10"
+                        className="p-3 font-bold border-b border-r border-amber-500/30 text-amber-400 cursor-pointer hover:bg-amber-500/20 transition-colors text-center w-28 bg-card sticky left-0 z-50 shadow-sm"
                         title="Column 1: Total number of positive (+ve) Call Option indicators out of 14"
                       >
                         <div className="flex items-center justify-center gap-1">
@@ -281,16 +281,17 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                         </div>
                       </th>
 
+                      {/* SECOND COLUMN: Ticker & Index (Sticky Left) */}
                       <th
                         onClick={() => handleSort('symbol')}
-                        className="p-3 font-bold border-b border-r cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="p-3 font-bold border-b border-r cursor-pointer hover:bg-muted/70 transition-colors sticky left-28 z-50 bg-card shadow-sm w-36"
                       >
                         Ticker & Index
                       </th>
 
                       <th
                         onClick={() => handleSort('stock_price')}
-                        className="p-3 font-bold border-b border-r text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="p-3 font-bold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
                       >
                         Price ($)
                       </th>
@@ -299,7 +300,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                         <th
                           key={ik.key}
                           onClick={() => handleSort(`ind_${ik.key}`)}
-                          className="p-2.5 font-semibold border-b border-r text-center cursor-pointer hover:bg-muted/50 transition-colors min-w-[95px]"
+                          className="p-2.5 font-semibold border-b border-r text-center cursor-pointer hover:bg-muted/70 transition-colors min-w-[105px]"
                           title={ik.title}
                         >
                           <div className="flex items-center justify-center gap-1">
@@ -318,8 +319,8 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                       return (
                         <tr key={row.symbol} className="hover:bg-muted/30 transition-colors">
                           
-                          {/* COLUMN 1: +ve Indicators Score Badge */}
-                          <td className="p-3 border-r border-amber-500/20 text-center font-mono font-bold text-sm bg-amber-500/5">
+                          {/* COLUMN 1: +ve Indicators Score Badge (Sticky Left) */}
+                          <td className="p-3 border-r border-amber-500/20 text-center font-mono font-bold text-sm bg-card sticky left-0 z-30 shadow-sm">
                             <span
                               className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold shadow-xs ${
                                 isHighScorer
@@ -333,11 +334,11 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                             </span>
                           </td>
 
-                          {/* Ticker & Index */}
-                          <td className="p-3 border-r font-mono">
+                          {/* Ticker & Index (Sticky Left) */}
+                          <td className="p-3 border-r font-mono bg-card sticky left-28 z-30 shadow-sm">
                             <div className="flex flex-col">
                               <span className="font-bold text-sm text-foreground">{row.symbol}</span>
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[130px]">
                                 {row.index_source}
                               </span>
                             </div>
