@@ -39,6 +39,21 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
   const [csvSaving, setCsvSaving] = useState<boolean>(false);
   const [csvSuccess, setCsvSuccess] = useState<boolean>(false);
 
+  const topScrollRef = React.useRef<HTMLDivElement>(null);
+  const tableScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  };
+
   const fetchStats = async () => {
     setLoading(true);
     setError(null);
@@ -264,9 +279,23 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
               <p>No tickers match the selected search & filter criteria.</p>
             </div>
           ) : (
-            <div className="border border-border rounded-lg overflow-hidden shadow-xs">
-              <div className="overflow-x-auto max-h-[calc(90vh-230px)] overflow-y-auto custom-scrollbar">
-                <table className="w-full text-xs text-left border-collapse min-w-[1650px]">
+            <div className="flex flex-col border border-border rounded-lg overflow-hidden shadow-xs">
+              {/* TOP HORIZONTAL SCROLLBAR */}
+              <div
+                ref={topScrollRef}
+                onScroll={handleTopScroll}
+                className="overflow-x-auto bg-amber-500/15 border-b border-amber-500/30 p-1 flex items-center shrink-0 z-30"
+                style={{ overflowY: 'hidden' }}
+              >
+                <div className="h-2.5 min-w-[1850px] bg-amber-500/30 rounded-full" />
+              </div>
+
+              <div
+                ref={tableScrollRef}
+                onScroll={handleTableScroll}
+                className="overflow-x-auto max-h-[calc(90vh-250px)] overflow-y-auto"
+              >
+                <table className="w-full text-xs text-left border-collapse min-w-[1850px]">
                   <thead className="bg-muted/90 sticky top-0 z-40 text-[11px] font-mono uppercase text-muted-foreground backdrop-blur-md">
                     <tr>
                       {/* FIRST COLUMN: How many indicators are +ve for call options (Sticky Left) */}
