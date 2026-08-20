@@ -13,12 +13,133 @@ import {
     BrainCircuit,
     Activity,
     Gauge,
-    Search
+    Search,
+    Flame
 } from 'lucide-react';
 
 export function StrategyGlossary() {
     const [searchQuery, setSearchQuery] = useState('');
     const glossaryItems = [
+        {
+            id: "call-option-stats-matrix",
+            icon: <Flame className="w-5 h-5 text-amber-500" />,
+            title: "Call Option Stats Matrix (14 Indicators)",
+            badge: "Options Checklist Matrix",
+            description: "A 14-indicator quantitative checklist evaluating Call Option buying setups across Dow 30, Nasdaq 100, and S&P 500 constituents. Column 1 (+ve Indicators) sums the total number of positive criteria met out of 14.",
+            customContent: (
+                <div className="space-y-4 mt-4 text-sm">
+                    <div>
+                        <h4 className="font-semibold text-foreground">1. Column 1: Total Positive (+ve) Indicator Score</h4>
+                        <p className="text-muted-foreground mt-1 leading-relaxed">
+                            Ranks candidates from 0 to 14 positive criteria. High scores (&ge; 10/14 in green) signal strong confluence across trend, momentum, volatility, and option pricing metrics.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">2. Detailed Indicator Formulas & Rules</h4>
+                        <ul className="space-y-3 mt-2">
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">1. Stock Trend:</span>
+                                    <span className="text-muted-foreground block">Requires <code className="bg-muted px-1 rounded font-mono text-xs">Price &gt; 20 EMA &gt; 50 SMA</code> with both 20-day EMA and 50-day SMA slopes rising.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">2. Support &amp; Resistance:</span>
+                                    <span className="text-muted-foreground block">Verifies confirmed breakout (<code className="bg-muted px-1 rounded font-mono text-xs">Price &ge; 98.5% of 20d High</code>) or upside headroom <code className="bg-muted px-1 rounded font-mono text-xs">&ge; 2x ATR(14)</code>.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">3. Trading Volume:</span>
+                                    <span className="text-muted-foreground block">Requires <code className="bg-muted px-1 rounded font-mono text-xs">Volume / 20d Avg Vol &ge; 1.0</code> on a positive price close.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">4. RSI (14):</span>
+                                    <span className="text-muted-foreground block">Requires RSI in the bullish momentum corridor (<code className="bg-muted px-1 rounded font-mono text-xs">50.0 &le; RSI &le; 75.0</code>).</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">5. MACD:</span>
+                                    <span className="text-muted-foreground block">Requires <code className="bg-muted px-1 rounded font-mono text-xs">MACD Line &gt; Signal Line</code> or <code className="bg-muted px-1 rounded font-mono text-xs">MACD Histogram &gt; 0</code>.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">6. ATR Realism:</span>
+                                    <span className="text-muted-foreground block">Requires daily price range <code className="bg-muted px-1 rounded font-mono text-xs">ATR(14) / Price &ge; 1.2%</code> to ensure option premium expansion.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">7. Relative Strength vs. SPY:</span>
+                                    <span className="text-muted-foreground block">Requires 1-month stock return to outperform S&amp;P 500 benchmark (<code className="bg-muted px-1 rounded font-mono text-xs">Stock 1M Ret &gt; SPY 1M Ret</code>).</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">8. Bid-Ask Spread:</span>
+                                    <span className="text-muted-foreground block">Ensures option liquidity with tight spread <code className="bg-muted px-1 rounded font-mono text-xs">&le; $0.25</code> or <code className="bg-muted px-1 rounded font-mono text-xs">Spread / Midpoint &le; 10%</code>.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">9. Option Volume &amp; OI:</span>
+                                    <span className="text-muted-foreground block">Requires active liquid options chain (<code className="bg-muted px-1 rounded font-mono text-xs">Call Vol &gt; 0</code> and <code className="bg-muted px-1 rounded font-mono text-xs">Open Interest &gt; 100</code>).</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">10. Implied Volatility (IV):</span>
+                                    <span className="text-muted-foreground block">Protects against IV crush: <code className="bg-muted px-1 rounded font-mono text-xs">IV &le; 50%</code> or ratio <code className="bg-muted px-1 rounded font-mono text-xs">IV / HV(30) &le; 1.30</code>.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">11. Delta:</span>
+                                    <span className="text-muted-foreground block">Targets optimal directional sensitivity: <code className="bg-muted px-1 rounded font-mono text-xs">0.30 &le; Call Delta &le; 0.70</code>.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">12. Theta Decay:</span>
+                                    <span className="text-muted-foreground block">Ensures daily time decay is manageable: <code className="bg-muted px-1 rounded font-mono text-xs">Daily Theta / Premium &le; 5.0%</code>.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">13. Earnings Risk:</span>
+                                    <span className="text-muted-foreground block">Verifies no imminent earnings release within option expiration window to prevent earnings IV crush.</span>
+                                </div>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <div>
+                                    <span className="font-semibold text-foreground">14. Breakeven vs. Expected Move:</span>
+                                    <span className="text-muted-foreground block">Requires breakeven rise <code className="bg-muted px-1 rounded font-mono text-xs">&le; Expected Move</code> (<code className="bg-muted px-1 rounded font-mono text-xs">Price * IV * sqrt(Days/365)</code>).</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            )
+        },
         {
             id: "can-slim",
             icon: <TrendingUp className="w-5 h-5 text-blue-500" />,
@@ -380,6 +501,7 @@ export function StrategyGlossary() {
             item.description.toLowerCase().includes(query) ||
             (item.bullets && item.bullets.some(b => b.label.toLowerCase().includes(query) || b.text.toLowerCase().includes(query))) ||
             (item.formula && item.formula.toLowerCase().includes(query)) ||
+            (item.id === 'call-option-stats-matrix' && "Call Option Stats Matrix 14 Indicators Checklist Trend Support Volume RSI MACD ATR RS SPY Spread Delta Theta Earnings Expected Move".toLowerCase().includes(query)) ||
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
