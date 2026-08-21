@@ -261,6 +261,21 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [rangeMode, setRangeMode] = useState<'period' | 'date'>('period');
     const [customStartDate, setCustomStartDate] = useState<string>('');
 
+    const topScrollRef = React.useRef<HTMLDivElement>(null);
+    const tableScrollRef = React.useRef<HTMLDivElement>(null);
+
+    const handleTopScroll = () => {
+        if (topScrollRef.current && tableScrollRef.current) {
+            tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+        }
+    };
+
+    const handleTableScroll = () => {
+        if (topScrollRef.current && tableScrollRef.current) {
+            topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+        }
+    };
+
     const dataList = Object.values(analysisData);
 
     // Scan all tickers for overall min/max date
@@ -678,11 +693,25 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                     disabled={isExporting}
                 >
                     {exportSuccess ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />} 
-                    {isExporting ? "Saving..." : exportSuccess ? "Saved to Project Folder!" : "Export CSV"}
                 </Button>
             </div>
-            <div className={`w-full bg-card text-card-foreground border rounded-lg shadow-sm overflow-auto relative transition-all duration-300 ${selectedRowTicker ? 'h-[480px] shrink-0' : 'flex-1'}`}>
-            <table className="w-full caption-bottom text-sm border-separate border-spacing-0">
+
+            {/* TOP HORIZONTAL SCROLLBAR */}
+            <div
+                ref={topScrollRef}
+                onScroll={handleTopScroll}
+                className="overflow-x-auto bg-amber-500/15 border border-b-0 border-amber-500/30 p-1 flex items-center shrink-0 z-30 rounded-t-lg"
+                style={{ overflowY: 'hidden' }}
+            >
+                <div className="h-2.5 min-w-[2800px] bg-amber-500/30 rounded-full" />
+            </div>
+
+            <div
+                ref={tableScrollRef}
+                onScroll={handleTableScroll}
+                className={`w-full bg-card text-card-foreground border rounded-b-lg shadow-sm overflow-auto relative transition-all duration-300 ${selectedRowTicker ? 'h-[480px] shrink-0' : 'flex-1'}`}
+            >
+                <table className="w-full caption-bottom text-sm border-separate border-spacing-0 min-w-[2800px]">
                 <TableHeader className="sticky top-0 z-30 bg-card">
                     <TableRow>
                         <TableHead
