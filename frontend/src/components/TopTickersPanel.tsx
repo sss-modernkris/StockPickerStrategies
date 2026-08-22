@@ -63,7 +63,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [backtestOptionsError, setBacktestOptionsError] = useState<string | null>(null);
   const [csvSavingOptions, setCsvSavingOptions] = useState<boolean>(false);
   const [csvSaveSuccessOptions, setCsvSaveSuccessOptions] = useState<boolean>(false);
-  const [optionsExitMode, setOptionsExitMode] = useState<'intraday' | 'expiry'>('intraday');
+  const [optionsExitMode, setOptionsExitMode] = useState<string>('intraday_2');
 
   // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
   const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
@@ -971,12 +971,22 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               {/* Exit Mode Toggle */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80 font-mono">Options Exit:</span>
-                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5">
-                  {[{ label: 'T+2 Intraday (BS)', value: 'intraday' }, { label: 'Hold to Expiry', value: 'expiry' }].map((mode) => (
+                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5 flex-wrap">
+                  {[
+                    { label: 'T+2 Intraday', value: 'intraday_2' },
+                    { label: 'T+3 Intraday', value: 'intraday_3' },
+                    { label: 'T+5 Intraday', value: 'intraday_5' },
+                    { label: 'T+7 Intraday', value: 'intraday_7' },
+                    { label: 'T+10 Intraday', value: 'intraday_10' },
+                    { label: 'T+12 Intraday', value: 'intraday_12' },
+                    { label: 'T+14 Intraday', value: 'intraday_14' },
+                    { label: 'T+21 Intraday', value: 'intraday_21' },
+                    { label: 'Hold to Expiry', value: 'expiry' }
+                  ].map((mode) => (
                     <Button
                       key={mode.value}
                       variant={optionsExitMode === mode.value ? 'secondary' : 'ghost'}
-                      onClick={() => setOptionsExitMode(mode.value as 'intraday' | 'expiry')}
+                      onClick={() => setOptionsExitMode(mode.value)}
                       size="sm"
                       className={`h-6 px-2.5 text-xs font-bold rounded-sm transition-all ${
                         optionsExitMode === mode.value
@@ -1013,6 +1023,14 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                       </span>
                       )
                     </span>
+                    {backtestOptionsResult && backtestOptionsResult.hold_roi_pct !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        Hold :{" "}
+                        <span className={backtestOptionsResult.hold_roi_pct >= 0 ? "text-amber-400 font-bold" : "text-red-500 font-bold"}>
+                          {backtestOptionsResult.hold_roi_pct >= 0 ? "+" : ""}{backtestOptionsResult.hold_roi_pct.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
                     {backtestOptionsResult && backtestOptionsResult.sp500_pct_change !== undefined && (
                       <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
                         S&P 500:{" "}
@@ -1023,7 +1041,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     )}
                     {backtestOptionsResult && (
                       <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal text-amber-500/80">
-                        Mode: {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to Expiry' : 'T+2 Intraday'}
+                        Mode: {backtestOptionsResult.mode_label || (backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to Expiry' : (backtestOptionsResult.exit_mode?.includes('intraday') ? `T+${backtestOptionsResult.exit_mode.replace(/\D/g, '') || '2'} Intraday` : backtestOptionsResult.exit_mode))}
                       </span>
                     )}
                   </span>
@@ -1383,7 +1401,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               <p className="text-xs text-muted-foreground">
                 Black-Scholes synthetic pricing. Same Strategy 1 screening (5 filters). $2,000/position. Exit mode:{" "}
                 <span className="font-bold text-amber-500">
-                  {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to weekly expiry (intrinsic value at T+7)' : 'Intraday T+2 11:00 AM (BS re-priced)'}
+                  {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to weekly expiry (intrinsic value at T+7)' : `${backtestOptionsResult.mode_label || 'Intraday'} 11:00 AM (BS re-priced)`}
                 </span>
               </p>
             </div>

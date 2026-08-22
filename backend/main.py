@@ -790,7 +790,7 @@ def get_30d_backtest_strategy3(period: str = "1m"):
 
 
 @app.get("/api/backtest-30d/options")
-def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
+def get_options_backtest(period: str = "1m", exit_mode: str = "intraday_2"):
     """
     Options backtesting endpoint.
     Uses Strategy 1 screening (5 filters, top-5 by 1-wk strategy value).
@@ -798,11 +798,10 @@ def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
     
     Query params:
       period:    '1w', '1m', '3m', '6m', '1y'
-      exit_mode: 'intraday' (exit T+2 11AM via BS repricing)
-                 'expiry'   (hold to weekly expiry ~7 days, intrinsic value)
+      exit_mode: 'intraday_2', 'intraday_3', 'intraday_5', 'intraday_7',
+                 'intraday_10', 'intraday_12', 'intraday_14', 'intraday_21',
+                 'intraday', 'expiry'
     """
-    if exit_mode not in ('intraday', 'expiry'):
-        exit_mode = 'intraday'
     try:
         result = execute_options_backtest(period=period, exit_mode=exit_mode)
         return result
