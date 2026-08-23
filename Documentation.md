@@ -202,3 +202,56 @@ Open [http://localhost:3000](http://localhost:3000) in your web browser.
     *   **S&P 500 Benchmark**: Quantifies excess leveraged alpha over the broad market.
     *   **Options Trade Ledger**: Inspect per-contract strikes, entry/exit premiums, leverage multiples, and export full logs to `Backtest_Ledger_Options.csv`.
 
+#### 12. Specialized AI Agents & Robinhood MCP Sandbox Pipeline
+*   **Action**: Select the *Brokers* tab and choose **Robinhood Agentic AI**.
+*   **Dual Agent Architecture**:
+    *   **1. Backtester Agent**:
+        *   **Automated Schedule**: Triggers every trading day at **2:00 PM Market Time (EST)**.
+        *   **Universe Scan**: Scans all ~170 constituent tickers from the **Dow 30**, **Nasdaq 100**, and **S&P 500**.
+        *   **Quantitative Screener**: Runs Strategy 1 (1-Week lookback) with 5 strict filters (Willy Bull state, 1-Wk Strategy Value > $10k, MACD Hist $\in (-0.5, 0.5)$, MACD Slope $> 0$, RSI $14 \in (30, 70)$).
+        *   **Signals Generated**: Produces target stock share allocations and ATM Call options parameters (strike, weekly expiration, synthetic Black-Scholes premium).
+    *   **2. Broker Agent**:
+        *   **Portfolio Comparative Analysis**: Queries the active Robinhood Sandbox account (`RH-SIM-SANDBOX-001`) and compares current holdings against incoming recommendations.
+        *   **Dynamic Liquidation & Buying Power**: Automatically generates SELL orders for non-strategy positions to free up cash. Computes effective buying power as:
+            $$\text{Effective Buying Power} = \text{Available Cash} + \sum \text{Sell Liquidation Proceeds}$$
+        *   **Order Execution**: Sizes and dispatches simulated BUY limit orders for top stocks and ATM Call option contracts directly via the Robinhood Model Context Protocol (MCP) toolset.
+*   **Guardrails**: All operations are restricted to the sandbox simulation environment, ensuring 0% live-capital risk.
+*   **Interactive Controls**: Click **Run Daily Pipeline Now** to trigger on-demand linear analysis, view real-time stage execution breakdowns, and inspect the Robinhood MCP sandbox order ledger.
+
+```mermaid
+flowchart TD
+    subgraph Trigger ["1. Trigger & Ingestion Layer"]
+        T1["Scheduler Trigger<br/>2:00 PM EST Daily"] --> PIPE["Trading Pipeline Orchestrator<br/>(pipeline.py)"]
+        T2["On-Demand UI Click<br/>(Run Daily Pipeline Now)"] --> PIPE
+        CSV["Universe Constituent Feeds<br/>(DOW100.csv, Nasdaq100.csv, SP100.csv)"] -->|~170 Tickers| BT["Backtester Agent<br/>(backtester_agent.py)"]
+    end
+
+    subgraph Stage1 ["2. Backtester Agent Screening & Pricing"]
+        PIPE -->|1. Start Analysis| BT
+        BT --> S1["5-Layer Strategy 1 Screen<br/>• Bull Willy VWAP (Close > VWAP)<br/>• 1-Wk Strategy Value > $10,000<br/>• MACD Hist in [-0.5, 0.5]<br/>• MACD Slope > 0<br/>• RSI 14 in [30, 70]"]
+        S1 --> S2["Rank Candidates by 1-Wk Momentum<br/>(Select Top 5 Candidates)"]
+        S2 --> S3["Generate Execution Signals<br/>• Stock: Target Price & Shares Allocation<br/>• Options: ATM Strike, Expiry Date,<br/>  Black-Scholes Synthetic Premium & Contracts"]
+    end
+
+    subgraph Payload ["3. Structured Signal Hand-Off"]
+        S3 -->|JSON Recommendations Payload| BR["Broker Agent<br/>(broker_agent.py)"]
+    end
+
+    subgraph Stage2 ["4. Broker Agent Comparative Analysis & Rebalancing"]
+        BR --> Q1["Call MCP: robinhood_get_portfolio<br/>Account: RH-SIM-SANDBOX-001"]
+        Q1 --> Q2["Portfolio Comparative Analysis<br/>• Match current holdings against Top 5<br/>• Identify displaced non-strategy holdings"]
+        Q2 --> Q3["Compute Dynamic Buying Power<br/>Buying Power = Cash Available + ∑(Sell Proceeds)"]
+        Q3 --> P1["Phase 1: Liquidations<br/>Dispatch SELL Orders to MCP<br/>(Free up cash capital)"]
+        P1 --> P2["Phase 2: Allocations<br/>Dispatch Stock BUY Orders &<br/>ATM Call Option BUY Orders to MCP"]
+    end
+
+    subgraph MCP ["5. Robinhood MCP Sandbox Toolset"]
+        P1 -->|MCP Tool: robinhood_place_stock_order| RH_SRV["Robinhood MCP Server<br/>(rh_mcp_server.py)"]
+        P2 -->|MCP Tools: stock & option order| RH_SRV
+        RH_SRV --> LEDGER[("Simulated Sandbox Ledger<br/>• Stock Fills & Option Positions<br/>• 0% Live-Capital Risk Guardrail")]
+        LEDGER -->|Post-Execution Snapshot| RPT["Execution Audit Report &<br/>UI Dashboard Update"]
+    end
+```
+
+
+
