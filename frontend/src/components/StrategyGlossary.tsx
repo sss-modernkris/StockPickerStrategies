@@ -14,12 +14,389 @@ import {
     Activity,
     Gauge,
     Search,
-    Flame
+    Flame,
+    Building2
 } from 'lucide-react';
 
 export function StrategyGlossary() {
     const [searchQuery, setSearchQuery] = useState('');
     const glossaryItems = [
+        {
+            id: "danaher-fundamental-data",
+            icon: <Building2 className="w-5 h-5 text-sky-400" />,
+            title: "Fundamental & Trading Data Guide (Danaher Benchmark)",
+            badge: "Financial Data Guide",
+            description: "This screen shows fundamental and trading data for Danaher Corporation (DHR) as a concrete benchmark for analyzing company metrics.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Key Notation */}
+                    <div className="bg-muted/50 p-4 rounded-lg border border-border/50 text-xs space-y-2">
+                        <p className="font-semibold text-foreground text-sm">Key Notation & Symbols:</p>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground">
+                            <li><span className="font-bold text-foreground">B</span> = billion dollars</li>
+                            <li><span className="font-bold text-foreground">M</span> = million shares</li>
+                            <li>Decimal margins such as <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-foreground font-semibold">0.59</code> mean <span className="font-bold text-foreground">59%</span></li>
+                            <li><span className="font-bold text-foreground">TTM</span> or &ldquo;Trailing 12 Months&rdquo; means the most recently completed 12-month period</li>
+                        </ul>
+                    </div>
+
+                    {/* Section 1: Company Profile */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">1. Company Profile</h4>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Item</th>
+                                        <th className="p-3 w-1/2">Meaning</th>
+                                        <th className="p-3 w-1/4">Danaher Example</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Short Name</td>
+                                        <td className="p-3 text-muted-foreground">Abbreviated company name displayed by financial websites.</td>
+                                        <td className="p-3 font-medium">Danaher Corporation</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Long Name</td>
+                                        <td className="p-3 text-muted-foreground">Company’s full official or commonly reported name.</td>
+                                        <td className="p-3 font-medium">Danaher Corporation</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Sector</td>
+                                        <td className="p-3 text-muted-foreground">Broad part of the economy in which the company operates.</td>
+                                        <td className="p-3 font-medium">Healthcare</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Industry</td>
+                                        <td className="p-3 text-muted-foreground">More specific business category within the sector.</td>
+                                        <td className="p-3 font-medium">Diagnostics &amp; Research</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Exchange</td>
+                                        <td className="p-3 text-muted-foreground">Stock exchange where the shares trade.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">NYQ</span> generally refers to the New York Stock Exchange</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Country</td>
+                                        <td className="p-3 text-muted-foreground">Country where the company is based or incorporated, depending on the data source.</td>
+                                        <td className="p-3 font-medium">United States</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Website</td>
+                                        <td className="p-3 text-muted-foreground">Company’s official website.</td>
+                                        <td className="p-3 font-medium text-sky-400">danaher.com</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-xs text-muted-foreground italic">
+                            The sector and industry are useful when comparing Danaher with similar healthcare and diagnostic companies.
+                        </p>
+                    </div>
+
+                    {/* Section 2: Valuation Metrics */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">2. Valuation Metrics</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            These measurements indicate how expensive or inexpensive the stock appears relative to earnings, sales, assets, and cash-generating ability. A high ratio is not automatically bad: investors may pay more for a company expected to grow quickly or generate dependable profits.
+                        </p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Item</th>
+                                        <th className="p-3 w-1/2">Meaning</th>
+                                        <th className="p-3 w-1/4">Interpretation of Shown Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Market Cap</td>
+                                        <td className="p-3 text-muted-foreground">Share price × total shares outstanding. It is the market value of the company’s equity.</td>
+                                        <td className="p-3 font-bold text-foreground">$153.85B</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Enterprise Value</td>
+                                        <td className="p-3 text-muted-foreground">Market cap + debt and certain other claims − cash. It approximates the cost of acquiring the entire operating business.</td>
+                                        <td className="p-3 font-bold text-foreground">$177.37B</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Trailing P/E</td>
+                                        <td className="p-3 text-muted-foreground">Current share price ÷ earnings per share during the past 12 months.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">39.08:</span> investors pay about $39.08 for every $1 of historical annual earnings.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Forward P/E</td>
+                                        <td className="p-3 text-muted-foreground">Current share price ÷ estimated earnings per share for the coming year.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">23.54:</span> investors pay about $23.54 for every $1 of forecast earnings.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">PEG Ratio</td>
+                                        <td className="p-3 text-muted-foreground">P/E ratio adjusted for expected earnings growth. Usually calculated as P/E ÷ earnings-growth rate.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">1.43:</span> the valuation is 1.43 times the stated growth measure.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Price-to-Book</td>
+                                        <td className="p-3 text-muted-foreground">Market price per share ÷ book value per share. Book value is assets minus liabilities attributable to shareholders.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">2.93:</span> the market values Danaher at 2.93 times its accounting book value.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Price-to-Sales, TTM</td>
+                                        <td className="p-3 text-muted-foreground">Market cap ÷ revenue during the past 12 months.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">6.13:</span> investors pay $6.13 for every $1 of annual sales.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Enterprise Value-to-Revenue</td>
+                                        <td className="p-3 text-muted-foreground">Enterprise value ÷ annual revenue. It incorporates debt and cash, unlike price-to-sales.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">7.07:</span> total business value equals about 7.07 times revenue.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Enterprise Value-to-EBITDA</td>
+                                        <td className="p-3 text-muted-foreground">Enterprise value ÷ EBITDA. Often used to compare businesses with different debt levels.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">22.09:</span> enterprise value is about 22.09 times annual EBITDA.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Sub-section: Why Forward P/E is Lower */}
+                        <div className="bg-sky-500/10 border border-sky-500/30 p-4 rounded-lg text-xs space-y-1.5">
+                            <h5 className="font-semibold text-sky-400 text-sm">Why forward P/E is lower than trailing P/E</h5>
+                            <p className="text-muted-foreground leading-relaxed">
+                                A forward P/E of <strong className="text-foreground">23.54</strong>, versus a trailing P/E of <strong className="text-foreground">39.08</strong>, suggests analysts expect future earnings to be higher than recent earnings. It could also reflect unusual items that reduced past earnings. Forecasts are uncertain, so this should be investigated rather than accepted automatically.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Financial Highlights */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">3. Financial Highlights</h4>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Item</th>
+                                        <th className="p-3 w-1/2">Meaning</th>
+                                        <th className="p-3 w-1/4">Interpretation of Shown Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Total Revenue</td>
+                                        <td className="p-3 text-muted-foreground">Money generated from selling products and services before expenses.</td>
+                                        <td className="p-3 font-bold text-foreground">$25.11B</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Revenue Growth</td>
+                                        <td className="p-3 text-muted-foreground">Percentage change in revenue versus the comparison period, normally the prior year.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.06</span> = approximately 6% growth</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Gross Margin</td>
+                                        <td className="p-3 text-muted-foreground"><code className="bg-muted px-1 py-0.5 rounded font-mono text-xs">(Revenue − cost of goods/services) ÷ revenue</code>. It shows what remains after direct production costs.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.59</span> = 59%</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">EBITDA</td>
+                                        <td className="p-3 text-muted-foreground">Earnings before interest, taxes, depreciation and amortization. It approximates operating earnings before financing and major noncash expenses.</td>
+                                        <td className="p-3 font-bold text-foreground">$8.03B</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">EBITDA Margin</td>
+                                        <td className="p-3 text-muted-foreground">EBITDA ÷ revenue.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.32</span> = 32%</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Operating Margin</td>
+                                        <td className="p-3 text-muted-foreground">Operating income ÷ revenue after operating expenses, depreciation and amortization.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.20</span> = 20%</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Profit Margin</td>
+                                        <td className="p-3 text-muted-foreground">Net income ÷ revenue after operating expenses, interest and taxes.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.16</span> = 16%</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Return on Assets</td>
+                                        <td className="p-3 text-muted-foreground">Net income relative to the company’s assets. It measures how effectively assets generate profit.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.04</span> = approximately 4%</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Return on Equity</td>
+                                        <td className="p-3 text-muted-foreground">Net income relative to shareholders’ equity.</td>
+                                        <td className="p-3 font-medium"><span className="font-bold text-foreground">0.08</span> = approximately 8%</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Free Cash Flow</td>
+                                        <td className="p-3 text-muted-foreground">Operating cash flow minus capital expenditures. This cash may be used for acquisitions, debt repayment, dividends and share repurchases.</td>
+                                        <td className="p-3 font-bold text-foreground">$4.33B</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Total Debt</td>
+                                        <td className="p-3 text-muted-foreground">Interest-bearing short- and long-term borrowings.</td>
+                                        <td className="p-3 font-bold text-foreground">$27.86B</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Debt-to-Equity</td>
+                                        <td className="p-3 text-muted-foreground">Debt relative to shareholders’ equity. Yahoo/yfinance often supplies this figure on a percentage scale.</td>
+                                        <td className="p-3 text-muted-foreground"><span className="font-bold text-foreground">52.97</span> generally means approximately 52.97%, or $0.53 of debt per $1 of equity—not 52.97 times.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Revenue Flow Breakdown */}
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-lg text-xs space-y-2">
+                            <h5 className="font-semibold text-emerald-400 text-sm">How $100 of revenue approximately flows through the business</h5>
+                            <p className="text-muted-foreground">Based on the displayed margins:</p>
+                            <ul className="space-y-1 font-medium text-foreground">
+                                <li>• Revenue: <span className="font-bold">$100</span></li>
+                                <li>• After direct costs, gross profit: about <span className="font-bold">$59</span></li>
+                                <li>• EBITDA: about <span className="font-bold">$32</span></li>
+                                <li>• Operating profit: about <span className="font-bold">$20</span></li>
+                                <li>• Final net profit: about <span className="font-bold">$16</span></li>
+                            </ul>
+                            <p className="text-xs text-muted-foreground italic pt-1 border-t border-emerald-500/20 mt-2">
+                                These are simplified margin comparisons, not a complete income statement.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 4: Trading Information */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">4. Trading Information</h4>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Item</th>
+                                        <th className="p-3 w-1/2">Meaning</th>
+                                        <th className="p-3 w-1/4">Interpretation of Shown Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Current Price</td>
+                                        <td className="p-3 text-muted-foreground">Latest available market price. It may be delayed.</td>
+                                        <td className="p-3 font-bold text-foreground">$218.85</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Regular Market Price</td>
+                                        <td className="p-3 text-muted-foreground">Latest price during regular exchange hours, generally excluding after-hours trading.</td>
+                                        <td className="p-3 font-bold text-foreground">$218.85</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Previous Close</td>
+                                        <td className="p-3 text-muted-foreground">Final regular-session price on the preceding trading day.</td>
+                                        <td className="p-3 font-bold text-foreground">$215.91</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Open</td>
+                                        <td className="p-3 text-muted-foreground">Price of the first trade in the current regular session.</td>
+                                        <td className="p-3 font-bold text-foreground">$215.58</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Day Low</td>
+                                        <td className="p-3 text-muted-foreground">Lowest price traded during the session.</td>
+                                        <td className="p-3 font-bold text-foreground">$213.46</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Day High</td>
+                                        <td className="p-3 text-muted-foreground">Highest price traded during the session.</td>
+                                        <td className="p-3 font-bold text-foreground">$220.25</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">52-Week Low</td>
+                                        <td className="p-3 text-muted-foreground">Lowest trading price during the previous 52 weeks.</td>
+                                        <td className="p-3 font-bold text-foreground">$160.93</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">52-Week High</td>
+                                        <td className="p-3 text-muted-foreground">Highest trading price during the previous 52 weeks.</td>
+                                        <td className="p-3 font-bold text-foreground">$242.80</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Volume</td>
+                                        <td className="p-3 text-muted-foreground">Shares traded during the current or most recently completed session.</td>
+                                        <td className="p-3 font-bold text-foreground">4.00M shares</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Average Volume</td>
+                                        <td className="p-3 text-muted-foreground">Average number of shares traded per session over the data provider’s chosen period.</td>
+                                        <td className="p-3 font-bold text-foreground">4.90M shares</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Beta</td>
+                                        <td className="p-3 text-muted-foreground">Measures historical stock-price sensitivity to overall market movements.</td>
+                                        <td className="p-3"><span className="font-bold text-foreground">0.80:</span> historically, Danaher has tended to fluctuate less than the market.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Dividend Yield</td>
+                                        <td className="p-3 text-muted-foreground">Annual dividend per share ÷ share price, expressed as a percentage.</td>
+                                        <td className="p-3 text-muted-foreground"><span className="font-bold text-foreground">0.73</span> most likely means approximately 0.73%, not 73%.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">Trailing Annual Dividend Rate</td>
+                                        <td className="p-3 text-muted-foreground">Total dividends paid per share during the past 12 months.</td>
+                                        <td className="p-3 font-bold text-foreground">$1.44 per share</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Beta Explanation Box */}
+                        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg text-xs space-y-2">
+                            <h5 className="font-semibold text-amber-400 text-sm">Understanding beta</h5>
+                            <p className="text-muted-foreground">A beta of:</p>
+                            <ul className="space-y-1 text-muted-foreground ml-2">
+                                <li>• <strong className="text-foreground">1.00</strong> means the stock historically moved about as much as the market.</li>
+                                <li>• <strong className="text-foreground">Above 1.00</strong> means it was generally more volatile than the market.</li>
+                                <li>• <strong className="text-foreground">Below 1.00</strong> means it was generally less volatile.</li>
+                            </ul>
+                            <p className="text-muted-foreground leading-relaxed pt-1">
+                                Danaher’s <strong className="text-foreground">0.80 beta</strong> suggests that, historically, a 10% market movement corresponded to roughly an 8% movement in Danaher, on average. It does not predict the exact next movement.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 5: Important Observations */}
+                    <div className="bg-card border border-border p-4.5 rounded-lg space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">Important observations</h4>
+                        <ul className="space-y-2 text-xs sm:text-sm text-muted-foreground">
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                <span>Danaher appears to have <strong className="text-foreground">strong margins and positive free cash flow</strong>.</span>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                <span>Its valuation multiples—especially trailing P/E and EV/EBITDA—indicate that investors are assigning a relatively substantial value to its earnings.</span>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                <span>The lower forward P/E suggests expectations for improved future earnings, but those estimates can be wrong.</span>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                <span>The stock is below its displayed 52-week high but well above its 52-week low.</span>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                <span>Current volume of <strong className="text-foreground">4.00 million</strong> is below the <strong className="text-foreground">4.90 million</strong> average, suggesting slightly lighter-than-normal trading activity.</span>
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                <span>The <strong className="text-foreground">dividend yield and debt-to-equity fields require careful unit handling</strong> because yfinance/Yahoo fields are not always displayed consistently across applications.</span>
+                            </li>
+                        </ul>
+                        <p className="text-xs text-muted-foreground italic pt-2 border-t border-border/30">
+                            These figures should be compared with Danaher’s history, direct competitors, recent SEC filings, and expected earnings growth before making an investment decision.
+                        </p>
+                    </div>
+                </div>
+            )
+        },
         {
             id: "call-option-stats-matrix",
             icon: <Flame className="w-5 h-5 text-amber-500" />,
@@ -490,6 +867,90 @@ export function StrategyGlossary() {
                 { label: "Step 3: Trade Execution (Entry & Exit)", text: "Simulates entering positions at 3:00 PM on T+1 with $2,000 per position (max $10,000 daily budget). Liquidates all positions at 2:50 PM on T+2 (holding for nearly 24 hours)." },
                 { label: "Step 4: ROI Calculation", text: "Accumulates daily gains/losses across the 30-day window to calculate Total Profit and ROI relative to the $10,000 max daily capital allocation." }
             ]
+        },
+        {
+            id: "compare-charts-linear-fit",
+            icon: <LineChart className="w-5 h-5 text-emerald-400" />,
+            title: "Compare Matrix Metrics & Call Option Significance",
+            badge: "Options Strategy & Metrics",
+            description: "Detailed mathematical breakdown of Current Price, Linear Fit Slope, and Residual Standard Deviation computed in the Compare Charts tab, and their critical strategic significance for Call Option buyers.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Overview Box */}
+                    <div className="bg-muted/50 p-4 rounded-lg border border-border/50 text-xs space-y-2">
+                        <p className="font-semibold text-foreground text-sm">Compare Matrix Metrics Overview:</p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            These three metrics evaluate price trajectory, trend velocity, and structural volatility over any chosen timeframe (1W to 5Y), providing options traders with quantitative precision for strike selection and timing.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Current Price */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>1. Current Price (S₀)</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Latest Closing Price</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-lg space-y-2 text-xs sm:text-sm">
+                            <p className="text-muted-foreground leading-relaxed">
+                                <strong className="text-foreground">Definition:</strong> The latest market closing price of the underlying equity for the selected observation window.
+                            </p>
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-md space-y-1.5 text-xs">
+                                <p className="font-semibold text-emerald-400">Significance for Call Options:</p>
+                                <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+                                    <li><strong className="text-foreground">Moneyness Determination:</strong> Dictates whether options are In-The-Money (ITM: S₀ &gt; K), At-The-Money (ATM: S₀ ≈ K), or Out-Of-The-Money (OTM: S₀ &lt; K).</li>
+                                    <li><strong className="text-foreground">Intrinsic vs Extrinsic Value:</strong> Directly sets intrinsic value (max(S₀ − K, 0)). Higher current price relative to strike reduces extrinsic time-decay vulnerability.</li>
+                                    <li><strong className="text-foreground">Delta (Δ) Acceleration:</strong> As S₀ increases past strike K, call Delta scales towards 1.0, capturing near 1:1 stock price gains.</li>
+                                    <li><strong className="text-foreground">Breakeven Anchor:</strong> Essential anchor for calculating option breakeven price (Strike + Premium) and maximum downside risk (100% of premium paid).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Linear Fit Slope */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>2. Linear Fit Slope (Slope, m)</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">m = Σ(xᵢ − x̄)(yᵢ − ȳ) / Σ(xᵢ − x̄)²</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-lg space-y-2 text-xs sm:text-sm">
+                            <p className="text-muted-foreground leading-relaxed">
+                                <strong className="text-foreground">Definition:</strong> The Ordinary Least Squares (OLS) linear trend slope measuring average dollar price change per trading day over the chosen period range.
+                            </p>
+                            <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded-md space-y-1.5 text-xs">
+                                <p className="font-semibold text-blue-400">Significance for Call Options:</p>
+                                <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+                                    <li><strong className="text-foreground">Directional Drift Velocity:</strong> Positive slope (m &gt; 0) confirms steady upward price momentum necessary to outpace daily Theta (Θ) time decay.</li>
+                                    <li><strong className="text-foreground">Price Projection at Expiry:</strong> Enables estimating projected stock price by expiration date (S_exp ≈ S₀ + m · D_days) to verify if calls can reach breakeven before expiry.</li>
+                                    <li><strong className="text-foreground">Delta/Gamma Expansion:</strong> Higher positive slope indicates strong price acceleration, maximizing rapid call premium expansion.</li>
+                                    <li><strong className="text-foreground">Negative Slope Warning (m &lt; 0):</strong> Clear signal to avoid buying call options; downward trend velocity almost guarantees total option premium decay.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Residual Standard Deviation */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>3. Standard Deviation around Linear Fit (Std, σ_res)</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Std = √(Σ(yᵢ − ŷᵢ)² / n)</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-lg space-y-2 text-xs sm:text-sm">
+                            <p className="text-muted-foreground leading-relaxed">
+                                <strong className="text-foreground">Definition:</strong> The standard deviation of historical daily close prices relative to the linear regression trendline (ŷᵢ = m · xᵢ + c). It measures dispersion / noise around the core trend.
+                            </p>
+                            <div className="bg-purple-500/10 border border-purple-500/30 p-3 rounded-md space-y-1.5 text-xs">
+                                <p className="font-semibold text-purple-400">Significance for Call Options:</p>
+                                <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+                                    <li><strong className="text-foreground">Regression Channel Bands:</strong> Prices oscillating within ±2·Std define a natural price channel. Buying calls when stock is near the lower -1·Std or -2·Std channel boundary provides optimal risk-reward entry.</li>
+                                    <li><strong className="text-foreground">Implied Volatility (IV) Mispricing Check:</strong> High residual Std indicates high realized volatility. If Option IV is low relative to high residual Std, call premiums are cheap/underpriced.</li>
+                                    <li><strong className="text-foreground">Strike Selection &amp; Probability of Profit:</strong> Choosing strikes within 1·Std of projected trend price maximizes overall probability of profit (POP).</li>
+                                    <li><strong className="text-foreground">Objective Stop-Loss Trigger:</strong> If price breaks below -2·Std from the linear fit line, structural trend collapse is confirmed, serving as a disciplined exit rule for call positions.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -501,7 +962,9 @@ export function StrategyGlossary() {
             item.description.toLowerCase().includes(query) ||
             (item.bullets && item.bullets.some(b => b.label.toLowerCase().includes(query) || b.text.toLowerCase().includes(query))) ||
             (item.formula && item.formula.toLowerCase().includes(query)) ||
+            (item.id === 'danaher-fundamental-data' && "Danaher Corporation Fundamental Trading Data Company Profile Valuation Metrics Financial Highlights Trading Information Beta Forward P/E Market Cap Revenue FCF Margin Short Name Long Name Sector Industry Exchange Country Website Debt".toLowerCase().includes(query)) ||
             (item.id === 'call-option-stats-matrix' && "Call Option Stats Matrix 14 Indicators Checklist Trend Support Volume RSI MACD ATR RS SPY Spread Delta Theta Earnings Expected Move".toLowerCase().includes(query)) ||
+            (item.id === 'compare-charts-linear-fit' && "Compare Matrix Indicators Call Option Significance Current Price Linear Fit Slope Standard Deviation Residual Volatility Strike Selection Delta Theta".toLowerCase().includes(query)) ||
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
@@ -541,14 +1004,14 @@ export function StrategyGlossary() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredItems.map((item) => (
-                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' ? 'md:col-span-2 shadow-md border-primary/50 bg-primary/5' : 'bg-card'}`}>
+                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
                             <CardHeader className="pb-3 border-b border-border/10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         {item.icon}
                                         <CardTitle className="text-lg">{item.title}</CardTitle>
                                     </div>
-                                    {item.badge && <Badge variant={item.id === 'xgboost' ? 'default' : 'secondary'}>{item.badge}</Badge>}
+                                    {item.badge && <Badge variant={item.id === 'xgboost' || item.id === 'danaher-fundamental-data' ? 'default' : 'secondary'}>{item.badge}</Badge>}
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-4 flex-grow text-sm space-y-4">
