@@ -149,7 +149,7 @@ export default function Dashboard() {
 
         {!selectedTicker ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260820</span></h2>
+            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260828</span></h2>
             <p>Add and select a ticker from the sidebar to view quant analysis.</p>
           </div>
         ) : loading ? (

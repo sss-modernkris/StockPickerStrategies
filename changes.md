@@ -1,9 +1,11 @@
-# Project Changes Summary (v20260820)
+# Project Changes Summary (v20260828)
 
 This document summarizes the enhancements and synchronization tasks completed for the **Strategic Alpha Dashboard**.
 
-## 1. Release v20260820 Updates
-- **Version Tag Update**: Updated system version to `v20260820` across `README.md`, `TickerSidebar.tsx`, `page.tsx`, and project documentation.
+## 1. Release v20260828 Updates
+- **Version Tag Update**: Updated system version to `v20260828` across `README.md`, `TickerSidebar.tsx`, `page.tsx`, and project documentation.
+- **Compare Charts Matrix Expansion**: Added `Current Price`, OLS `Linear Fit Slope` ($m$), and `Residual Standard Deviation` ($\text{Std}$) columns to the summary table with interactive sorting and dynamic period recalculation.
+- **Strategy Glossary Options Significance Block**: Added a full-width featured section to `StrategyGlossary.tsx` explaining the quantitative significance of Current Price, Linear Fit Slope, and Residual Standard Deviation for Call Option buyers.
 - **Options Data & Option Greeks Engine**: Enhanced `get_options_data` in Top Tickers tab to calculate and save full Option Greeks (Delta, Gamma, Theta, Vega, Rho for Call & Put across 1W, 2W, and 3W expirations) to `OptionsData.csv`.
 
 ## 2. Strategic Alpha Dashboard (411x)
