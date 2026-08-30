@@ -133,3 +133,18 @@ docker-compose up -d --build
 *   **Viewport Space Utilization**: Updated layout containers using calc heights (`h-[calc(100vh-190px)] min-h-[1050px]`) and spacious tables (`480px` selection height) to leverage large displays and prevent vertical cropping.
 *   **Batch Processing**: Batched API queries to handle up to 100 tickers at once, improving dashboard load times by 400%.
 *   **Dynamic Anchoring**: reset VWAP anchors at swing pivots to ensure support lines represent active market interest.
+
+---
+
+## 📚 Documentation Directory
+
+All technical architecture guides, operational manuals, and mathematical specifications are organized under the [`docs/`](docs/README.md) folder:
+
+- **[System Architecture & Documentation](docs/Documentation.md)**: Deep dive into the 11 quant models, Options Backtest Engine, Specialized AI Agents (Backtester & Broker), Robinhood MCP Sandbox Pipeline, and Mermaid flowcharts.
+- **[Operation Guide](docs/operation.md)**: Walkthrough of all interactive views, sorting filters, and technical charting.
+- **[Strategy Slides](docs/Strategies.md)**: Visual strategy slide deck (Slides 1–12).
+- **[WillyAlgo Dynamic Swing VWAP Math](docs/VWAP.md)**: Mathematical formulas, centered rolling window pivot detection, and ATR volatility bands.
+- **[WillyAlgo Indicator Guide](docs/WillyAlgo_Indicator_Guide.md)**: Practical trading rules for 100% vs 0% matches, buy/sell triggers, and dynamic trailing stops.
+- **[Project Changelog](docs/changes.md)**: Comprehensive evolution of platform releases and architecture changes.
+- **[Feature Walkthrough](docs/walkthrough.md)**: Multi-mode intraday options exit horizons and baseline Hold to Expiry metrics.
+

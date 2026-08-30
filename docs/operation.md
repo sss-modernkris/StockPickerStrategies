@@ -11,7 +11,7 @@ This guide outlines the core features and how to navigate the four primary views
 
 The **Main Dashboard** is the landing page and the core analytical engine of the application. It provides a deep dive into a single selected stock ticker (e.g., NVDA, AAPL).
 
-![Main Dashboard View](images_20260310/main_dashboard_1773110817611.png)
+![Main Dashboard View](../images_20260310/main_dashboard_1773110817611.png)
 
 ### Key Features:
 *   **Ticker Search & Selection:** Use the top navigation bar to search for and select the stock you want to analyze.
@@ -27,7 +27,7 @@ The **Main Dashboard** is the landing page and the core analytical engine of the
 
 The **Comparison Table** provides a macroscopic view, allowing you to evaluate and rank multiple stocks simultaneously against all the quantitative metrics.
 
-![Comparison Table View](images_20260310/comparison_table_view_1773110872238.jpg)
+![Comparison Table View](../images_20260310/comparison_table_view_1773110872238.jpg)
 
 ### Key Features:
 *   **Single-Glance Comparison:** Compare all loaded/favorited tickers side-by-side.
@@ -42,7 +42,7 @@ The **Comparison Table** provides a macroscopic view, allowing you to evaluate a
 
 The **Raw Data** page bypasses the abstracted Strategy Engine and provides direct, unfiltered access to the underlying fundamental and technical data fetched from Yahoo Finance via the `yfinance` library.
 
-![Raw Data Exploration View](images_20260310/raw_data_page_1773110861156.png)
+![Raw Data Exploration View](../images_20260310/raw_data_page_1773110861156.png)
 
 ### Key Features:
 *   **Comprehensive Metrics:** Exposes all ~150 data points returned by the API for the selected stock.
@@ -59,7 +59,7 @@ The **Raw Data** page bypasses the abstracted Strategy Engine and provides direc
 
 The **Glossary** page serves as the internal documentation and mathematical reference for the dashboard's quantitative engine.
 
-![Strategy Glossary](images_20260310/strategy_glossary_page_1773110885647.png)
+![Strategy Glossary](../images_20260310/strategy_glossary_page_1773110885647.png)
 
 ### Key Features:
 *   **Strategy Definitions:** Provides detailed explanations of what each of the 10 quantitative strategies is designed to measure (e.g., "High-Pass Filter" vs "Contrarian Indicators").
@@ -72,7 +72,7 @@ The **Glossary** page serves as the internal documentation and mathematical refe
 
 The **Compare Charts** view provides a normalized, relative performance view of all selected or favorited stocks on a single interactive timeline.
 
-![Compare Charts View](images_20260310/compare_charts_page_1773113111553.png)
+![Compare Charts View](../images_20260310/compare_charts_page_1773113111553.png)
 
 ### Key Features:
 *   **Normalized Baseline:** All assets are indexed to a starting baseline of 100 at the beginning of the selected timeframe, allowing for direct "apples-to-apples" comparison of relative growth.
@@ -85,7 +85,7 @@ The **Compare Charts** view provides a normalized, relative performance view of 
 
 The **Technicals** page is dedicated to classical price action, momentum, and volume analysis, providing the underlying technical context to the core fundamental strategies.
 
-![Technicals View](images_20260310/technicals_page_1773113126184.png)
+![Technicals View](../images_20260310/technicals_page_1773113126184.png)
 
 ### Key Features:
 *   **Moving Averages:** Tracks standard SMA/EMA bounds (20-Day, 50-Day, 200-Day) to identify immediate trend directions and support/resistance levels.
