@@ -14,7 +14,7 @@ Welcome to the **Strategic Alpha Platform Documentation Directory**. This direct
 | **[VWAP.md](VWAP.md)** | **WillyAlgo Dynamic Swing VWAP Math** | Centered rolling window pivot detection, dynamic price-volume reset triggers, mathematical formulas, and ATR boundary envelopes |
 | **[WillyAlgo_Indicator_Guide.md](WillyAlgo_Indicator_Guide.md)** | **WillyAlgo Indicator User Guide** | Practical trader guide for interpreting 100% vs 0% matches, buy/sell decision rules, and trailing stop methodologies |
 | **[changes.md](changes.md)** | **Project Changelog & Evolution** | Chronological record of architectural updates, feature rollouts, and refactoring milestones |
-| **[walkthrough.md](walkthrough.md)** | **Feature Walkthrough & Verifications** | Detailed implementation walkthrough covering multi-mode intraday exit horizons, baseline performance calculations, and verification metrics |
+| **[Options_Walkthrough.md](Options_Walkthrough.md)** | **Feature Walkthrough & Verifications** | Detailed implementation walkthrough covering multi-mode intraday exit horizons, baseline performance calculations, and verification metrics |
 | **[Portfolio_Positions_May-29-2026 - 4223_Analysis_Report.md](Portfolio_Positions_May-29-2026%20-%204223_Analysis_Report.md)** | **Portfolio Technical Analysis Report Sample** | Sample synthesized portfolio analysis report with posture classifications, ATR boundary envelopes, and embedded technical charts |
 
 ---
@@ -30,7 +30,7 @@ docs/
 ├── VWAP.md                                               # Dynamic Swing VWAP algorithm & mathematical specs
 ├── WillyAlgo_Indicator_Guide.md                          # Trader guide for Dynamic Swing VWAP signals
 ├── changes.md                                            # Chronological project changelog
-├── walkthrough.md                                        # Options exit horizons & baseline walkthrough
+├── Options_Walkthrough.md                                # Options exit horizons & baseline walkthrough
 └── Portfolio_Positions_May-29-2026 - 4223_Analysis_Report.md # Sample technical analysis report
 ```
 

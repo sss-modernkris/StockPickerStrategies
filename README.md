@@ -146,5 +146,5 @@ All technical architecture guides, operational manuals, and mathematical specifi
 - **[WillyAlgo Dynamic Swing VWAP Math](docs/VWAP.md)**: Mathematical formulas, centered rolling window pivot detection, and ATR volatility bands.
 - **[WillyAlgo Indicator Guide](docs/WillyAlgo_Indicator_Guide.md)**: Practical trading rules for 100% vs 0% matches, buy/sell triggers, and dynamic trailing stops.
 - **[Project Changelog](docs/changes.md)**: Comprehensive evolution of platform releases and architecture changes.
-- **[Feature Walkthrough](docs/walkthrough.md)**: Multi-mode intraday options exit horizons and baseline Hold to Expiry metrics.
+- **[Feature Walkthrough](docs/Options_Walkthrough.md)**: Multi-mode intraday options exit horizons and baseline Hold to Expiry metrics.
 
