@@ -155,8 +155,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
     const computedTableData = useMemo(() => {
         const rowData = selectedTickers.map(ticker => {
             const tData = analysisData[ticker];
+            const hData = historyData.find(h => h.symbol === ticker);
 
             // Default raw numerical values for sorting (null if missing)
+            let currentPrice: number | null = null;
+            let slope: number | null = null;
+            let stdDev: number | null = null;
             let mlAlpha: number | null = null;
             let stratAvg: number | null = null;
             let macdHist: number | null = null;
@@ -165,12 +169,69 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let strategyValue: number | null = null;
 
             // Formatted string representations for UI
+            let currentPriceStr = 'N/A';
+            let slopeStr = 'N/A';
+            let stdDevStr = 'N/A';
             let mlAlphaStr = 'N/A';
             let stratAvgStr = 'N/A';
             let macdHistStr = 'N/A';
             let macdRelStr = 'N/A';
             let rsiStr = 'N/A';
             let strategyValueStr = 'N/A';
+
+            // Calculate currentPrice, slope, and std from historyData (selected period)
+            if (hData && hData.history && hData.history.length > 0) {
+                const pts = hData.history;
+                const n = pts.length;
+                const latest = pts[n - 1];
+                currentPrice = latest.close;
+                currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                if (n >= 2) {
+                    let sumX = 0;
+                    let sumY = 0;
+                    let sumXY = 0;
+                    let sumXX = 0;
+
+                    for (let i = 0; i < n; i++) {
+                        const x = i;
+                        const y = pts[i].close;
+                        sumX += x;
+                        sumY += y;
+                        sumXY += x * y;
+                        sumXX += x * x;
+                    }
+
+                    const meanX = sumX / n;
+                    const meanY = sumY / n;
+                    const numerator = sumXY - n * meanX * meanY;
+                    const denominator = sumXX - n * meanX * meanX;
+
+                    if (denominator !== 0) {
+                        const m = numerator / denominator;
+                        const c = meanY - m * meanX;
+                        slope = m;
+                        slopeStr = (m >= 0 ? '+' : '') + m.toFixed(4);
+
+                        let sumResidualSq = 0;
+                        for (let i = 0; i < n; i++) {
+                            const x = i;
+                            const y = pts[i].close;
+                            const yFit = m * x + c;
+                            const residual = y - yFit;
+                            sumResidualSq += residual * residual;
+                        }
+
+                        const variance = sumResidualSq / n;
+                        stdDev = Math.sqrt(variance);
+                        stdDevStr = stdDev.toFixed(2);
+                    }
+                }
+            } else if (tData?.price_history && tData.price_history.length > 0) {
+                const latest = tData.price_history[tData.price_history.length - 1];
+                currentPrice = latest.close;
+                currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
 
             if (tData) {
                 if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
@@ -207,6 +268,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
 
             return {
                 symbol: ticker,
+                currentPrice,
+                currentPriceStr,
+                slope,
+                slopeStr,
+                stdDev,
+                stdDevStr,
                 mlAlpha,
                 mlAlphaStr,
                 stratAvg,
@@ -244,7 +311,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
         }
 
         return rowData;
-    }, [selectedTickers, analysisData, sortConfig]);
+    }, [selectedTickers, analysisData, historyData, sortConfig, period]);
 
     // Transform data for Recharts into a normalized format
     const chartData = useMemo(() => {
@@ -299,14 +366,14 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
 
             return (
-                <div className="bg-background/95 border p-3 rounded-lg shadow-xl backdrop-blur-sm z-50">
-                    <p className="font-semibold mb-2 text-foreground">{label}</p>
+                <div className="bg-transparent border border-white/20 p-3 rounded-lg pointer-events-none z-50">
+                    <p className="font-semibold mb-2 text-foreground drop-shadow-md">{label}</p>
                     <div className="space-y-1">
                         {sortedPayload.map((entry: { value: number; color: string; name: string }, index: number) => {
                             const isPositive = entry.value >= 100;
                             const diff = Math.abs(entry.value - 100).toFixed(2);
                             return (
-                                <div key={index} className="flex items-center justify-between gap-4 text-sm">
+                                <div key={index} className="flex items-center justify-between gap-4 text-sm drop-shadow-md">
                                     <div className="flex items-center gap-2">
                                         <div
                                             className="w-2 h-2 rounded-full"
@@ -317,8 +384,8 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="font-mono">{entry.value.toFixed(2)}</span>
-                                        <span className={`text-xs ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        <span className="font-mono text-foreground font-semibold">{entry.value.toFixed(2)}</span>
+                                        <span className={`text-xs font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                                             {isPositive ? '+' : '-'}{diff}%
                                         </span>
                                     </div>
@@ -525,6 +592,24 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('currentPrice')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Current Price
+                                            {SortIcon('currentPrice')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('slope')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Slope
+                                            {SortIcon('slope')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('stdDev')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Std
+                                            {SortIcon('stdDev')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('mlAlpha')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             ML Alpha Proba
                                             {SortIcon('mlAlpha')}
@@ -572,6 +657,11 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             />
                                             {row.symbol}
                                         </TableCell>
+                                        <TableCell className="text-right font-mono font-semibold">{row.currentPriceStr}</TableCell>
+                                        <TableCell className={`text-right font-mono ${row.slope !== null && row.slope > 0 ? 'text-emerald-500 font-semibold' : row.slope !== null && row.slope < 0 ? 'text-red-500 font-semibold' : ''}`}>
+                                            {row.slopeStr}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">{row.stdDevStr}</TableCell>
                                         <TableCell className="text-right font-mono">{row.mlAlphaStr}</TableCell>
                                         <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.strategyValueStr}</TableCell>

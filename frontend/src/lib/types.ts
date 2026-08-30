@@ -134,3 +134,27 @@ export interface PortfolioAnalysisResponse {
   items: StockAnalysisItem[];
   status: string;
 }
+
+export interface CallOptionIndicatorDetail {
+  positive: boolean;
+  value_str: string;
+  details: string;
+}
+
+export interface TickerCallStats {
+  symbol: string;
+  index_source: string;
+  stock_price: number;
+  positive_count: number;
+  total_indicators: number;
+  score_pct: number;
+  indicators: Record<string, CallOptionIndicatorDetail>;
+}
+
+export interface CallOptionStatsResponse {
+  timestamp: string;
+  total_tickers: number;
+  items: TickerCallStats[];
+  status: string;
+}
+

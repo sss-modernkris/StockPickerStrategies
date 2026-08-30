@@ -6,6 +6,7 @@ import datetime
 import pandas as pd
 import numpy as np
 import yfinance as yf
+from scipy.stats import norm
 from strategies.willy_algo import calculate_willy_vwap
 
 def norm_cdf(x: float) -> float:

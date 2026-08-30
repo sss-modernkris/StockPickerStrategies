@@ -1,8 +1,14 @@
-# Project Changes Summary (v20260411)
+# Project Changes Summary (v20260828)
 
-This document summarizes the enhancements and synchronization tasks completed during this development session, focused on both the **Strategic Alpha Dashboard** and the **Financial ETL Pipeline**.
+This document summarizes the enhancements and synchronization tasks completed for the **Strategic Alpha Dashboard**.
 
-## 1. Strategic Alpha Dashboard (411x)
+## 1. Release v20260828 Updates
+- **Version Tag Update**: Updated system version to `v20260828` across `README.md`, `TickerSidebar.tsx`, `page.tsx`, and project documentation.
+- **Compare Charts Matrix Expansion**: Added `Current Price`, OLS `Linear Fit Slope` ($m$), and `Residual Standard Deviation` ($\text{Std}$) columns to the summary table with interactive sorting and dynamic period recalculation.
+- **Strategy Glossary Options Significance Block**: Added a full-width featured section to `StrategyGlossary.tsx` explaining the quantitative significance of Current Price, Linear Fit Slope, and Residual Standard Deviation for Call Option buyers.
+- **Options Data & Option Greeks Engine**: Enhanced `get_options_data` in Top Tickers tab to calculate and save full Option Greeks (Delta, Gamma, Theta, Vega, Rho for Call & Put across 1W, 2W, and 3W expirations) to `OptionsData.csv`.
+
+## 2. Strategic Alpha Dashboard (411x)
 
 ### Feature Synchronizations (from v405)
 - **Paper Study Page**: Restored full feature parity, including the interactive transaction ledger and color-coded P&L tracking. Stripped all Interactive Brokers (IB) dependencies to maintain a standalone simulation environment.

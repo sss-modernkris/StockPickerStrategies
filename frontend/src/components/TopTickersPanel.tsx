@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '@/lib/api';
 import { TickerAnalysis } from '@/lib/types';
 import { ComparisonTable, runWillyBacktest } from './ComparisonTable';
+import { CallOptionStatsModal } from './CallOptionStatsModal';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, Info, Check } from 'lucide-react';
+import { Loader2, TrendingUp, Info, Check, Flame } from 'lucide-react';
 
 interface TopTickersPanelProps {
   analysisData: Record<string, TickerAnalysis>;
@@ -23,6 +24,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [indexTickers, setIndexTickers] = useState<string[]>([]);
   const [loadingTickers, setLoadingTickers] = useState<boolean>(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
+  const [showCallStatsModal, setShowCallStatsModal] = useState<boolean>(false);
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +66,33 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [csvSavingOptions, setCsvSavingOptions] = useState<boolean>(false);
   const [csvSaveSuccessOptions, setCsvSaveSuccessOptions] = useState<boolean>(false);
   const [optionsExitMode, setOptionsExitMode] = useState<string>('intraday_2');
+
+  // Options Data Generator State Variables
+  const [optionsDataLoading, setOptionsDataLoading] = useState<boolean>(false);
+  const [optionsDataResult, setOptionsDataResult] = useState<any>(null);
+  const [optionsDataError, setOptionsDataError] = useState<string | null>(null);
+
+  const fetchOptionsData = async () => {
+    setOptionsDataLoading(true);
+    setOptionsDataError(null);
+    setOptionsDataResult(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/get-options-data`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || `Request failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      setOptionsDataResult(data);
+    } catch (err: any) {
+      console.error("Options data fetch error:", err);
+      setOptionsDataError(err.message || "Failed to fetch options data.");
+    } finally {
+      setOptionsDataLoading(false);
+    }
+  };
 
   // Use a ref to keep track of the active request combination key to prevent race conditions/overlapping states
   const activeFilesKeyRef = useRef<string>(selectedFiles.sort().join(','));
@@ -783,18 +812,93 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               })}
             </div>
 
-            {!loadingTickers && !loadingAnalysis && indexTickers.length > 0 && (
+            <div className="flex items-center gap-2">
+              {!loadingTickers && !loadingAnalysis && indexTickers.length > 0 && (
+                <Button
+                  onClick={runScreen}
+                  size="sm"
+                  variant="outline"
+                  className="rounded-md border-primary/30 hover:bg-primary/10 text-primary font-bold px-4 shadow-sm"
+                >
+                  Run Buy Screen
+                </Button>
+              )}
+
               <Button
-                onClick={runScreen}
+                onClick={fetchOptionsData}
+                disabled={optionsDataLoading}
                 size="sm"
                 variant="outline"
-                className="rounded-md border-primary/30 hover:bg-primary/10 text-primary font-bold px-4 shadow-sm"
+                className="rounded-md border-indigo-500/40 hover:bg-indigo-500/10 text-indigo-400 font-bold px-4 shadow-sm flex items-center gap-2"
               >
-                Run Buy Screen
+                {optionsDataLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Fetching Options Data...
+                  </>
+                ) : (
+                  <>Get Options Data</>
+                )}
               </Button>
-            )}
+
+              <Button
+                onClick={() => setShowCallStatsModal(true)}
+                size="sm"
+                variant="outline"
+                className="rounded-md border-amber-500/40 hover:bg-amber-500/10 text-amber-400 font-bold px-4 shadow-sm flex items-center gap-1.5"
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                Call Option Stats
+              </Button>
+            </div>
           </div>
         </div>
+
+        <CallOptionStatsModal
+          isOpen={showCallStatsModal}
+          onClose={() => setShowCallStatsModal(false)}
+        />
+
+        {/* Options Data Feedback Banner */}
+        {optionsDataLoading && (
+          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-indigo-300 text-sm flex items-center gap-3 animate-pulse">
+            <Loader2 className="w-4 h-4 animate-spin text-indigo-400 flex-shrink-0" />
+            <span>Fetching 1W, 2W, and 3W Call & Put options data for Dow 30, Nasdaq 100, and S&P 500 constituents...</span>
+          </div>
+        )}
+
+        {optionsDataResult && (
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-sm flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>
+                <strong>{optionsDataResult.message}</strong> Saved to <code className="bg-emerald-950/60 px-1.5 py-0.5 rounded font-mono text-xs text-emerald-200">OptionsData.csv</code> at {optionsDataResult.timestamp}.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOptionsDataResult(null)}
+              className="h-6 px-2 text-xs text-emerald-400 hover:text-emerald-200"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {optionsDataError && (
+          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm flex items-center justify-between gap-3">
+            <span><strong>Options Data Error:</strong> {optionsDataError}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOptionsDataError(null)}
+              className="h-6 px-2 text-xs text-destructive hover:text-destructive/80"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
 
         {/* Strategy Backtesting Controls */}
         {indexTickers.length > 0 && (

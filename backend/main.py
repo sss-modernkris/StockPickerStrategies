@@ -3,12 +3,14 @@ from typing import List, Optional
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest, CallOptionStatsResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
 from services.rh_client import RHClient
 from services.backtester import execute_30d_backtest, execute_options_backtest
+from services.options_service import generate_and_save_options_data
+from services.call_option_stats_service import generate_call_option_stats
 from services.email_service import send_email_with_attachment
 import csv
 import os
@@ -867,3 +869,32 @@ def get_options_backtest(period: str = "1m", exit_mode: str = "intraday_2"):
         raise HTTPException(status_code=500, detail=f"Options backtest execution failed: {str(e)}")
 
 
+@app.post("/api/get-options-data")
+@app.get("/api/get-options-data")
+def get_options_data():
+    """
+    Fetches 1W, 2W, and 3W Call & Put options data for all tickers in Dow 30, Nasdaq 100, and S&P 500.
+    Logs output in Format A schema to OptionsData.csv.
+    """
+    try:
+        res = generate_and_save_options_data()
+        if res.get("status") == "error":
+            raise HTTPException(status_code=500, detail=res.get("message"))
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate options data: {str(e)}")
+
+
+@app.get("/api/call-option-stats", response_model=CallOptionStatsResponse)
+def get_call_option_stats():
+    """
+    Evaluates 14 quantitative Call Option indicators for all constituent tickers of Dow 30, Nasdaq 100, and S&P 500.
+    Returns ranked TickerCallStats matrix with +ve indicator counts in Column 1.
+    """
+    try:
+        res = generate_call_option_stats()
+        if res.status == "error":
+            raise HTTPException(status_code=500, detail="Failed to evaluate Call Option Stats.")
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Call Option Stats evaluation failed: {str(e)}")
