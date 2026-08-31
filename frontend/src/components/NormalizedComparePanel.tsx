@@ -160,7 +160,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             // Default raw numerical values for sorting (null if missing)
             let currentPrice: number | null = null;
             let slope: number | null = null;
+            let slopePct: number | null = null;
             let stdDev: number | null = null;
+            let stdDevPct: number | null = null;
             let mlAlpha: number | null = null;
             let stratAvg: number | null = null;
             let macdHist: number | null = null;
@@ -171,7 +173,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             // Formatted string representations for UI
             let currentPriceStr = 'N/A';
             let slopeStr = 'N/A';
+            let slopePctStr = 'N/A';
             let stdDevStr = 'N/A';
+            let stdDevPctStr = 'N/A';
             let mlAlphaStr = 'N/A';
             let stratAvgStr = 'N/A';
             let macdHistStr = 'N/A';
@@ -227,6 +231,17 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         stdDevStr = stdDev.toFixed(2);
                     }
                 }
+
+                if (currentPrice !== null && currentPrice > 0) {
+                    if (slope !== null) {
+                        slopePct = (slope * 100) / currentPrice;
+                        slopePctStr = (slopePct >= 0 ? '+' : '') + slopePct.toFixed(2) + '%';
+                    }
+                    if (stdDev !== null) {
+                        stdDevPct = (stdDev * 100) / currentPrice;
+                        stdDevPctStr = stdDevPct.toFixed(2) + '%';
+                    }
+                }
             } else if (tData?.price_history && tData.price_history.length > 0) {
                 const latest = tData.price_history[tData.price_history.length - 1];
                 currentPrice = latest.close;
@@ -272,8 +287,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 currentPriceStr,
                 slope,
                 slopeStr,
+                slopePct,
+                slopePctStr,
                 stdDev,
                 stdDevStr,
+                stdDevPct,
+                stdDevPctStr,
                 mlAlpha,
                 mlAlphaStr,
                 stratAvg,
@@ -598,6 +617,18 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('slopePct')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Slope %
+                                            {SortIcon('slopePct')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('stdDevPct')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Std %
+                                            {SortIcon('stdDevPct')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('slope')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             Slope
                                             {SortIcon('slope')}
@@ -658,6 +689,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             {row.symbol}
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.currentPriceStr}</TableCell>
+                                        <TableCell className={`text-right font-mono ${row.slopePct !== null && row.slopePct > 0 ? 'text-emerald-500 font-semibold' : row.slopePct !== null && row.slopePct < 0 ? 'text-red-500 font-semibold' : ''}`}>
+                                            {row.slopePctStr}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono text-muted-foreground font-semibold">
+                                            {row.stdDevPctStr}
+                                        </TableCell>
                                         <TableCell className={`text-right font-mono ${row.slope !== null && row.slope > 0 ? 'text-emerald-500 font-semibold' : row.slope !== null && row.slope < 0 ? 'text-red-500 font-semibold' : ''}`}>
                                             {row.slopeStr}
                                         </TableCell>

@@ -99,6 +99,9 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
     } else if (sortField === 'stock_price') {
       valA = a.stock_price;
       valB = b.stock_price;
+    } else if (['slope_1w', 'std_1w', 'slope_2w', 'slope_2w_pct', 'std_2w', 'std_2w_pct', 'slope_4w', 'std_4w'].includes(sortField)) {
+      valA = (a as any)[sortField] ?? -999999;
+      valB = (b as any)[sortField] ?? -999999;
     } else if (sortField === 'score_pct') {
       valA = a.score_pct;
       valB = b.score_pct;
@@ -133,6 +136,14 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
         "Ticker",
         "Index Source",
         "Stock Price ($)",
+        "2W Slope %",
+        "2W Std %",
+        "1W Slope",
+        "1W Std",
+        "2W Slope",
+        "2W Std",
+        "4W Slope",
+        "4W Std",
         ...INDICATOR_KEYS.map(i => i.label)
       ];
 
@@ -150,6 +161,14 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
           item.symbol,
           item.index_source,
           item.stock_price.toFixed(2),
+          item.slope_2w_pct !== undefined && item.slope_2w_pct !== null ? (item.slope_2w_pct >= 0 ? `+${item.slope_2w_pct.toFixed(2)}%` : `${item.slope_2w_pct.toFixed(2)}%`) : 'N/A',
+          item.std_2w_pct !== undefined && item.std_2w_pct !== null ? `${item.std_2w_pct.toFixed(2)}%` : 'N/A',
+          item.slope_1w !== undefined && item.slope_1w !== null ? (item.slope_1w >= 0 ? `+${item.slope_1w.toFixed(4)}` : item.slope_1w.toFixed(4)) : 'N/A',
+          item.std_1w !== undefined && item.std_1w !== null ? item.std_1w.toFixed(2) : 'N/A',
+          item.slope_2w !== undefined && item.slope_2w !== null ? (item.slope_2w >= 0 ? `+${item.slope_2w.toFixed(4)}` : item.slope_2w.toFixed(4)) : 'N/A',
+          item.std_2w !== undefined && item.std_2w !== null ? item.std_2w.toFixed(2) : 'N/A',
+          item.slope_4w !== undefined && item.slope_4w !== null ? (item.slope_4w >= 0 ? `+${item.slope_4w.toFixed(4)}` : item.slope_4w.toFixed(4)) : 'N/A',
+          item.std_4w !== undefined && item.std_4w !== null ? item.std_4w.toFixed(2) : 'N/A',
           ...indCols
         ].map(v => `"${v}"`).join(','));
       });
@@ -184,11 +203,11 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
             <div className="flex items-center gap-2">
               <Flame className="w-6 h-6 text-amber-500" />
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                Call Option Stats Matrix (14 Indicators)
+                Call Option Stats Matrix (14 Indicators + 1W/2W/4W Linear Fit Metrics)
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Evaluates 14 quantitative call option checklist indicators across Dow 30, Nasdaq 100, and S&P 500 constituents. Column 1 shows total positive (<code className="text-amber-400 font-mono">+ve</code>) indicators.
+              Evaluates 14 quantitative call option checklist indicators and 1W, 2W, and 4W closing price slopes (slope m) &amp; linear fit standard deviations (std) across Dow 30, Nasdaq 100, and S&amp;P 500 constituents.
             </p>
           </div>
 
@@ -276,7 +295,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
           ) : sortedData.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
               <ShieldCheck className="w-10 h-10 text-muted-foreground/40" />
-              <p>No tickers match the selected search & filter criteria.</p>
+              <p>No tickers match the selected search &amp; filter criteria.</p>
             </div>
           ) : (
             <div className="flex flex-col border border-border rounded-lg overflow-hidden shadow-xs">
@@ -287,7 +306,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                 className="overflow-x-auto bg-amber-500/15 border-b border-amber-500/30 p-1 flex items-center shrink-0 z-30"
                 style={{ overflowY: 'hidden' }}
               >
-                <div className="h-2.5 min-w-[1850px] bg-amber-500/30 rounded-full" />
+                <div className="h-2.5 min-w-[2550px] bg-amber-500/30 rounded-full" />
               </div>
 
               <div
@@ -295,7 +314,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                 onScroll={handleTableScroll}
                 className="overflow-x-auto max-h-[calc(90vh-250px)] overflow-y-auto"
               >
-                <table className="w-full text-xs text-left border-collapse min-w-[1850px]">
+                <table className="w-full text-xs text-left border-collapse min-w-[2550px]">
                   <thead className="bg-muted/90 sticky top-0 z-40 text-[11px] font-mono uppercase text-muted-foreground backdrop-blur-md">
                     <tr>
                       {/* FIRST COLUMN: How many indicators are +ve for call options (Sticky Left) */}
@@ -315,7 +334,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                         onClick={() => handleSort('symbol')}
                         className="p-3 font-bold border-b border-r cursor-pointer hover:bg-muted/70 transition-colors sticky left-28 z-50 bg-card shadow-sm w-36"
                       >
-                        Ticker & Index
+                        Ticker &amp; Index
                       </th>
 
                       <th
@@ -323,6 +342,95 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                         className="p-3 font-bold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
                       >
                         Price ($)
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_2w_pct')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24 text-amber-400/90"
+                        title="2-Week Closing Price Slope Percentage (slope_2w * 100 / Price)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>2W Slope %</span>
+                          {sortField === 'slope_2w_pct' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_2w_pct')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24 text-amber-400/90"
+                        title="2-Week Standard Deviation Percentage (std_2w * 100 / Price)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>2W Std %</span>
+                          {sortField === 'std_2w_pct' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      {/* 1W, 2W, 4W SLOPE & STD DEV METRICS */}
+                      <th
+                        onClick={() => handleSort('slope_1w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="1-Week Closing Price Slope (5 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>1W Slope</span>
+                          {sortField === 'slope_1w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_1w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="1-Week Linear Fit Standard Deviation (5 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>1W Std</span>
+                          {sortField === 'std_1w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_2w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="2-Week Closing Price Slope (10 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>2W Slope</span>
+                          {sortField === 'slope_2w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_2w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="2-Week Linear Fit Standard Deviation (10 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>2W Std</span>
+                          {sortField === 'std_2w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_4w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="4-Week Closing Price Slope (20 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>4W Slope</span>
+                          {sortField === 'slope_4w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_4w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="4-Week Linear Fit Standard Deviation (20 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>4W Std</span>
+                          {sortField === 'std_4w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
                       </th>
 
                       {INDICATOR_KEYS.map(ik => (
@@ -376,6 +484,38 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                           {/* Stock Price */}
                           <td className="p-3 border-r text-right font-mono font-semibold text-foreground">
                             ${row.stock_price.toFixed(2)}
+                          </td>
+
+                          {/* 2W Slope % */}
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_2w_pct !== undefined && row.slope_2w_pct !== null && row.slope_2w_pct > 0 ? 'text-emerald-400' : row.slope_2w_pct !== undefined && row.slope_2w_pct !== null && row.slope_2w_pct < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_2w_pct !== undefined && row.slope_2w_pct !== null ? (row.slope_2w_pct >= 0 ? `+${row.slope_2w_pct.toFixed(2)}%` : `${row.slope_2w_pct.toFixed(2)}%`) : '-'}
+                          </td>
+
+                          {/* 2W Std % */}
+                          <td className="p-2.5 border-r text-right font-mono font-semibold text-muted-foreground">
+                            {row.std_2w_pct !== undefined && row.std_2w_pct !== null ? `${row.std_2w_pct.toFixed(2)}%` : '-'}
+                          </td>
+
+                          {/* 1W, 2W, 4W SLOPE & STD DEV VALUES */}
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_1w !== undefined && row.slope_1w !== null && row.slope_1w > 0 ? 'text-emerald-400' : row.slope_1w !== undefined && row.slope_1w !== null && row.slope_1w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_1w !== undefined && row.slope_1w !== null ? (row.slope_1w >= 0 ? `+${row.slope_1w.toFixed(4)}` : row.slope_1w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_1w !== undefined && row.std_1w !== null ? row.std_1w.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_2w !== undefined && row.slope_2w !== null && row.slope_2w > 0 ? 'text-emerald-400' : row.slope_2w !== undefined && row.slope_2w !== null && row.slope_2w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_2w !== undefined && row.slope_2w !== null ? (row.slope_2w >= 0 ? `+${row.slope_2w.toFixed(4)}` : row.slope_2w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_2w !== undefined && row.std_2w !== null ? row.std_2w.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_4w !== undefined && row.slope_4w !== null && row.slope_4w > 0 ? 'text-emerald-400' : row.slope_4w !== undefined && row.slope_4w !== null && row.slope_4w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_4w !== undefined && row.slope_4w !== null ? (row.slope_4w >= 0 ? `+${row.slope_4w.toFixed(4)}` : row.slope_4w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_4w !== undefined && row.std_4w !== null ? row.std_4w.toFixed(2) : '-'}
                           </td>
 
                           {/* 14 Indicators */}

@@ -15,7 +15,8 @@ import {
     Gauge,
     Search,
     Flame,
-    Building2
+    Building2,
+    Percent
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -951,6 +952,80 @@ export function StrategyGlossary() {
                     </div>
                 </div>
             )
+        },
+        {
+            id: "percentage-slope-std-metrics",
+            icon: <Percent className="w-5 h-5 text-amber-400" />,
+            title: "Normalized Percentage Metrics: Slope % & Std %",
+            badge: "Normalized Volatility & Velocity",
+            description: "Detailed mathematical breakdown of computation and strategic significance of Slope % and Std % metrics in the Compare Charts tab and Call Option Stats Matrix.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Overview Box */}
+                    <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg text-xs space-y-2">
+                        <p className="font-semibold text-amber-400 text-sm">Why Normalization Matters (Percentage vs Dollar Scale):</p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            Raw linear fit slope (slope m, in dollars/day) and standard deviation (residual std dev, in dollars) depend directly on a stock&apos;s share price. A $5/day slope on a $500 stock represents a 1% daily move, whereas a $5/day slope on a $50 stock represents a 10% daily move. Expressing both slope and standard deviation as a percentage of the current share price (S₀) normalizes all securities on an equal footing, enabling cross-asset comparisons across stocks of vastly different prices.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Slope % */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>1. Slope % (Linear Fit Slope Percentage)</span>
+                            <span className="text-xs font-mono font-normal text-amber-400">Slope % = (Slope × 100) / Current Price</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-lg space-y-3 text-xs sm:text-sm">
+                            <div>
+                                <h5 className="font-semibold text-foreground">Computation Method:</h5>
+                                <p className="text-muted-foreground mt-1 leading-relaxed">
+                                    Calculated by taking the Ordinary Least Squares (OLS) linear regression slope m (dollar change per trading day over the selected timeframe, e.g., 2W or custom period) and dividing by the current closing stock price S₀, multiplied by 100:
+                                </p>
+                                <div className="bg-muted p-2.5 rounded-md font-mono text-xs text-center my-2 text-foreground font-semibold">
+                                    Slope % = ( slope × 100 ) / stock_price
+                                </div>
+                            </div>
+
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-md space-y-1.5 text-xs">
+                                <p className="font-semibold text-emerald-400">Strategic Significance:</p>
+                                <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+                                    <li><strong className="text-foreground">Cross-Asset Velocity Comparison:</strong> Allows traders to rank constituents of Dow 30, Nasdaq 100, and S&amp;P 500 by true percentage trend momentum regardless of whether the stock trades at $20 or $2,000.</li>
+                                    <li><strong className="text-foreground">Theta Coverage Ratio:</strong> In option buying, positive Slope % must outpace the option&apos;s daily percentage theta decay ((Theta / Premium) × 100) to guarantee net positive return.</li>
+                                    <li><strong className="text-foreground">2W Slope % (Call Option Matrix):</strong> Evaluates short-term 10-day linear momentum. Tickers with 2W Slope % &gt; +0.5% show rapid upside trend velocity ideal for 14-day to 30-day Call options.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Std % */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>2. Std % (Linear Fit Standard Deviation Percentage)</span>
+                            <span className="text-xs font-mono font-normal text-amber-400">Std % = (Std × 100) / Current Price</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-lg space-y-3 text-xs sm:text-sm">
+                            <div>
+                                <h5 className="font-semibold text-foreground">Computation Method:</h5>
+                                <p className="text-muted-foreground mt-1 leading-relaxed">
+                                    Calculated by taking the residual standard deviation (sigma_res) around the linear regression trendline over the observation window and dividing by the current closing price S₀, multiplied by 100:
+                                </p>
+                                <div className="bg-muted p-2.5 rounded-md font-mono text-xs text-center my-2 text-foreground font-semibold">
+                                    Std % = ( std × 100 ) / stock_price
+                                </div>
+                            </div>
+
+                            <div className="bg-purple-500/10 border border-purple-500/30 p-3 rounded-md space-y-1.5 text-xs">
+                                <p className="font-semibold text-purple-400">Strategic Significance:</p>
+                                <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+                                    <li><strong className="text-foreground">Normalized Noise &amp; Volatility:</strong> Measures structural dispersion around the trendline as a percentage of stock price. A low Std % (&lt; 1.5%) indicates a smooth, tight trend channel; a high Std % (&gt; 3.0%) indicates choppy, noisy price action.</li>
+                                    <li><strong className="text-foreground">Risk-Adjusted Trend Efficiency (Slope % / Std % Ratio):</strong> Dividing Slope % by Std % produces a trend efficiency ratio (similar to a Sharpe ratio). Higher ratios signal high-conviction, low-noise momentum suitable for call buying.</li>
+                                    <li><strong className="text-foreground">2W Std % (Call Option Matrix):</strong> Provides option buyers with a quick gauge of price dispersion over 10 trading days. Paired with 2W Slope %, it reveals whether price advances are steady or wildly volatile.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -965,6 +1040,7 @@ export function StrategyGlossary() {
             (item.id === 'danaher-fundamental-data' && "Danaher Corporation Fundamental Trading Data Company Profile Valuation Metrics Financial Highlights Trading Information Beta Forward P/E Market Cap Revenue FCF Margin Short Name Long Name Sector Industry Exchange Country Website Debt".toLowerCase().includes(query)) ||
             (item.id === 'call-option-stats-matrix' && "Call Option Stats Matrix 14 Indicators Checklist Trend Support Volume RSI MACD ATR RS SPY Spread Delta Theta Earnings Expected Move".toLowerCase().includes(query)) ||
             (item.id === 'compare-charts-linear-fit' && "Compare Matrix Indicators Call Option Significance Current Price Linear Fit Slope Standard Deviation Residual Volatility Strike Selection Delta Theta".toLowerCase().includes(query)) ||
+            (item.id === 'percentage-slope-std-metrics' && "Normalized Percentage Metrics Slope Percent Std Percent Slope % Std % Compare Charts Call Option Stats Matrix Linear Fit Trend Velocity Volatility Ratio".toLowerCase().includes(query)) ||
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
