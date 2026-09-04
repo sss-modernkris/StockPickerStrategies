@@ -1026,6 +1026,341 @@ export function StrategyGlossary() {
                     </div>
                 </div>
             )
+        },
+        {
+            id: "call-option-criteria-framework",
+            icon: <Gauge className="w-5 h-5 text-emerald-400" />,
+            title: "Call Option Criteria & Quant Selection Framework",
+            badge: "Options Strategy & Backtesting",
+            description: "Comprehensive quantitative framework for picking Call Option criteria: addressing stock prediction vs. option profit mismatch, indicator limitations, log-price regression modeling, 10-factor stock & 9-factor option selection criteria, option pricing & volatility expected move comparison, 3-stage screening sequence with exit rules, and rigorous backtesting requirements.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Section 0: Core Problem & Mismatch */}
+                    <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-lg space-y-3">
+                        <div className="flex items-center gap-2 text-rose-400 font-semibold text-base">
+                            <ShieldAlert className="w-5 h-5" />
+                            <span>The Fundamental Problem: Stock Forecast vs. Option Profit Mismatch</span>
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed text-xs sm:text-sm">
+                            The most important problem is that <strong className="text-foreground">you are predicting the stock, while your profit comes from the option</strong>. A stock can rise and the call can still lose money because of time decay, excessive implied volatility, or a wide bid–ask spread.
+                        </p>
+                        <div className="bg-muted/80 p-3 rounded-md border border-border/50 text-center font-mono text-xs text-foreground font-semibold">
+                            ΔC ≈ Δ · ΔS + ½ Γ (ΔS)² + Vega · ΔIV + Theta · Δt
+                        </div>
+                        <div>
+                            <p className="font-semibold text-foreground text-xs mb-1.5">Why a correct stock forecast can still lose:</p>
+                            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                <li className="bg-card/60 p-2 rounded border border-border/40"><strong className="text-foreground">1. Slow Upside:</strong> Stock rises too slowly to outpace daily time decay.</li>
+                                <li className="bg-card/60 p-2 rounded border border-border/40"><strong className="text-foreground">2. Theta Dominance:</strong> Theta removes more value daily than Delta adds.</li>
+                                <li className="bg-card/60 p-2 rounded border border-border/40"><strong className="text-foreground">3. IV Crush:</strong> Implied volatility declines after purchase, collapsing Vega value.</li>
+                                <li className="bg-card/60 p-2 rounded border border-border/40"><strong className="text-foreground">4. High Slippage:</strong> Paid a large bid–ask spread on entry or exit.</li>
+                                <li className="col-span-1 sm:col-span-2 bg-card/60 p-2 rounded border border-border/40"><strong className="text-foreground">5. Expected Move Shortfall:</strong> The stock rises, but not as much as the option market expected and priced in.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Section 1: Evaluation of Current Indicators & Weaknesses */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>1. What Current Trend Indicators Measure &amp; Their 3 Weaknesses</span>
+                            <span className="text-xs font-mono font-normal text-sky-400">P_t = α + β·t + ε_t</span>
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Linear regression models fit <code className="bg-muted px-1 rounded font-mono text-xs">P_t = α + β·t + ε_t</code> where <strong>Slope β</strong> indicates recent trend direction/speed and <strong>Residual Std Dev (ε_t)</strong> measures trend smoothness. High positive slope + low residual deviation indicates a strong, relatively smooth recent rise. However, this has 3 critical weaknesses:
+                        </p>
+                        <div className="space-y-3 text-xs sm:text-sm">
+                            {/* Weakness 1 */}
+                            <div className="bg-card border border-border/50 p-3.5 rounded-lg space-y-1.5">
+                                <h5 className="font-semibold text-amber-400 text-xs flex items-center gap-1.5">
+                                    <span>Weakness 1: 10 Observations Are Insufficiently Stable</span>
+                                </h5>
+                                <p className="text-muted-foreground text-xs leading-relaxed">
+                                    Two weeks provides only ~10 closing prices. One unusually strong or weak day can change the slope substantially.
+                                </p>
+                                <div className="bg-muted/50 p-2 rounded text-xs text-foreground font-medium">
+                                    <strong>Remedy:</strong> Use the 2-week slope as a short-term indicator, but confirm it using <strong>20 trading days</strong>, <strong>50 or 60 trading days</strong>, and <strong>Market/Sector performance</strong>.
+                                </div>
+                            </div>
+
+                            {/* Weakness 2 */}
+                            <div className="bg-card border border-border/50 p-3.5 rounded-lg space-y-1.5">
+                                <h5 className="font-semibold text-amber-400 text-xs flex items-center gap-1.5">
+                                    <span>Weakness 2: Raw Slope Cannot Fairly Compare Differently Priced Stocks</span>
+                                </h5>
+                                <p className="text-muted-foreground text-xs leading-relaxed">
+                                    Consider: A $20 stock rising $0.10 daily = <strong>0.50% daily</strong> vs. a $500 stock rising $0.50 daily = <strong>0.10% daily</strong>. The second stock has a larger dollar slope, but the first has a much stronger percentage trend.
+                                </p>
+                                <div className="bg-muted/50 p-2.5 rounded space-y-1 font-mono text-xs text-foreground">
+                                    <div className="text-center font-semibold">Regress Logarithm of Adjusted Prices: ln(P_t) = α + β·t + ε_t</div>
+                                    <div className="text-center text-sky-400">Projected 10-Trading-Day % Return = e^(10β) − 1</div>
+                                </div>
+                                <p className="text-xs text-muted-foreground italic">
+                                    Log regression makes trend slopes directly comparable across tickers of any price level.
+                                </p>
+                            </div>
+
+                            {/* Weakness 3 */}
+                            <div className="bg-card border border-border/50 p-3.5 rounded-lg space-y-1.5">
+                                <h5 className="font-semibold text-amber-400 text-xs flex items-center gap-1.5">
+                                    <span>Weakness 3: Residual Deviation Measures Smoothness—Not Future Direction</span>
+                                </h5>
+                                <p className="text-muted-foreground text-xs leading-relaxed">
+                                    A low residual standard deviation means the previous trend was smooth. It does not guarantee that the trend will continue.
+                                </p>
+                                <div className="bg-muted/50 p-2.5 rounded font-mono text-xs text-center text-emerald-400 font-semibold">
+                                    Trend Score = ( Projected 10-Day Return ) / ( Residual Standard Deviation )
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Add either a <strong>Slope t-statistic</strong>, <strong>R²</strong>, or a <strong>Trend signal-to-noise ratio</strong>. A slope t-statistic is usually better than slope alone, although ordinary regression statistics should not be treated as exact probabilities for stock prices.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Recommended Stock-Selection Indicators */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">2. Recommended Stock-Selection Indicators</h4>
+                        <p className="text-xs text-muted-foreground">Use your regression signal together with the following 10 factors:</p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-2.5 w-1/3">Factor</th>
+                                        <th className="p-2.5 w-2/3">What to Look For</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20 text-xs">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">20-day trend</td>
+                                        <td className="p-2.5 text-muted-foreground">Positive log-price slope</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">60-day trend</td>
+                                        <td className="p-2.5 text-muted-foreground">Positive or at least not strongly negative</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Trend confidence</td>
+                                        <td className="p-2.5 text-muted-foreground">Positive slope with relatively high R² or slope t-statistic</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Moving averages</td>
+                                        <td className="p-2.5 text-muted-foreground">Price above rising 20-day and 50-day averages</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Relative strength</td>
+                                        <td className="p-2.5 text-muted-foreground">Stock outperforming SPY and its sector ETF</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Volume</td>
+                                        <td className="p-2.5 text-muted-foreground">Up days or breakouts supported by above-average volume</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Resistance</td>
+                                        <td className="p-2.5 text-muted-foreground">Sufficient room between current price and next resistance</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">ATR</td>
+                                        <td className="p-2.5 text-muted-foreground">Enough normal movement to reach your price target</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Market condition</td>
+                                        <td className="p-2.5 text-muted-foreground">Favorable S&amp;P 500 and sector trend</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Events</td>
+                                        <td className="p-2.5 text-muted-foreground">Earnings and other major announcements identified</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Relative Strength Deep Dive */}
+                        <div className="bg-sky-500/10 border border-sky-500/30 p-4 rounded-lg space-y-2 text-xs">
+                            <h5 className="font-semibold text-sky-400 text-sm">Relative Strength is Particularly Useful</h5>
+                            <p className="text-muted-foreground">Calculate 20-day relative strength differential:</p>
+                            <div className="bg-muted p-2 rounded font-mono text-center text-foreground font-semibold">
+                                RS₂₀ = R_(stock, 20) − R_(SPY, 20)
+                            </div>
+                            <p className="text-muted-foreground leading-relaxed">
+                                Also compare the stock with its sector ETF. For example, a semiconductor stock should ideally outperform both <strong>SPY</strong> and <strong>SMH</strong> (or another appropriate semiconductor benchmark). A stock rising 3% while its sector rises 7% is showing relative weakness even though its slope is positive.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Option-Selection Layer */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">3. Option-Selection Layer</h4>
+                        <p className="text-xs text-muted-foreground">After identifying a strong stock, evaluate the actual option contract:</p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-2.5 w-1/3">Option Factor</th>
+                                        <th className="p-2.5 w-2/3">Practical Starting Preference</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20 text-xs">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Expiration</td>
+                                        <td className="p-2.5 text-muted-foreground">Approximately 21–35 days, even if holding for only two weeks</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Delta</td>
+                                        <td className="p-2.5 text-muted-foreground">Approximately 0.55–0.70</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Strike</td>
+                                        <td className="p-2.5 text-muted-foreground">At the money or slightly in the money</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Bid–ask spread</td>
+                                        <td className="p-2.5 text-muted-foreground">Ideally no more than 5%–10% of midpoint</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Open interest</td>
+                                        <td className="p-2.5 text-muted-foreground">Several hundred contracts or more</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Daily volume</td>
+                                        <td className="p-2.5 text-muted-foreground">Consistent activity in that contract</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Implied volatility</td>
+                                        <td className="p-2.5 text-muted-foreground">Not abnormally expensive</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Earnings</td>
+                                        <td className="p-2.5 text-muted-foreground">Avoid unless earnings risk is explicitly part of the strategy</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-semibold text-foreground">Theta</td>
+                                        <td className="p-2.5 text-muted-foreground">Acceptable relative to the option premium</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="bg-muted/40 p-3 rounded-lg border border-border/40 text-xs text-muted-foreground">
+                            <strong className="text-foreground font-semibold">Cboe Liquidity Guidance:</strong> Cboe identifies option volume, open interest, and bid–ask spread as the three principal liquidity measures.
+                        </div>
+
+                        {/* Why 21-35 days */}
+                        <div className="bg-purple-500/10 border border-purple-500/30 p-4 rounded-lg text-xs space-y-2">
+                            <h5 className="font-semibold text-purple-400 text-sm">Why 21–35 Days May Be Preferable</h5>
+                            <p className="text-muted-foreground leading-relaxed">
+                                If your planned holding period is up to two weeks, buying an option with exactly 14 days remaining leaves little room for error. Theta accelerates near expiration. Buying 21–35 days and selling within your two-week window usually provides:
+                            </p>
+                            <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+                                <li>Less severe daily time decay</li>
+                                <li>Additional time if the stock moves slowly</li>
+                                <li>Better ability to exit before the final week</li>
+                            </ul>
+                            <p className="text-muted-foreground italic pt-1 border-t border-purple-500/20">
+                                Note: It costs more premium upfront, so this choice should still be tested against your 14-day approach in backtests.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 4: Forecast vs Market Implied Move */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">4. Compare Your Forecast with the Option Market’s Forecast</h4>
+                        <p className="text-xs text-muted-foreground">Approximate the option-implied expected price move:</p>
+                        <div className="bg-muted p-3 rounded-md font-mono text-xs text-center text-foreground font-semibold">
+                            Expected Move ≈ P × IV × √(DTE / 365)
+                        </div>
+                        <div className="bg-card border border-border/50 p-4 rounded-lg text-xs space-y-2">
+                            <p className="font-semibold text-foreground">Worked Example (14 DTE):</p>
+                            <p className="text-muted-foreground">Suppose Stock Price = $100, IV = 36%, Days to Expiration (DTE) = 14:</p>
+                            <div className="bg-muted/70 p-2 rounded font-mono text-center text-amber-400 font-bold">
+                                100 × 0.36 × √(14 / 365) ≈ ±$7.05
+                            </div>
+                            <p className="text-muted-foreground leading-relaxed">
+                                The options market is approximately pricing a move of about ±$7.05, not necessarily upward. If your model forecasts only a $2 increase while the call premium reflects a much larger expected move, the call may be too expensive. Higher IV generally means a higher option premium. <em>(Fidelity expiration and volatility guidance)</em>.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 5: Stronger Screening Sequence & Exit Rules */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">5. Stronger Screening Sequence &amp; Exit Rules</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-lg space-y-2">
+                                <h5 className="font-semibold text-emerald-400 text-sm">Step 1: Stock Filter</h5>
+                                <ul className="space-y-1.5 text-muted-foreground">
+                                    <li>• Positive 20-day log-price slope</li>
+                                    <li>• Positive or neutral 60-day slope</li>
+                                    <li>• Positive relative strength vs SPY &amp; sector</li>
+                                    <li>• Price above rising 20D &amp; 50D averages</li>
+                                    <li>• Breakout / support bounce with high vol</li>
+                                    <li>• Reasonable upside to next resistance</li>
+                                    <li>• No earnings announcement during trade</li>
+                                </ul>
+                            </div>
+                            <div className="bg-blue-500/10 border border-blue-500/30 p-3.5 rounded-lg space-y-2">
+                                <h5 className="font-semibold text-blue-400 text-sm">Step 2: Option Filter</h5>
+                                <ul className="space-y-1.5 text-muted-foreground">
+                                    <li>• Select 21–35 DTE contracts</li>
+                                    <li>• Choose ~0.55–0.70 Delta</li>
+                                    <li>• Require narrow spread (≤5-10% mid)</li>
+                                    <li>• Require adequate volume &amp; open interest</li>
+                                    <li>• Reject expensive IV (unless strong catalyst)</li>
+                                    <li>• Compare forecast move vs implied move</li>
+                                </ul>
+                            </div>
+                            <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-lg space-y-2">
+                                <h5 className="font-semibold text-amber-400 text-sm">Step 3: Exit Rules</h5>
+                                <ul className="space-y-1.5 text-muted-foreground">
+                                    <li>• <strong>Profit target:</strong> 25%–40% gain</li>
+                                    <li>• <strong>Maximum loss:</strong> 20%–30% stop</li>
+                                    <li>• Exit on close below technical support</li>
+                                    <li>• Time stop if move fails in 3–5 trading days</li>
+                                    <li>• Exit before final 7 days to expiration</li>
+                                </ul>
+                                <p className="text-[10px] text-muted-foreground italic pt-1 border-t border-amber-500/20">
+                                    Percentages are backtest hypotheses—not universal rules.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 6: Backtesting Requirements & Bottom Line */}
+                    <div className="bg-card border border-border p-4.5 rounded-lg space-y-4 text-xs sm:text-sm">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">6. Backtesting Requirements &amp; Bottom Line</h4>
+                        <div className="space-y-2">
+                            <h5 className="font-semibold text-foreground text-xs">To know whether the strategy genuinely works, enforce these requirements:</h5>
+                            <ol className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground list-decimal pl-4">
+                                <li>Calculate signals strictly using point-in-time data available at trade generation.</li>
+                                <li>Enter on the following trading day, not at the same closing price used for the signal.</li>
+                                <li>Use historical option bid and ask prices for realistic entry/exit execution.</li>
+                                <li>Include realistic transaction commissions and bid–ask slippage.</li>
+                                <li>Include delisted stocks to avoid survivorship bias.</li>
+                                <li>Separate earnings trades from normal non-earnings trades.</li>
+                                <li>Use walk-forward testing rather than choosing parameters from the entire dataset.</li>
+                                <li>Test bullish, bearish, sideways, and high-volatility market periods.</li>
+                                <li>Compare performance against simple benchmarks (e.g. buying SPY calls or basic 20D momentum).</li>
+                            </ol>
+                        </div>
+
+                        <div className="bg-muted/50 p-3 rounded-lg border border-border/40 text-xs">
+                            <span className="font-semibold text-foreground">Core Metrics to Measure:</span> Average profit per trade, Median profit, Win rate, Average gain vs. average loss, Maximum drawdown, and Percentage of total profit generated by the top few trades.
+                        </div>
+
+                        {/* Bottom Line */}
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-lg space-y-2 text-xs">
+                            <h5 className="font-semibold text-emerald-400 text-sm">Bottom Line</h5>
+                            <p className="text-muted-foreground leading-relaxed">
+                                Keep your two-week slope and residual deviation, but treat them as only one part of the signal. The most useful additions are:
+                            </p>
+                            <p className="font-mono text-foreground font-semibold text-center bg-card/80 p-2 rounded border border-emerald-500/20">
+                                Normalized log-price slope + longer-term trend confirmation + relative strength + volume + resistance/ATR + option liquidity + implied-volatility valuation + Theta control.
+                            </p>
+                            <p className="text-foreground font-medium pt-1">
+                                <strong className="text-emerald-400">The highest-priority improvement</strong> is to backtest the specific options actually purchased, because good stock selection does not automatically produce profitable call-option selection.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -1041,6 +1376,7 @@ export function StrategyGlossary() {
             (item.id === 'call-option-stats-matrix' && "Call Option Stats Matrix 14 Indicators Checklist Trend Support Volume RSI MACD ATR RS SPY Spread Delta Theta Earnings Expected Move".toLowerCase().includes(query)) ||
             (item.id === 'compare-charts-linear-fit' && "Compare Matrix Indicators Call Option Significance Current Price Linear Fit Slope Standard Deviation Residual Volatility Strike Selection Delta Theta".toLowerCase().includes(query)) ||
             (item.id === 'percentage-slope-std-metrics' && "Normalized Percentage Metrics Slope Percent Std Percent Slope % Std % Compare Charts Call Option Stats Matrix Linear Fit Trend Velocity Volatility Ratio".toLowerCase().includes(query)) ||
+            (item.id === 'call-option-criteria-framework' && "Call Option Criteria Selection Framework Forecast Option Profit Mismatch Delta Gamma Vega Theta Time Decay Implied Volatility Log Price Slope Regression Relative Strength Liquidity Expected Move DTE Exit Rules Backtesting Requirements".toLowerCase().includes(query)) ||
             (item.id === 'xgboost' && "Dynamic Factor (XGBoost) Quantitative Machine Learning Predict Alpha".toLowerCase().includes(query)) ||
             (item.id === 'macd' && "MACD Moving Average Convergence Divergence Momentum Indicator".toLowerCase().includes(query)) ||
             (item.id === 'rsi' && "RSI Relative Strength Index Momentum Oscillator".toLowerCase().includes(query)) ||
@@ -1080,7 +1416,7 @@ export function StrategyGlossary() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredItems.map((item) => (
-                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
+                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
                             <CardHeader className="pb-3 border-b border-border/10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">

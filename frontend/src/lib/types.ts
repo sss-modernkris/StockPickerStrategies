@@ -157,6 +157,12 @@ export interface TickerCallStats {
   std_2w_pct?: number | null;
   slope_4w?: number | null;
   std_4w?: number | null;
+  slope_6w?: number | null;
+  std_6w?: number | null;
+  slope_3m?: number | null;
+  std_3m?: number | null;
+  slope_6m?: number | null;
+  std_6m?: number | null;
 }
 
 export interface CallOptionStatsResponse {

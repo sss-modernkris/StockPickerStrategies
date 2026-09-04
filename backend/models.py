@@ -154,6 +154,12 @@ class TickerCallStats(BaseModel):
     std_2w_pct: Optional[float] = None
     slope_4w: Optional[float] = None
     std_4w: Optional[float] = None
+    slope_6w: Optional[float] = None
+    std_6w: Optional[float] = None
+    slope_3m: Optional[float] = None
+    std_3m: Optional[float] = None
+    slope_6m: Optional[float] = None
+    std_6m: Optional[float] = None
 
 class CallOptionStatsResponse(BaseModel):
     timestamp: str

@@ -1,9 +1,14 @@
-# Project Changes Summary (v20260828)
+# Project Changes Summary (v20260904)
 
 This document summarizes the enhancements and synchronization tasks completed for the **Strategic Alpha Dashboard**.
 
-## 1. Release v20260828 Updates
-- **Version Tag Update**: Updated system version to `v20260828` across `README.md`, `TickerSidebar.tsx`, `page.tsx`, and project documentation.
+## 1. Release v20260904 Updates
+- **Version Tag Update**: Updated system version to `v20260904` across `README.md`, `TickerSidebar.tsx`, `page.tsx`, and project documentation.
+- **Call Option Stats Matrix Multi-Period Linear Fit**: Added timeframe selection (`1Wk`, `2Wk`, `4Wk`, `6Wk`, `3 months`, `6 months`) to compute Ordinary Least Squares (OLS) linear fit slope and standard deviation over 1-year history.
+- **Dynamic Trend Metrics**: Inserted 3 dynamic columns (**Trend**, **Slope %**, **Std %**) directly after Price ($) column in the Call Option Stats Matrix modal, calculated as:
+  - $\text{Slope \%} = \text{Slope} \times 100 / \text{Price}$
+  - $\text{Std \%} = \text{Std Dev} \times 100 / \text{Price}$
+  - $\text{Trend} = \text{Slope \%} / \text{Std \%}$
 - **Compare Charts Matrix Expansion**: Added `Current Price`, OLS `Linear Fit Slope` ($m$), and `Residual Standard Deviation` ($\text{Std}$) columns to the summary table with interactive sorting and dynamic period recalculation.
 - **Strategy Glossary Options Significance Block**: Added a full-width featured section to `StrategyGlossary.tsx` explaining the quantitative significance of Current Price, Linear Fit Slope, and Residual Standard Deviation for Call Option buyers.
 - **Options Data & Option Greeks Engine**: Enhanced `get_options_data` in Top Tickers tab to calculate and save full Option Greeks (Delta, Gamma, Theta, Vega, Rho for Call & Put across 1W, 2W, and 3W expirations) to `OptionsData.csv`.
