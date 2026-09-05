@@ -23,6 +23,29 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Starts the 24x7 autonomous daily trading pipeline scheduler on container boot."""
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        pipeline.start_scheduler()
+        print(f"[STARTUP] Autonomous 24x7 Trading Pipeline Scheduler active. Next execution: {pipeline.get_next_run_time()}")
+    except Exception as e:
+        print(f"[STARTUP] Error starting Trading Pipeline scheduler: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Gracefully shuts down the background pipeline scheduler."""
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        pipeline.stop_scheduler()
+        print("[SHUTDOWN] Autonomous Trading Pipeline Scheduler stopped.")
+    except Exception as e:
+        print(f"[SHUTDOWN] Error stopping Trading Pipeline scheduler: {e}")
+
+
 # Standardize data paths relative to this script
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(BACKEND_DIR)
@@ -163,50 +186,108 @@ def get_ib_data():
 
 @app.get("/api/rh/config")
 def get_rh_config():
+    from mcp.rh_mcp_server import get_sandbox
+    sb = get_sandbox()
     return {
-        "is_connected": rh_control.is_connected(),
-        "mcp_url": rh_control.mcp_url,
-        "is_simulated": rh_control.is_simulated,
-        "paused": rh_control.paused,
-        "budget_limit": rh_control.budget_limit
+        "is_connected": True,
+        "mcp_url": "https://agent.robinhood.com/mcp/trading",
+        "is_simulated": True,
+        "paused": sb.paused,
+        "budget_limit": sb.budget_limit
     }
 
 @app.post("/api/rh/connect")
 def rh_connect(req: RHConnectRequest):
-    success, msg = rh_control.connect(mcp_url=req.mcp_url, simulate=req.simulate)
-    if success:
-        return {"status": "success", "message": msg}
-    else:
-        raise HTTPException(status_code=500, detail=msg)
+    return {"status": "success", "message": "Connected to Robinhood MCP Sandbox"}
 
 @app.post("/api/rh/disconnect")
 def rh_disconnect():
-    rh_control.disconnect()
-    return {"status": "success", "message": "Disconnected from Robinhood Agentic AI"}
+    return {"status": "success", "message": "Disconnected from Robinhood MCP Sandbox"}
 
 @app.get("/api/rh/data")
 def get_rh_data():
-    data = rh_control.get_portfolio_summary()
-    if data:
-        return data
-    else:
-        raise HTTPException(status_code=400, detail="Not connected to Robinhood Agentic AI")
+    from mcp.rh_mcp_server import get_sandbox
+    sb = get_sandbox()
+    return sb.get_portfolio()
 
 @app.post("/api/rh/order")
 def place_rh_order(ticker: str, action: str, quantity: float, price: float):
-    success, msg = rh_control.place_order(ticker, action, quantity, price)
-    if success:
-        return {"status": "success", "message": msg}
+    from mcp.rh_mcp_server import get_sandbox
+    sb = get_sandbox()
+    res = sb.place_stock_order(ticker, action, quantity, price)
+    if res.get("success"):
+        return {"status": "success", "message": res.get("message")}
     else:
-        raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=400, detail=res.get("error"))
 
 @app.post("/api/rh/controls")
 def update_rh_controls(req: RHControlsRequest):
-    success, msg = rh_control.update_controls(paused=req.paused, budget_limit=req.budget_limit)
-    if success:
-        return {"status": "success", "message": msg}
-    else:
-        raise HTTPException(status_code=400, detail=msg)
+    from mcp.rh_mcp_server import get_sandbox
+    sb = get_sandbox()
+    if req.paused is not None:
+        sb.paused = req.paused
+    if req.budget_limit is not None:
+        sb.budget_limit = req.budget_limit
+    return {"status": "success", "message": "Controls updated successfully"}
+
+# -----------------------------------------------------------------------------
+# SPECIALIZED AI AGENTS & ROBINHOOD MCP SANDBOX PIPELINE
+# -----------------------------------------------------------------------------
+
+@app.get("/api/agents/pipeline/status")
+def get_agents_pipeline_status():
+    """Returns the live status of the Backtester Agent, Broker Agent, and scheduled 2:00 PM EST trigger."""
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        return pipeline.get_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch pipeline status: {str(e)}")
+
+@app.post("/api/agents/pipeline/run")
+def run_agents_pipeline():
+    """
+    Triggers the end-to-end automated linear data pipeline:
+    1. Backtester Agent runs Strategy 1 on Dow 30, Nasdaq 100, S&P 500 universe.
+    2. Broker Agent performs comparative portfolio analysis, calculates buying power from cash and sell liquidations.
+    3. Dispatches simulated stock and option orders directly to Robinhood MCP Sandbox.
+    """
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        report = pipeline.run_pipeline()
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+
+@app.post("/api/agents/backtester/run")
+def run_backtester_agent():
+    """Runs the Backtester Agent independently to generate ranked signals on the index universe."""
+    try:
+        from agents.backtester_agent import BacktesterAgent
+        agent = BacktesterAgent()
+        result = agent.run_daily_analysis()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtester Agent failed: {str(e)}")
+
+@app.post("/api/agents/broker/rebalance")
+def run_broker_agent_rebalance(payload: Optional[dict] = None):
+    """
+    Runs the Broker Agent to compare current portfolio against recommendations,
+    execute sell liquidations, and place buy orders in the Robinhood Sandbox.
+    """
+    try:
+        from agents.backtester_agent import BacktesterAgent
+        from agents.broker_agent import BrokerAgent
+        if not payload or not payload.get("ranked_recommendations"):
+            bt = BacktesterAgent()
+            payload = bt.run_daily_analysis()
+        broker = BrokerAgent()
+        report = broker.evaluate_and_rebalance(payload)
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Broker Agent execution failed: {str(e)}")
 
 @app.get("/api/portfolio")
 def get_portfolio_tickers(filename: str = "portfolio.csv"):
@@ -792,7 +873,7 @@ def get_30d_backtest_strategy3(period: str = "1m"):
 
 
 @app.get("/api/backtest-30d/options")
-def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
+def get_options_backtest(period: str = "1m", exit_mode: str = "intraday_2"):
     """
     Options backtesting endpoint.
     Uses Strategy 1 screening (5 filters, top-5 by 1-wk strategy value).
@@ -800,11 +881,10 @@ def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
     
     Query params:
       period:    '1w', '1m', '3m', '6m', '1y'
-      exit_mode: 'intraday' (exit T+2 11AM via BS repricing)
-                 'expiry'   (hold to weekly expiry ~7 days, intrinsic value)
+      exit_mode: 'intraday_2', 'intraday_3', 'intraday_5', 'intraday_7',
+                 'intraday_10', 'intraday_12', 'intraday_14', 'intraday_21',
+                 'intraday', 'expiry'
     """
-    if exit_mode not in ('intraday', 'expiry'):
-        exit_mode = 'intraday'
     try:
         result = execute_options_backtest(period=period, exit_mode=exit_mode)
         return result
@@ -841,7 +921,3 @@ def get_call_option_stats():
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Call Option Stats evaluation failed: {str(e)}")
-
-
-
-
