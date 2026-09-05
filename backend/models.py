@@ -146,6 +146,20 @@ class TickerCallStats(BaseModel):
     total_indicators: int = 14
     score_pct: float
     indicators: Dict[str, CallOptionIndicatorDetail]
+    slope_1w: Optional[float] = None
+    std_1w: Optional[float] = None
+    slope_2w: Optional[float] = None
+    slope_2w_pct: Optional[float] = None
+    std_2w: Optional[float] = None
+    std_2w_pct: Optional[float] = None
+    slope_4w: Optional[float] = None
+    std_4w: Optional[float] = None
+    slope_6w: Optional[float] = None
+    std_6w: Optional[float] = None
+    slope_3m: Optional[float] = None
+    std_3m: Optional[float] = None
+    slope_6m: Optional[float] = None
+    std_6m: Optional[float] = None
 
 class CallOptionStatsResponse(BaseModel):
     timestamp: str

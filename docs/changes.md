@@ -26,12 +26,33 @@ This document maintains a chronological record of architectural updates, feature
   - Expanded `PipelineStatus` interface to include `scheduler_enabled`, `scheduler_running`, and `next_run_time_est`.
   - Added a live pulsating green badge displaying `24x7 Auto-Trigger: Next: <YYYY-MM-DD HH:MM:SS EST/EDT>` next to the manual execution button.
 
-### 🏷️ Version Bump (`v20260905`)
+### 🏷️ Version Synchronization (`v20260905`)
 - Synchronized version tags across `README.md`, `frontend/src/app/page.tsx`, and `frontend/src/components/TickerSidebar.tsx`.
 
 ---
 
-## 2. Release v20260829 / v20260830 - Unified Branch Merge & Agentic MCP Pipeline
+## 2. Release v20260904 - Call Option Stats Multi-Period Linear Fit & Trend Metrics
+
+### 📊 Call Option Stats Matrix Multi-Period Linear Fit (`frontend/src/components/CallOptionStatsModal.tsx`)
+- **Multi-Horizon Timeframe Selector**:
+  - Added interactive timeframe buttons (`1Wk`, `2Wk`, `4Wk`, `6Wk`, `3 months`, `6 months`) dynamically calculating Ordinary Least Squares (OLS) linear fit slope and standard deviation over 1-year price history.
+- **Dynamic Trend Metrics & Normalized Ratios**:
+  - Inserted 3 dynamic columns (**Trend**, **Slope %**, **Std %**) directly adjacent to the Price ($) column:
+    - $\text{Slope \%} = \text{Slope} \times 100 / \text{Price}$ (measures percentage drift rate relative to spot price)
+    - $\text{Std \%} = \text{Std Dev} \times 100 / \text{Price}$ (measures normalized dispersion relative to spot price)
+    - $\text{Trend} = \text{Slope \%} / \text{Std \%}$ (signal-to-noise quality metric for directional momentum)
+- **Interactive Sorting & Visual Cues**:
+  - Fully sortable columns with color-coded positive/negative badges for immediate breakout identification.
+
+### 📈 Compare Charts Matrix Expansion (`frontend/src/components/NormalizedComparePanel.tsx`)
+- Added `Current Price`, OLS `Linear Fit Slope` ($m$), and `Residual Standard Deviation` ($\text{Std}$) columns to the summary metrics table with dynamic lookback recalculation.
+
+### 📖 Strategy Glossary Quantitative Enhancements (`frontend/src/components/StrategyGlossary.tsx`)
+- Added a full-width featured technical guide explaining the quantitative rationale for using positive Linear Fit Slope paired with low Residual Std Dev for high-probability Call Option momentum trades.
+
+---
+
+## 3. Release v20260829 / v20260830 - Unified Branch Merge & Agentic MCP Pipeline
 
 ### 🔄 Branch Integration & Merge (`origin/main` into `Krishna-ST`)
 - **Unified Master Codebase**: Merged `origin/main` into `Krishna-ST` ([commit f8ba48b]), combining the AI Agentic Trading Sandbox, Robinhood Model Context Protocol (MCP) Server, Call Option Stats 14-Indicator Matrix, and Option Greeks calculation engine.
@@ -72,7 +93,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 3. Release v20260828 - Call Option Analytics & Compare Matrix Enhancements
+## 4. Release v20260828 - Call Option Analytics & Compare Matrix Enhancements
 
 ### 📈 Compare Charts Matrix Expansion
 - **Ordinary Least Squares (OLS) Linear Fit Slope ($m$)**: Quantifies directional momentum and rate of price change over selected lookback intervals.
@@ -89,7 +110,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 4. Release v20260820 - Call Option Stats Matrix Modal & UI Ergonomics
+## 5. Release v20260820 - Call Option Stats Matrix Modal & UI Ergonomics
 
 ### 📋 Call Option Stats Modal (14 Indicators)
 - **Comprehensive Deep-Dive View** ([CallOptionStatsModal.tsx](../frontend/src/components/CallOptionStatsModal.tsx)):
@@ -102,7 +123,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 5. Release v20260807 - Benchmark Comparison & Timeframe Selectors
+## 6. Release v20260807 - Benchmark Comparison & Timeframe Selectors
 
 - **Multi-Timeframe Backtesting**: Configurable backtest windows (1Wk, 1M, 3M, 6M, 1Y) on the Top Tickers page.
 - **Benchmark Alpha Overlay**: Integrated baseline comparison curves for S&P 500 and NASDAQ.
@@ -110,14 +131,14 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 6. Release v20260703 - Compare Matrix Ergonomics & Strategy 3 Integration
+## 7. Release v20260703 - Compare Matrix Ergonomics & Strategy 3 Integration
 
 - **Compare Charts Multi-Select**: Added "Select All" and "Deselect All" action buttons for bulk ticker comparison.
 - **Strategy 3 Backtester**: Added 30-Day rolling backtest evaluation for Strategy 3 and corresponding glossary reference cards.
 
 ---
 
-## 7. Strategic Alpha Dashboard (411x)
+## 8. Strategic Alpha Dashboard (411x)
 
 ### Feature Synchronizations (from v405)
 - **Paper Study Page**: Restored full feature parity, including interactive transaction ledger and color-coded P&L tracking without external broker dependencies.
@@ -130,7 +151,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 8. Financial ETL Pipeline (20260412-Trans)
+## 9. Financial ETL Pipeline (20260412-Trans)
 
 ### ETL Script Implementation (`etl_script.py`)
 - Standardized financial CSV exports from **Ameriprise (AKD)** and **Fidelity (FKD/FSD)** into a uniform 17-column target schema.

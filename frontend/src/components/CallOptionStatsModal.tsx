@@ -27,12 +27,66 @@ const INDICATOR_KEYS = [
   { key: 'expected_move', label: '14. Exp Move', title: 'Expected Move: Breakeven rise <= Market Expected Move' },
 ];
 
+const PERIOD_OPTIONS = [
+  { label: '1Wk', value: '1w' },
+  { label: '2Wk', value: '2w' },
+  { label: '4Wk', value: '4w' },
+  { label: '6Wk', value: '6w' },
+  { label: '3 months', value: '3m' },
+  { label: '6 months', value: '6m' },
+];
+
+export const getPeriodMetrics = (item: TickerCallStats, periodKey: string) => {
+  let slope: number | null = null;
+  let std: number | null = null;
+
+  if (periodKey === '1w') {
+    slope = item.slope_1w ?? null;
+    std = item.std_1w ?? null;
+  } else if (periodKey === '2w') {
+    slope = item.slope_2w ?? null;
+    std = item.std_2w ?? null;
+  } else if (periodKey === '4w') {
+    slope = item.slope_4w ?? null;
+    std = item.std_4w ?? null;
+  } else if (periodKey === '6w') {
+    slope = item.slope_6w ?? null;
+    std = item.std_6w ?? null;
+  } else if (periodKey === '3m') {
+    slope = item.slope_3m ?? null;
+    std = item.std_3m ?? null;
+  } else if (periodKey === '6m') {
+    slope = item.slope_6m ?? null;
+    std = item.std_6m ?? null;
+  }
+
+  const stockPrice = item.stock_price;
+  let slopePct: number | null = null;
+  let stdPct: number | null = null;
+  let trend: number | null = null;
+
+  if (stockPrice > 0) {
+    if (slope !== null) {
+      slopePct = (slope * 100.0) / stockPrice;
+    }
+    if (std !== null) {
+      stdPct = (std * 100.0) / stockPrice;
+    }
+    if (slopePct !== null && stdPct !== null && stdPct > 0) {
+      trend = slopePct / stdPct;
+    }
+  }
+
+  return { slope, std, slopePct, stdPct, trend };
+};
+
 export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalProps) {
   const [data, setData] = useState<TickerCallStats[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
   const [selectedIndex, setSelectedIndex] = useState<string>('All');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('2w');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
   const [sortField, setSortField] = useState<string>('positive_count');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -58,7 +112,9 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/call-option-stats`);
+      const res = await fetch(`${API_BASE_URL}/api/call-option-stats?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
       if (!res.ok) {
         throw new Error(`Failed to fetch Call Option Stats (Status ${res.status})`);
       }
@@ -99,6 +155,22 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
     } else if (sortField === 'stock_price') {
       valA = a.stock_price;
       valB = b.stock_price;
+    } else if (['trend', 'slope_pct', 'std_pct'].includes(sortField)) {
+      const mA = getPeriodMetrics(a, selectedPeriod);
+      const mB = getPeriodMetrics(b, selectedPeriod);
+      if (sortField === 'trend') {
+        valA = mA.trend ?? -999999;
+        valB = mB.trend ?? -999999;
+      } else if (sortField === 'slope_pct') {
+        valA = mA.slopePct ?? -999999;
+        valB = mB.slopePct ?? -999999;
+      } else if (sortField === 'std_pct') {
+        valA = mA.stdPct ?? -999999;
+        valB = mB.stdPct ?? -999999;
+      }
+    } else if (['slope_1w', 'std_1w', 'slope_2w', 'slope_2w_pct', 'std_2w', 'std_2w_pct', 'slope_4w', 'std_4w', 'slope_6w', 'std_6w', 'slope_3m', 'std_3m', 'slope_6m', 'std_6m'].includes(sortField)) {
+      valA = (a as any)[sortField] ?? -999999;
+      valB = (b as any)[sortField] ?? -999999;
     } else if (sortField === 'score_pct') {
       valA = a.score_pct;
       valB = b.score_pct;
@@ -133,11 +205,27 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
         "Ticker",
         "Index Source",
         "Stock Price ($)",
+        `${selectedPeriod.toUpperCase()} Trend`,
+        `${selectedPeriod.toUpperCase()} Slope %`,
+        `${selectedPeriod.toUpperCase()} Std %`,
+        "1W Slope",
+        "1W Std",
+        "2W Slope",
+        "2W Std",
+        "4W Slope",
+        "4W Std",
+        "6W Slope",
+        "6W Std",
+        "3M Slope",
+        "3M Std",
+        "6M Slope",
+        "6M Std",
         ...INDICATOR_KEYS.map(i => i.label)
       ];
 
       const rows: string[] = [];
       sortedData.forEach(item => {
+        const m = getPeriodMetrics(item, selectedPeriod);
         const indCols = INDICATOR_KEYS.map(ik => {
           const detail = item.indicators[ik.key];
           return detail ? `${detail.positive ? 'TRUE' : 'FALSE'} (${detail.value_str})` : 'N/A';
@@ -150,6 +238,21 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
           item.symbol,
           item.index_source,
           item.stock_price.toFixed(2),
+          m.trend !== null ? (m.trend >= 0 ? `+${m.trend.toFixed(2)}` : m.trend.toFixed(2)) : 'N/A',
+          m.slopePct !== null ? (m.slopePct >= 0 ? `+${m.slopePct.toFixed(2)}%` : `${m.slopePct.toFixed(2)}%`) : 'N/A',
+          m.stdPct !== null ? `${m.stdPct.toFixed(2)}%` : 'N/A',
+          item.slope_1w !== undefined && item.slope_1w !== null ? (item.slope_1w >= 0 ? `+${item.slope_1w.toFixed(4)}` : item.slope_1w.toFixed(4)) : 'N/A',
+          item.std_1w !== undefined && item.std_1w !== null ? item.std_1w.toFixed(2) : 'N/A',
+          item.slope_2w !== undefined && item.slope_2w !== null ? (item.slope_2w >= 0 ? `+${item.slope_2w.toFixed(4)}` : item.slope_2w.toFixed(4)) : 'N/A',
+          item.std_2w !== undefined && item.std_2w !== null ? item.std_2w.toFixed(2) : 'N/A',
+          item.slope_4w !== undefined && item.slope_4w !== null ? (item.slope_4w >= 0 ? `+${item.slope_4w.toFixed(4)}` : item.slope_4w.toFixed(4)) : 'N/A',
+          item.std_4w !== undefined && item.std_4w !== null ? item.std_4w.toFixed(2) : 'N/A',
+          item.slope_6w !== undefined && item.slope_6w !== null ? (item.slope_6w >= 0 ? `+${item.slope_6w.toFixed(4)}` : item.slope_6w.toFixed(4)) : 'N/A',
+          item.std_6w !== undefined && item.std_6w !== null ? item.std_6w.toFixed(2) : 'N/A',
+          item.slope_3m !== undefined && item.slope_3m !== null ? (item.slope_3m >= 0 ? `+${item.slope_3m.toFixed(4)}` : item.slope_3m.toFixed(4)) : 'N/A',
+          item.std_3m !== undefined && item.std_3m !== null ? item.std_3m.toFixed(2) : 'N/A',
+          item.slope_6m !== undefined && item.slope_6m !== null ? (item.slope_6m >= 0 ? `+${item.slope_6m.toFixed(4)}` : item.slope_6m.toFixed(4)) : 'N/A',
+          item.std_6m !== undefined && item.std_6m !== null ? item.std_6m.toFixed(2) : 'N/A',
           ...indCols
         ].map(v => `"${v}"`).join(','));
       });
@@ -184,11 +287,11 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
             <div className="flex items-center gap-2">
               <Flame className="w-6 h-6 text-amber-500" />
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                Call Option Stats Matrix (14 Indicators)
+                Call Option Stats Matrix (14 Indicators + Multi-Period Linear Fit Metrics)
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Evaluates 14 quantitative call option checklist indicators across Dow 30, Nasdaq 100, and S&P 500 constituents. Column 1 shows total positive (<code className="text-amber-400 font-mono">+ve</code>) indicators.
+              Evaluates 14 quantitative call option checklist indicators and multi-period closing price slopes &amp; linear fit standard deviations across Dow 30, Nasdaq 100, and S&amp;P 500 constituents.
             </p>
           </div>
 
@@ -217,21 +320,40 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
 
         {/* Filters & Control Bar */}
         <div className="p-4 bg-muted/40 border-b border-border flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono mr-1">Index Filter:</span>
-            {['All', 'Dow 30', 'Nasdaq 100', 'S&P 500'].map(idxName => (
-              <Button
-                key={idxName}
-                variant={selectedIndex === idxName ? 'secondary' : 'ghost'}
-                onClick={() => setSelectedIndex(idxName)}
-                size="sm"
-                className={`h-7 px-3 text-xs font-semibold rounded-md ${
-                  selectedIndex === idxName ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'text-muted-foreground'
-                }`}
-              >
-                {idxName}
-              </Button>
-            ))}
+          <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono mr-1">Period:</span>
+              {PERIOD_OPTIONS.map(p => (
+                <Button
+                  key={p.value}
+                  variant={selectedPeriod === p.value ? 'secondary' : 'ghost'}
+                  onClick={() => setSelectedPeriod(p.value)}
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs font-semibold rounded-md ${
+                    selectedPeriod === p.value ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold' : 'text-muted-foreground'
+                  }`}
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono mr-1">Index:</span>
+              {['All', 'Dow 30', 'Nasdaq 100', 'S&P 500'].map(idxName => (
+                <Button
+                  key={idxName}
+                  variant={selectedIndex === idxName ? 'secondary' : 'ghost'}
+                  onClick={() => setSelectedIndex(idxName)}
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs font-semibold rounded-md ${
+                    selectedIndex === idxName ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold' : 'text-muted-foreground'
+                  }`}
+                >
+                  {idxName}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
@@ -276,7 +398,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
           ) : sortedData.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
               <ShieldCheck className="w-10 h-10 text-muted-foreground/40" />
-              <p>No tickers match the selected search & filter criteria.</p>
+              <p>No tickers match the selected search &amp; filter criteria.</p>
             </div>
           ) : (
             <div className="flex flex-col border border-border rounded-lg overflow-hidden shadow-xs">
@@ -287,7 +409,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                 className="overflow-x-auto bg-amber-500/15 border-b border-amber-500/30 p-1 flex items-center shrink-0 z-30"
                 style={{ overflowY: 'hidden' }}
               >
-                <div className="h-2.5 min-w-[1850px] bg-amber-500/30 rounded-full" />
+                <div className="h-2.5 min-w-[3300px] bg-amber-500/30 rounded-full" />
               </div>
 
               <div
@@ -295,7 +417,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                 onScroll={handleTableScroll}
                 className="overflow-x-auto max-h-[calc(90vh-250px)] overflow-y-auto"
               >
-                <table className="w-full text-xs text-left border-collapse min-w-[1850px]">
+                <table className="w-full text-xs text-left border-collapse min-w-[3300px]">
                   <thead className="bg-muted/90 sticky top-0 z-40 text-[11px] font-mono uppercase text-muted-foreground backdrop-blur-md">
                     <tr>
                       {/* FIRST COLUMN: How many indicators are +ve for call options (Sticky Left) */}
@@ -315,7 +437,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                         onClick={() => handleSort('symbol')}
                         className="p-3 font-bold border-b border-r cursor-pointer hover:bg-muted/70 transition-colors sticky left-28 z-50 bg-card shadow-sm w-36"
                       >
-                        Ticker & Index
+                        Ticker &amp; Index
                       </th>
 
                       <th
@@ -323,6 +445,173 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                         className="p-3 font-bold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
                       >
                         Price ($)
+                      </th>
+
+                      {/* 3 COLUMNS RIGHT AFTER PRICE ($) */}
+                      <th
+                        onClick={() => handleSort('trend')}
+                        className="p-2.5 font-bold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24 text-amber-400"
+                        title={`Trend Score = Slope % / Std % (${selectedPeriod.toUpperCase()} timeframe)`}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Trend</span>
+                          {sortField === 'trend' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_pct')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24 text-amber-400/90"
+                        title={`Slope % = Linear Fit Slope * 100 / Price (${selectedPeriod.toUpperCase()} timeframe)`}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Slope %</span>
+                          {sortField === 'slope_pct' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_pct')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24 text-amber-400/90"
+                        title={`Std % = Standard Deviation * 100 / Price (${selectedPeriod.toUpperCase()} timeframe)`}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Std %</span>
+                          {sortField === 'std_pct' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      {/* 1W, 2W, 4W SLOPE & STD DEV METRICS */}
+                      <th
+                        onClick={() => handleSort('slope_1w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="1-Week Closing Price Slope (5 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>1W Slope</span>
+                          {sortField === 'slope_1w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_1w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="1-Week Linear Fit Standard Deviation (5 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>1W Std</span>
+                          {sortField === 'std_1w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_2w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="2-Week Closing Price Slope (10 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>2W Slope</span>
+                          {sortField === 'slope_2w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_2w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="2-Week Linear Fit Standard Deviation (10 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>2W Std</span>
+                          {sortField === 'std_2w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_4w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="4-Week Closing Price Slope (20 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>4W Slope</span>
+                          {sortField === 'slope_4w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_4w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="4-Week Linear Fit Standard Deviation (20 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>4W Std</span>
+                          {sortField === 'std_4w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_6w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="6-Week Closing Price Slope (30 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>6W Slope</span>
+                          {sortField === 'slope_6w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_6w')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="6-Week Linear Fit Standard Deviation (30 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>6W Std</span>
+                          {sortField === 'std_6w' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_3m')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="3-Month Closing Price Slope (63 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>3M Slope</span>
+                          {sortField === 'slope_3m' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_3m')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="3-Month Linear Fit Standard Deviation (63 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>3M Std</span>
+                          {sortField === 'std_3m' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('slope_6m')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-24"
+                        title="6-Month Closing Price Slope (126 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>6M Slope</span>
+                          {sortField === 'slope_6m' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
+                      </th>
+
+                      <th
+                        onClick={() => handleSort('std_6m')}
+                        className="p-2.5 font-semibold border-b border-r text-right cursor-pointer hover:bg-muted/70 transition-colors w-20"
+                        title="6-Month Linear Fit Standard Deviation (126 trading days)"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>6M Std</span>
+                          {sortField === 'std_6m' && (sortDir === 'desc' ? '▼' : '▲')}
+                        </div>
                       </th>
 
                       {INDICATOR_KEYS.map(ik => (
@@ -344,6 +633,7 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                     {sortedData.map((row) => {
                       const isHighScorer = row.positive_count >= 10;
                       const isModerate = row.positive_count >= 7 && row.positive_count < 10;
+                      const metrics = getPeriodMetrics(row, selectedPeriod);
 
                       return (
                         <tr key={row.symbol} className="hover:bg-muted/30 transition-colors">
@@ -376,6 +666,64 @@ export function CallOptionStatsModal({ isOpen, onClose }: CallOptionStatsModalPr
                           {/* Stock Price */}
                           <td className="p-3 border-r text-right font-mono font-semibold text-foreground">
                             ${row.stock_price.toFixed(2)}
+                          </td>
+
+                          {/* Trend (Slope % / Std %) */}
+                          <td className={`p-2.5 border-r text-right font-mono font-bold ${metrics.trend !== null && metrics.trend > 0 ? 'text-emerald-400' : metrics.trend !== null && metrics.trend < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                            {metrics.trend !== null ? (metrics.trend >= 0 ? `+${metrics.trend.toFixed(2)}` : metrics.trend.toFixed(2)) : '-'}
+                          </td>
+
+                          {/* Slope % */}
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${metrics.slopePct !== null && metrics.slopePct > 0 ? 'text-emerald-400' : metrics.slopePct !== null && metrics.slopePct < 0 ? 'text-red-400' : ''}`}>
+                            {metrics.slopePct !== null ? (metrics.slopePct >= 0 ? `+${metrics.slopePct.toFixed(2)}%` : `${metrics.slopePct.toFixed(2)}%`) : '-'}
+                          </td>
+
+                          {/* Std % */}
+                          <td className="p-2.5 border-r text-right font-mono font-semibold text-muted-foreground">
+                            {metrics.stdPct !== null ? `${metrics.stdPct.toFixed(2)}%` : '-'}
+                          </td>
+
+                          {/* 1W, 2W, 4W SLOPE & STD DEV VALUES */}
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_1w !== undefined && row.slope_1w !== null && row.slope_1w > 0 ? 'text-emerald-400' : row.slope_1w !== undefined && row.slope_1w !== null && row.slope_1w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_1w !== undefined && row.slope_1w !== null ? (row.slope_1w >= 0 ? `+${row.slope_1w.toFixed(4)}` : row.slope_1w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_1w !== undefined && row.std_1w !== null ? row.std_1w.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_2w !== undefined && row.slope_2w !== null && row.slope_2w > 0 ? 'text-emerald-400' : row.slope_2w !== undefined && row.slope_2w !== null && row.slope_2w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_2w !== undefined && row.slope_2w !== null ? (row.slope_2w >= 0 ? `+${row.slope_2w.toFixed(4)}` : row.slope_2w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_2w !== undefined && row.std_2w !== null ? row.std_2w.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_4w !== undefined && row.slope_4w !== null && row.slope_4w > 0 ? 'text-emerald-400' : row.slope_4w !== undefined && row.slope_4w !== null && row.slope_4w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_4w !== undefined && row.slope_4w !== null ? (row.slope_4w >= 0 ? `+${row.slope_4w.toFixed(4)}` : row.slope_4w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_4w !== undefined && row.std_4w !== null ? row.std_4w.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_6w !== undefined && row.slope_6w !== null && row.slope_6w > 0 ? 'text-emerald-400' : row.slope_6w !== undefined && row.slope_6w !== null && row.slope_6w < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_6w !== undefined && row.slope_6w !== null ? (row.slope_6w >= 0 ? `+${row.slope_6w.toFixed(4)}` : row.slope_6w.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_6w !== undefined && row.std_6w !== null ? row.std_6w.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_3m !== undefined && row.slope_3m !== null && row.slope_3m > 0 ? 'text-emerald-400' : row.slope_3m !== undefined && row.slope_3m !== null && row.slope_3m < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_3m !== undefined && row.slope_3m !== null ? (row.slope_3m >= 0 ? `+${row.slope_3m.toFixed(4)}` : row.slope_3m.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_3m !== undefined && row.std_3m !== null ? row.std_3m.toFixed(2) : '-'}
+                          </td>
+
+                          <td className={`p-2.5 border-r text-right font-mono font-semibold ${row.slope_6m !== undefined && row.slope_6m !== null && row.slope_6m > 0 ? 'text-emerald-400' : row.slope_6m !== undefined && row.slope_6m !== null && row.slope_6m < 0 ? 'text-red-400' : ''}`}>
+                            {row.slope_6m !== undefined && row.slope_6m !== null ? (row.slope_6m >= 0 ? `+${row.slope_6m.toFixed(4)}` : row.slope_6m.toFixed(4)) : '-'}
+                          </td>
+                          <td className="p-2.5 border-r text-right font-mono text-muted-foreground">
+                            {row.std_6m !== undefined && row.std_6m !== null ? row.std_6m.toFixed(2) : '-'}
                           </td>
 
                           {/* 14 Indicators */}

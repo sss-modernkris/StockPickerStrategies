@@ -206,7 +206,7 @@ Open [http://localhost:3000](http://localhost:3000) in your web browser.
 *   **Action**: Select the *Brokers* tab and choose **Robinhood Agentic AI**.
 *   **Dual Agent Architecture**:
     *   **1. Backtester Agent**:
-        *   **Automated Schedule**: Triggers every trading day at **2:00 PM Market Time (EST)**.
+        *   **Automated 24x7 In-Process Schedule**: Daemon background scheduler thread monitoring `America/New_York` market time continuously in Docker, automatically triggering every trading day at **2:00 PM Market Time (EST/EDT)**.
         *   **Universe Scan**: Scans all ~170 constituent tickers from the **Dow 30**, **Nasdaq 100**, and **S&P 500**.
         *   **Quantitative Screener**: Runs Strategy 1 (1-Week lookback) with 5 strict filters (Willy Bull state, 1-Wk Strategy Value > $10k, MACD Hist $\in (-0.5, 0.5)$, MACD Slope $> 0$, RSI $14 \in (30, 70)$).
         *   **Signals Generated**: Produces target stock share allocations and ATM Call options parameters (strike, weekly expiration, synthetic Black-Scholes premium).
@@ -221,7 +221,7 @@ Open [http://localhost:3000](http://localhost:3000) in your web browser.
 ```mermaid
 flowchart TD
     subgraph Trigger ["1. Trigger & Ingestion Layer"]
-        T1["Scheduler Trigger<br/>2:00 PM EST Daily"] --> PIPE["Trading Pipeline Orchestrator<br/>(pipeline.py)"]
+        T1["24x7 Autonomous Daemon Scheduler<br/>2:00 PM EST/EDT Trading Days (Mon-Fri)"] --> PIPE["Trading Pipeline Orchestrator<br/>(pipeline.py)"]
         T2["On-Demand UI Click<br/>(Run Daily Pipeline Now)"] --> PIPE
         CSV["Universe Constituent Feeds<br/>(DOW100.csv, Nasdaq100.csv, SP100.csv)"] -->|~170 Tickers| BT["Backtester Agent<br/>(backtester_agent.py)"]
     end
@@ -252,6 +252,16 @@ flowchart TD
         LEDGER -->|Post-Execution Snapshot| RPT["Execution Audit Report &<br/>UI Dashboard Update"]
     end
 ```
+
+#### 13. Call Option Stats Matrix & Trend Metrics
+*   **Action**: Click the **Call Option Stats Matrix** button on the Top Tickers view or open the modal.
+*   **Multi-Period Ordinary Least Squares (OLS) Linear Fit**:
+    *   Configurable timeframes (`1Wk`, `2Wk`, `4Wk`, `6Wk`, `3 months`, `6 months`) dynamically calculating linear slope ($m$) and residual standard deviation ($\text{Std}$).
+*   **Normalized Trend Metrics**:
+    *   **Slope %**: $\text{Slope \%} = \frac{\text{Slope}}{\text{Price}} \times 100\%$ — Normalized percentage drift rate per day.
+    *   **Std %**: $\text{Std \%} = \frac{\text{Std Dev}}{\text{Price}} \times 100\%$ — Normalized percentage price volatility envelope.
+    *   **Trend Score**: $\text{Trend} = \frac{\text{Slope \%}}{\text{Std \%}}$ — Quantifies the signal-to-noise ratio of directional momentum, highlighting clean trend breakouts suitable for Call Option entries.
+
 
 
 

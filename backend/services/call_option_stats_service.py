@@ -5,13 +5,38 @@ import datetime
 import pandas as pd
 import numpy as np
 import yfinance as yf
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from models import TickerCallStats, CallOptionIndicatorDetail, CallOptionStatsResponse
 from services.options_service import load_index_tickers_map, get_live_or_bs_option_price, calculate_option_greeks
 from services.backtester import get_atm_strike, calc_historical_volatility
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_DIR = os.path.dirname(BACKEND_DIR)
+
+def calc_linear_fit(closes: pd.Series, window: int) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Computes Ordinary Least Squares (OLS) slope and residual standard deviation
+    over a specified window of recent daily closing prices.
+    """
+    if len(closes) < window or window < 2:
+        return None, None
+    sub_closes = closes.tail(window).values
+    n = len(sub_closes)
+    x = np.arange(n)
+    mean_x = np.mean(x)
+    mean_y = np.mean(sub_closes)
+    denom = np.sum((x - mean_x) ** 2)
+    if denom == 0:
+        return 0.0, 0.0
+    slope = float(np.sum((x - mean_x) * (sub_closes - mean_y)) / denom)
+    intercept = mean_y - slope * mean_x
+    y_fit = slope * x + intercept
+    residuals = sub_closes - y_fit
+    std_dev = float(np.sqrt(np.mean(residuals ** 2)))
+    if math.isnan(slope) or math.isnan(std_dev):
+        return None, None
+    return round(slope, 4), round(std_dev, 2)
+
 
 def evaluate_ticker_call_indicators(
     symbol: str, 
@@ -28,7 +53,17 @@ def evaluate_ticker_call_indicators(
     if closes.empty or len(closes) < 30:
         raise ValueError(f"Insufficient history data for {symbol}")
 
+    # Compute 1W (5d), 2W (10d), 4W (20d), 6W (30d), 3M (63d), 6M (126d) closing price slope and linear fit standard deviation
+    slope_1w, std_1w = calc_linear_fit(closes, 5)
+    slope_2w, std_2w = calc_linear_fit(closes, 10)
+    slope_4w, std_4w = calc_linear_fit(closes, 20)
+    slope_6w, std_6w = calc_linear_fit(closes, 30)
+    slope_3m, std_3m = calc_linear_fit(closes, min(63, len(closes)))
+    slope_6m, std_6m = calc_linear_fit(closes, min(126, len(closes)))
+
     stock_price = float(closes.iloc[-1])
+    slope_2w_pct = round((slope_2w * 100.0 / stock_price), 2) if (slope_2w is not None and stock_price > 0) else None
+    std_2w_pct = round((std_2w * 100.0 / stock_price), 2) if (std_2w is not None and stock_price > 0) else None
     prev_close = float(closes.iloc[-2]) if len(closes) >= 2 else stock_price
     
     # 1. Stock Trend (20 EMA, 50 SMA, slopes)
@@ -193,7 +228,21 @@ def evaluate_ticker_call_indicators(
         positive_count=positive_count,
         total_indicators=14,
         score_pct=score_pct,
-        indicators=indicators
+        indicators=indicators,
+        slope_1w=slope_1w,
+        std_1w=std_1w,
+        slope_2w=slope_2w,
+        slope_2w_pct=slope_2w_pct,
+        std_2w=std_2w,
+        std_2w_pct=std_2w_pct,
+        slope_4w=slope_4w,
+        std_4w=std_4w,
+        slope_6w=slope_6w,
+        std_6w=std_6w,
+        slope_3m=slope_3m,
+        std_3m=std_3m,
+        slope_6m=slope_6m,
+        std_6m=std_6m
     )
 
 
@@ -215,7 +264,7 @@ def generate_call_option_stats() -> CallOptionStatsResponse:
     
     # Download market data in batch (including SPY as benchmark)
     all_symbols = tickers + ["SPY"]
-    daily_data = yf.download(all_symbols, period="6mo", interval="1d", progress=False)
+    daily_data = yf.download(all_symbols, period="1y", interval="1d", progress=False)
 
     spy_closes = pd.Series(dtype=float)
     if ('Close', 'SPY') in daily_data.columns:
