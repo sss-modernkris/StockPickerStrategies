@@ -23,6 +23,29 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Starts the 24x7 autonomous daily trading pipeline scheduler on container boot."""
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        pipeline.start_scheduler()
+        print(f"[STARTUP] Autonomous 24x7 Trading Pipeline Scheduler active. Next execution: {pipeline.get_next_run_time()}")
+    except Exception as e:
+        print(f"[STARTUP] Error starting Trading Pipeline scheduler: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Gracefully shuts down the background pipeline scheduler."""
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        pipeline.stop_scheduler()
+        print("[SHUTDOWN] Autonomous Trading Pipeline Scheduler stopped.")
+    except Exception as e:
+        print(f"[SHUTDOWN] Error stopping Trading Pipeline scheduler: {e}")
+
+
 # Standardize data paths relative to this script
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(BACKEND_DIR)

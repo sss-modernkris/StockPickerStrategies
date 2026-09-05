@@ -57,9 +57,13 @@ interface RHData {
 export interface PipelineStatus {
   pipeline_active: boolean;
   is_running: boolean;
+  scheduler_enabled?: boolean;
+  scheduler_running?: boolean;
   scheduled_time_est: string;
   schedule_description: string;
+  next_run_time_est?: string;
   last_run_time: string | null;
+  last_trigger_source?: string | null;
   has_report: boolean;
   last_summary: string;
   agents: {
@@ -472,10 +476,16 @@ export function BrokersPanel() {
 
                 {/* Status and Trigger Controls */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-emerald-500/20 text-xs">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-muted-foreground text-[11px]">Trigger:</span>
-                    <span className="font-semibold text-white text-[11px]">2:00 PM EST (Trading Days)</span>
+                    <span className="text-muted-foreground text-[11px]">24x7 Auto-Trigger:</span>
+                    <span className="font-semibold text-white text-[11px]">
+                      {pipelineStatus?.next_run_time_est ? `Next: ${pipelineStatus.next_run_time_est}` : "2:00 PM EST (Mon-Fri)"}
+                    </span>
                   </div>
 
                   <Button
