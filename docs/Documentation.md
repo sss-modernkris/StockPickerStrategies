@@ -262,6 +262,17 @@ flowchart TD
     *   **Std %**: $\text{Std \%} = \frac{\text{Std Dev}}{\text{Price}} \times 100\%$ — Normalized percentage price volatility envelope.
     *   **Trend Score**: $\text{Trend} = \frac{\text{Slope \%}}{\text{Std \%}}$ — Quantifies the signal-to-noise ratio of directional momentum, highlighting clean trend breakouts suitable for Call Option entries.
 
+#### 14. Slope % Ranked Call Options Backtesting Engine (1-Week & 2-Day Holding)
+*   **Action**: On the Top Tickers panel, select the **Slope % (1-Week Hold)** or **Slope % (2-Day Hold)** Backtest tabs.
+*   **Core Mechanics**:
+    *   **Screening**: Filters constituents across Dow 30, Nasdaq 100, and S&P 500 on Day $T$ for positive Slope % ($m > 0$), RSI, MACD, and Volume health.
+    *   **Candidate Ranking**: Ranks eligible tickers by descending Slope % over the selected OLS lookback window (`1Wk`, `2Wk`, `4Wk`, `6Wk`, `3M`, `6M`).
+    *   **Execution Models**:
+        *   **1-Week Hold**: Enters 1-Month ATM Call options on Day $T+1$ (Open) and exits 1 week later (Day $T+5$ Close).
+        *   **2-Day Hold**: Enters 1-Month ATM Call options on Day $T+1$ (Open) and exits 2 trading days later (Day $T+3$ Close) to capture immediate breakout momentum.
+    *   **Ledger & Analytics**: Displays day-by-day strike, expiration, premium leverage multiple, Slope %, Std %, and Trend score metrics with Dow, S&P 500, and NASDAQ benchmark comparisons.
+
+
 
 
 

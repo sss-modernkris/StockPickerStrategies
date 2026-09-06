@@ -67,6 +67,32 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [csvSaveSuccessOptions, setCsvSaveSuccessOptions] = useState<boolean>(false);
   const [optionsExitMode, setOptionsExitMode] = useState<string>('intraday_2');
 
+  // Trend-Filtered Options Strategy State variables
+  const [backtestTrendOptionsLoading, setBacktestTrendOptionsLoading] = useState<boolean>(false);
+  const [backtestTrendOptionsResult, setBacktestTrendOptionsResult] = useState<any>(null);
+  const [showTrendOptionsLedger, setShowTrendOptionsLedger] = useState<boolean>(false);
+  const [backtestTrendOptionsError, setBacktestTrendOptionsError] = useState<string | null>(null);
+  const [csvSavingTrendOptions, setCsvSavingTrendOptions] = useState<boolean>(false);
+  const [csvSaveSuccessTrendOptions, setCsvSaveSuccessTrendOptions] = useState<boolean>(false);
+
+  // Slope-Filtered Options Strategy State variables
+  const [backtestSlopeOptionsLoading, setBacktestSlopeOptionsLoading] = useState<boolean>(false);
+  const [backtestSlopeOptionsResult, setBacktestSlopeOptionsResult] = useState<any>(null);
+  const [showSlopeOptionsLedger, setShowSlopeOptionsLedger] = useState<boolean>(false);
+  const [backtestSlopeOptionsError, setBacktestSlopeOptionsError] = useState<string | null>(null);
+  const [csvSavingSlopeOptions, setCsvSavingSlopeOptions] = useState<boolean>(false);
+  const [csvSaveSuccessSlopeOptions, setCsvSaveSuccessSlopeOptions] = useState<boolean>(false);
+  const [slopeMatrixPeriod, setSlopeMatrixPeriod] = useState<string>('2w');
+
+  // Slope-Filtered 2-Day Options Strategy State variables
+  const [backtestSlope2DayOptionsLoading, setBacktestSlope2DayOptionsLoading] = useState<boolean>(false);
+  const [backtestSlope2DayOptionsResult, setBacktestSlope2DayOptionsResult] = useState<any>(null);
+  const [showSlope2DayOptionsLedger, setShowSlope2DayOptionsLedger] = useState<boolean>(false);
+  const [backtestSlope2DayOptionsError, setBacktestSlope2DayOptionsError] = useState<string | null>(null);
+  const [csvSavingSlope2DayOptions, setCsvSavingSlope2DayOptions] = useState<boolean>(false);
+  const [csvSaveSuccessSlope2DayOptions, setCsvSaveSuccessSlope2DayOptions] = useState<boolean>(false);
+  const [slope2DayMatrixPeriod, setSlope2DayMatrixPeriod] = useState<string>('2w');
+
   // Options Data Generator State Variables
   const [optionsDataLoading, setOptionsDataLoading] = useState<boolean>(false);
   const [optionsDataResult, setOptionsDataResult] = useState<any>(null);
@@ -752,6 +778,360 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
     }
   };
 
+  const runTrendOptionsBacktest = async () => {
+    setBacktestTrendOptionsLoading(true);
+    setBacktestTrendOptionsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/options-trend?period=${backtestPeriod}`);
+      if (!res.ok) {
+        throw new Error(`Trend Options Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestTrendOptionsResult(data);
+      setShowTrendOptionsLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestTrendOptionsError(err.message || "Failed to run Trend Options backtest.");
+    } finally {
+      setBacktestTrendOptionsLoading(false);
+    }
+  };
+
+  const saveTrendOptionsBacktestCsv = async () => {
+    if (!backtestTrendOptionsResult || !backtestTrendOptionsResult.trades || backtestTrendOptionsResult.trades.length === 0) return;
+
+    setCsvSavingTrendOptions(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Strike",
+        "Expiry Date",
+        "Underlying Entry",
+        "Underlying Exit",
+        "Underlying Move (%)",
+        "Trend Score",
+        "Slope %",
+        "Std %",
+        "Entry Premium",
+        "Exit Premium",
+        "Contracts",
+        "Cost of Position",
+        "Exit Value",
+        "Option P&L ($)",
+        "Leverage Multiple",
+        "IV Used",
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily P&L ($)",
+        "Daily P&L (%)"
+      ];
+
+      const rows: string[] = [];
+      backtestTrendOptionsResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date, day.buy_date, day.sell_date,
+            "N/A", "0", "N/A", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+            dowRet, spRet, ndxRet, day.daily_profit.toFixed(2), dailyProfitPct
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.strike.toFixed(2),
+              t.expiry_date,
+              t.underlying_entry.toFixed(2),
+              t.underlying_exit.toFixed(2),
+              t.underlying_pct_change.toFixed(2),
+              (t.trend_score ?? 0.0).toFixed(4),
+              (t.slope_pct ?? 0.0).toFixed(2) + "%",
+              (t.std_pct ?? 0.0).toFixed(2) + "%",
+              t.entry_premium.toFixed(4),
+              t.exit_premium.toFixed(4),
+              t.contracts,
+              t.cost_of_position.toFixed(2),
+              t.exit_value.toFixed(2),
+              t.profit.toFixed(2),
+              t.leverage_multiple.toFixed(4),
+              (t.iv_used * 100).toFixed(1) + "%",
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'Backtest_Ledger_Options_Trend.csv', content: csvContent })
+      });
+
+      if (!res.ok) throw new Error(`Failed to save CSV (Status ${res.status})`);
+
+      setCsvSaveSuccessTrendOptions(true);
+      setTimeout(() => setCsvSaveSuccessTrendOptions(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Trend Options backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSavingTrendOptions(false);
+    }
+  };
+
+  const runSlopeOptionsBacktest = async () => {
+    setBacktestSlopeOptionsLoading(true);
+    setBacktestSlopeOptionsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/options-slope?period=${backtestPeriod}&slope_period=${slopeMatrixPeriod}`);
+      if (!res.ok) {
+        throw new Error(`Slope Options Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestSlopeOptionsResult(data);
+      setShowSlopeOptionsLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestSlopeOptionsError(err.message || "Failed to run Slope Options backtest.");
+    } finally {
+      setBacktestSlopeOptionsLoading(false);
+    }
+  };
+
+  const saveSlopeOptionsBacktestCsv = async () => {
+    if (!backtestSlopeOptionsResult || !backtestSlopeOptionsResult.trades || backtestSlopeOptionsResult.trades.length === 0) return;
+
+    setCsvSavingSlopeOptions(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Strike",
+        "Expiry Date",
+        "Underlying Entry",
+        "Underlying Exit",
+        "Underlying Move (%)",
+        "Slope %",
+        "Std %",
+        "Trend Score",
+        "Entry Premium",
+        "Exit Premium",
+        "Contracts",
+        "Cost of Position",
+        "Exit Value",
+        "Option P&L ($)",
+        "Leverage Multiple",
+        "IV Used",
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily P&L ($)",
+        "Daily P&L (%)"
+      ];
+
+      const rows: string[] = [];
+      backtestSlopeOptionsResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date, day.buy_date, day.sell_date,
+            "N/A", "0", "N/A", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+            dowRet, spRet, ndxRet, day.daily_profit.toFixed(2), dailyProfitPct
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.strike.toFixed(2),
+              t.expiry_date,
+              t.underlying_entry.toFixed(2),
+              t.underlying_exit.toFixed(2),
+              t.underlying_pct_change.toFixed(2),
+              (t.slope_pct ?? 0.0).toFixed(2) + "%",
+              (t.std_pct ?? 0.0).toFixed(2) + "%",
+              (t.trend_score ?? 0.0).toFixed(4),
+              t.entry_premium.toFixed(4),
+              t.exit_premium.toFixed(4),
+              t.contracts,
+              t.cost_of_position.toFixed(2),
+              t.exit_value.toFixed(2),
+              t.profit.toFixed(2),
+              t.leverage_multiple.toFixed(4),
+              (t.iv_used * 100).toFixed(1) + "%",
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'Backtest_Ledger_Options_Slope.csv', content: csvContent })
+      });
+
+      if (!res.ok) throw new Error(`Failed to save CSV (Status ${res.status})`);
+
+      setCsvSaveSuccessSlopeOptions(true);
+      setTimeout(() => setCsvSaveSuccessSlopeOptions(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Slope Options backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSavingSlopeOptions(false);
+    }
+  };
+
+  const runSlope2DayOptionsBacktest = async () => {
+    setBacktestSlope2DayOptionsLoading(true);
+    setBacktestSlope2DayOptionsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/options-slope-2day?period=${backtestPeriod}&slope_period=${slope2DayMatrixPeriod}`);
+      if (!res.ok) {
+        throw new Error(`Slope 2-Day Options Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestSlope2DayOptionsResult(data);
+      setShowSlope2DayOptionsLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestSlope2DayOptionsError(err.message || "Failed to run Slope 2-Day Options backtest.");
+    } finally {
+      setBacktestSlope2DayOptionsLoading(false);
+    }
+  };
+
+  const saveSlope2DayOptionsBacktestCsv = async () => {
+    if (!backtestSlope2DayOptionsResult || !backtestSlope2DayOptionsResult.trades || backtestSlope2DayOptionsResult.trades.length === 0) return;
+
+    setCsvSavingSlope2DayOptions(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Strike",
+        "Expiry Date",
+        "Underlying Entry",
+        "Underlying Exit",
+        "Underlying Move (%)",
+        "Slope %",
+        "Std %",
+        "Trend Score",
+        "Entry Premium",
+        "Exit Premium",
+        "Contracts",
+        "Cost of Position",
+        "Exit Value",
+        "Option P&L ($)",
+        "Leverage Multiple",
+        "IV Used",
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily P&L ($)",
+        "Daily P&L (%)"
+      ];
+
+      const rows: string[] = [];
+      backtestSlope2DayOptionsResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date, day.buy_date, day.sell_date,
+            "N/A", "0", "N/A", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+            dowRet, spRet, ndxRet, day.daily_profit.toFixed(2), dailyProfitPct
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.strike.toFixed(2),
+              t.expiry_date,
+              t.underlying_entry.toFixed(2),
+              t.underlying_exit.toFixed(2),
+              t.underlying_pct_change.toFixed(2),
+              (t.slope_pct ?? 0.0).toFixed(2) + "%",
+              (t.std_pct ?? 0.0).toFixed(2) + "%",
+              (t.trend_score ?? 0.0).toFixed(4),
+              t.entry_premium.toFixed(4),
+              t.exit_premium.toFixed(4),
+              t.contracts,
+              t.cost_of_position.toFixed(2),
+              t.exit_value.toFixed(2),
+              t.profit.toFixed(2),
+              t.leverage_multiple.toFixed(4),
+              (t.iv_used * 100).toFixed(1) + "%",
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'Backtest_Ledger_Options_Slope_2Day.csv', content: csvContent })
+      });
+
+      if (!res.ok) throw new Error(`Failed to save CSV (Status ${res.status})`);
+
+      setCsvSaveSuccessSlope2DayOptions(true);
+      setTimeout(() => setCsvSaveSuccessSlope2DayOptions(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save 2-Day Slope Options backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSavingSlope2DayOptions(false);
+    }
+  };
+
   // Filter global analysisData to only show tickers belonging to the selected indexes
   const filteredData = indexTickers.reduce((acc, ticker) => {
     if (analysisData[ticker]) {
@@ -1158,6 +1538,216 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     className="rounded-md font-semibold text-amber-500 hover:bg-amber-500/10 self-end sm:self-auto"
                   >
                     {showOptionsLedger ? "Hide Options Ledger" : "Show Options Ledger"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Trend-Filtered 1-Month Call Options Strategy Row */}
+            <div className="flex flex-col gap-2 pt-3 border-t-2 border-emerald-500/20 mt-1">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={runTrendOptionsBacktest}
+                    disabled={backtestTrendOptionsLoading}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md shadow-sm w-full sm:w-auto"
+                  >
+                    {backtestTrendOptionsLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                    {backtestTrendOptionsLoading ? "Running Trend Options..." : `Run ${backtestPeriod.toUpperCase()} Trend Call Options Backtest (1-Mo Exp, 1-Wk Hold)`}
+                  </Button>
+                  <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                    <span>
+                      Trend Options P&L:{" "}
+                      <span className={backtestTrendOptionsResult ? (backtestTrendOptionsResult.total_profit >= 0 ? "text-emerald-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestTrendOptionsResult ? (backtestTrendOptionsResult.total_profit >= 0 ? "+" : "-") : ""}${backtestTrendOptionsResult ? Math.abs(backtestTrendOptionsResult.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                      </span>{" "}
+                      (
+                      <span className={backtestTrendOptionsResult ? (backtestTrendOptionsResult.roi_pct >= 0 ? "text-emerald-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestTrendOptionsResult ? (backtestTrendOptionsResult.roi_pct >= 0 ? "+" : "-") : ""}{backtestTrendOptionsResult ? Math.abs(backtestTrendOptionsResult.roi_pct).toFixed(1) : "0.0"}%
+                      </span>
+                      )
+                    </span>
+                    {backtestTrendOptionsResult && backtestTrendOptionsResult.sp500_pct_change !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        S&P 500:{" "}
+                        <span className={backtestTrendOptionsResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                          {backtestTrendOptionsResult.sp500_pct_change >= 0 ? "+" : ""}{backtestTrendOptionsResult.sp500_pct_change.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {backtestTrendOptionsResult && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowTrendOptionsLedger(!showTrendOptionsLedger)}
+                    size="sm"
+                    className="rounded-md font-semibold text-emerald-400 hover:bg-emerald-500/10 self-end sm:self-auto"
+                  >
+                    {showTrendOptionsLedger ? "Hide Trend Options Ledger" : "Show Trend Options Ledger"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Slope % Filtered 1-Month Call Options Strategy Row */}
+            <div className="flex flex-col gap-2 pt-3 border-t-2 border-cyan-500/20 mt-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400/80 font-mono">Matrix Slope Window:</span>
+                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5">
+                  {[
+                    { label: '1Wk', value: '1w' },
+                    { label: '2Wk', value: '2w' },
+                    { label: '4Wk', value: '4w' },
+                    { label: '6Wk', value: '6w' },
+                    { label: '3 months', value: '3m' },
+                    { label: '6 months', value: '6m' },
+                  ].map((p) => (
+                    <Button
+                      key={p.value}
+                      variant={slopeMatrixPeriod === p.value ? 'secondary' : 'ghost'}
+                      onClick={() => setSlopeMatrixPeriod(p.value)}
+                      size="sm"
+                      className={`h-6 px-2 text-xs font-bold rounded-sm transition-all ${
+                        slopeMatrixPeriod === p.value
+                          ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={runSlopeOptionsBacktest}
+                    disabled={backtestSlopeOptionsLoading}
+                    size="sm"
+                    className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-md shadow-sm w-full sm:w-auto"
+                  >
+                    {backtestSlopeOptionsLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                    {backtestSlopeOptionsLoading ? "Running Slope Options..." : `Run ${backtestPeriod.toUpperCase()} Slope % Call Options Backtest (1-Mo Exp, 1-Wk Hold)`}
+                  </Button>
+                  <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                    <span>
+                      Slope Options P&L:{" "}
+                      <span className={backtestSlopeOptionsResult ? (backtestSlopeOptionsResult.total_profit >= 0 ? "text-cyan-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestSlopeOptionsResult ? (backtestSlopeOptionsResult.total_profit >= 0 ? "+" : "-") : ""}${backtestSlopeOptionsResult ? Math.abs(backtestSlopeOptionsResult.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                      </span>{" "}
+                      (
+                      <span className={backtestSlopeOptionsResult ? (backtestSlopeOptionsResult.roi_pct >= 0 ? "text-cyan-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestSlopeOptionsResult ? (backtestSlopeOptionsResult.roi_pct >= 0 ? "+" : "-") : ""}{backtestSlopeOptionsResult ? Math.abs(backtestSlopeOptionsResult.roi_pct).toFixed(1) : "0.0"}%
+                      </span>
+                      )
+                    </span>
+                    {backtestSlopeOptionsResult && backtestSlopeOptionsResult.sp500_pct_change !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        S&P 500:{" "}
+                        <span className={backtestSlopeOptionsResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                          {backtestSlopeOptionsResult.sp500_pct_change >= 0 ? "+" : ""}{backtestSlopeOptionsResult.sp500_pct_change.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
+                    {backtestSlopeOptionsResult && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal text-cyan-400/80">
+                        Matrix Window: {slopeMatrixPeriod.toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {backtestSlopeOptionsResult && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowSlopeOptionsLedger(!showSlopeOptionsLedger)}
+                    size="sm"
+                    className="rounded-md font-semibold text-cyan-400 hover:bg-cyan-500/10 self-end sm:self-auto"
+                  >
+                    {showSlopeOptionsLedger ? "Hide Slope Options Ledger" : "Show Slope Options Ledger"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Slope % Filtered 1-Month Call Options Strategy Row (2-Day Hold) */}
+            <div className="flex flex-col gap-2 pt-3 border-t-2 border-teal-500/20 mt-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-teal-400/80 font-mono">Matrix Slope Window:</span>
+                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5">
+                  {[
+                    { label: '1Wk', value: '1w' },
+                    { label: '2Wk', value: '2w' },
+                    { label: '4Wk', value: '4w' },
+                    { label: '6Wk', value: '6w' },
+                    { label: '3 months', value: '3m' },
+                    { label: '6 months', value: '6m' },
+                  ].map((p) => (
+                    <Button
+                      key={p.value}
+                      variant={slope2DayMatrixPeriod === p.value ? 'secondary' : 'ghost'}
+                      onClick={() => setSlope2DayMatrixPeriod(p.value)}
+                      size="sm"
+                      className={`h-6 px-2 text-xs font-bold rounded-sm transition-all ${
+                        slope2DayMatrixPeriod === p.value
+                          ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={runSlope2DayOptionsBacktest}
+                    disabled={backtestSlope2DayOptionsLoading}
+                    size="sm"
+                    className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-md shadow-sm w-full sm:w-auto"
+                  >
+                    {backtestSlope2DayOptionsLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                    {backtestSlope2DayOptionsLoading ? "Running 2-Day Options..." : `Run ${backtestPeriod.toUpperCase()} Slope % Call Options Backtest (1-Mo Exp, 2-Day Hold)`}
+                  </Button>
+                  <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                    <span>
+                      Slope 2-Day Options P&L:{" "}
+                      <span className={backtestSlope2DayOptionsResult ? (backtestSlope2DayOptionsResult.total_profit >= 0 ? "text-teal-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestSlope2DayOptionsResult ? (backtestSlope2DayOptionsResult.total_profit >= 0 ? "+" : "-") : ""}${backtestSlope2DayOptionsResult ? Math.abs(backtestSlope2DayOptionsResult.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                      </span>{" "}
+                      (
+                      <span className={backtestSlope2DayOptionsResult ? (backtestSlope2DayOptionsResult.roi_pct >= 0 ? "text-teal-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                        {backtestSlope2DayOptionsResult ? (backtestSlope2DayOptionsResult.roi_pct >= 0 ? "+" : "-") : ""}{backtestSlope2DayOptionsResult ? Math.abs(backtestSlope2DayOptionsResult.roi_pct).toFixed(1) : "0.0"}%
+                      </span>
+                      )
+                    </span>
+                    {backtestSlope2DayOptionsResult && backtestSlope2DayOptionsResult.sp500_pct_change !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        S&P 500:{" "}
+                        <span className={backtestSlope2DayOptionsResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                          {backtestSlope2DayOptionsResult.sp500_pct_change >= 0 ? "+" : ""}{backtestSlope2DayOptionsResult.sp500_pct_change.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
+                    {backtestSlope2DayOptionsResult && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal text-teal-400/80">
+                        Matrix Window: {slope2DayMatrixPeriod.toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {backtestSlope2DayOptionsResult && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowSlope2DayOptionsLedger(!showSlope2DayOptionsLedger)}
+                    size="sm"
+                    className="rounded-md font-semibold text-teal-400 hover:bg-teal-500/10 self-end sm:self-auto"
+                  >
+                    {showSlope2DayOptionsLedger ? "Hide 2-Day Slope Options Ledger" : "Show 2-Day Slope Options Ledger"}
                   </Button>
                 )}
               </div>
@@ -1609,6 +2199,405 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     </td>
                     <td className={`p-3 text-right font-mono font-bold ${
                       day.daily_profit >= 0 ? 'text-amber-400' : 'text-red-500'
+                    }`}>
+                      {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtestTrendOptionsError && (
+        <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestTrendOptionsError}</div>
+        </div>
+      )}
+
+      {showTrendOptionsLedger && backtestTrendOptionsResult && (
+        <div className="p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-emerald-500/20">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-emerald-400">
+                <Check className="w-5 h-5 text-emerald-400" />
+                Trend-Filtered Call Options Ledger — 1-Month Expiry (1-Week Hold)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Black-Scholes pricing. Tickers filtered by Trend (Slope % / Std %), Volume, RSI, MACD. Ranked by Trend Score. $2,000/position. Exits 1 week later with 23 days to expiry.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveTrendOptionsBacktestCsv}
+                disabled={csvSavingTrendOptions}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccessTrendOptions
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
+              >
+                {csvSavingTrendOptions && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccessTrendOptions ? 'Saved!' : 'Save to Backtest_Ledger_Options_Trend.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowTrendOptionsLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-emerald-500/20">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-emerald-500/10 sticky top-0 z-10 text-xs uppercase text-emerald-400/80">
+                <tr>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20">Screen Date</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20">Entry Date</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20">Exit Date</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20">Options Traded & Trend Details</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20 text-right">Dow</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20 text-right">S&P</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20 text-right">Nasdaq</th>
+                  <th className="p-3 font-semibold border-b border-emerald-500/20 text-right">Daily P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestTrendOptionsResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-emerald-500/5 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers && day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 flex flex-col gap-0.5 shadow-xs min-w-[130px]"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-emerald-400">{t.ticker}</span>
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded font-mono">
+                                ${t.strike} C
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Trend Score: +{t.trend_score.toFixed(2)} (Slope: +{t.slope_pct.toFixed(2)}%, Std: {t.std_pct.toFixed(2)}%)
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Exp: {t.expiry_date}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Prem: ${t.entry_premium.toFixed(2)} → ${t.exit_premium.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t.contracts}x contracts · IV: {(t.iv_used * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Stock: {t.underlying_pct_change >= 0 ? '+' : ''}{t.underlying_pct_change.toFixed(2)}%
+                            </span>
+                            <span className={`font-semibold font-mono text-xs ${
+                              t.profit >= 0 ? 'text-emerald-400' : 'text-red-500'
+                            }`}>
+                              {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
+                              {' '}({t.leverage_multiple >= 0 ? '+' : ''}{(t.leverage_multiple * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        ))}
+                        {(!day.tickers || day.tickers.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">No options traded on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.dow_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.dow_return >= 0 ? '+' : ''}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.sp_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.sp_return >= 0 ? '+' : ''}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.nasdaq_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.nasdaq_return >= 0 ? '+' : ''}{day.nasdaq_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${
+                      day.daily_profit >= 0 ? 'text-emerald-400' : 'text-red-500'
+                    }`}>
+                      {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtestSlopeOptionsError && (
+        <div className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestSlopeOptionsError}</div>
+        </div>
+      )}
+
+      {showSlopeOptionsLedger && backtestSlopeOptionsResult && (
+        <div className="p-5 rounded-xl border border-cyan-500/20 bg-cyan-500/5 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-cyan-500/20">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-cyan-400">
+                <Check className="w-5 h-5 text-cyan-400" />
+                Slope % Filtered Call Options Ledger — 1-Month Expiry (1-Week Hold, {slopeMatrixPeriod.toUpperCase()} Matrix Window)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Black-Scholes pricing. Tickers filtered by Slope %, Volume, RSI, MACD. Ranked by Slope % descending. $2,000/position. Exits 1 week later with 23 days to expiry.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveSlopeOptionsBacktestCsv}
+                disabled={csvSavingSlopeOptions}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccessSlopeOptions
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                }`}
+              >
+                {csvSavingSlopeOptions && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccessSlopeOptions ? 'Saved!' : 'Save to Backtest_Ledger_Options_Slope.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowSlopeOptionsLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-cyan-500/20">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-cyan-500/10 sticky top-0 z-10 text-xs uppercase text-cyan-400/80">
+                <tr>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20">Screen Date</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20">Entry Date</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20">Exit Date</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20">Options Traded & Slope % Details</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20 text-right">Dow</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20 text-right">S&P</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20 text-right">Nasdaq</th>
+                  <th className="p-3 font-semibold border-b border-cyan-500/20 text-right">Daily P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestSlopeOptionsResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-cyan-500/5 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers && day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 flex flex-col gap-0.5 shadow-xs min-w-[130px]"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-cyan-400">{t.ticker}</span>
+                              <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-1 py-0.5 rounded font-mono">
+                                ${t.strike} C
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Slope %: +{t.slope_pct.toFixed(2)}% (Std %: {t.std_pct.toFixed(2)}%, Trend: +{t.trend_score.toFixed(2)})
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Exp: {t.expiry_date}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Prem: ${t.entry_premium.toFixed(2)} → ${t.exit_premium.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t.contracts}x contracts · IV: {(t.iv_used * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Stock: {t.underlying_pct_change >= 0 ? '+' : ''}{t.underlying_pct_change.toFixed(2)}%
+                            </span>
+                            <span className={`font-semibold font-mono text-xs ${
+                              t.profit >= 0 ? 'text-cyan-400' : 'text-red-500'
+                            }`}>
+                              {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
+                              {' '}({t.leverage_multiple >= 0 ? '+' : ''}{(t.leverage_multiple * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        ))}
+                        {(!day.tickers || day.tickers.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">No options traded on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.dow_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.dow_return >= 0 ? '+' : ''}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.sp_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.sp_return >= 0 ? '+' : ''}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.nasdaq_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.nasdaq_return >= 0 ? '+' : ''}{day.nasdaq_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${
+                      day.daily_profit >= 0 ? 'text-cyan-400' : 'text-red-500'
+                    }`}>
+                      {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {backtestSlope2DayOptionsError && (
+        <div className="bg-teal-500/10 text-teal-400 border border-teal-500/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestSlope2DayOptionsError}</div>
+        </div>
+      )}
+
+      {showSlope2DayOptionsLedger && backtestSlope2DayOptionsResult && (
+        <div className="p-5 rounded-xl border border-teal-500/20 bg-teal-500/5 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-teal-500/20">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-teal-400">
+                <Check className="w-5 h-5 text-teal-400" />
+                Slope % Filtered Call Options Ledger — 1-Month Expiry (2-Day Hold, {slope2DayMatrixPeriod.toUpperCase()} Matrix Window)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Black-Scholes pricing. Tickers filtered by Slope %, Volume, RSI, MACD. Ranked by Slope % descending. $2,000/position. Exits 2 days later with 28 days to expiry.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveSlope2DayOptionsBacktestCsv}
+                disabled={csvSavingSlope2DayOptions}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccessSlope2DayOptions
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-teal-600 hover:bg-teal-700 text-white'
+                }`}
+              >
+                {csvSavingSlope2DayOptions && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccessSlope2DayOptions ? 'Saved!' : 'Save to Backtest_Ledger_Options_Slope_2Day.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowSlope2DayOptionsLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-teal-500/20">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-teal-500/10 sticky top-0 z-10 text-xs uppercase text-teal-400/80">
+                <tr>
+                  <th className="p-3 font-semibold border-b border-teal-500/20">Screen Date</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20">Entry Date</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20">Exit Date</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20">Options Traded & Slope % Details</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20 text-right">Dow</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20 text-right">S&P</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20 text-right">Nasdaq</th>
+                  <th className="p-3 font-semibold border-b border-teal-500/20 text-right">Daily P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestSlope2DayOptionsResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-teal-500/5 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers && day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border border-teal-500/20 bg-teal-500/5 flex flex-col gap-0.5 shadow-xs min-w-[130px]"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-teal-400">{t.ticker}</span>
+                              <span className="text-[10px] bg-teal-500/20 text-teal-400 px-1 py-0.5 rounded font-mono">
+                                ${t.strike} C
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Slope %: +{t.slope_pct.toFixed(2)}% (Std %: {t.std_pct.toFixed(2)}%, Trend: +{t.trend_score.toFixed(2)})
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Exp: {t.expiry_date}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Prem: ${t.entry_premium.toFixed(2)} → ${t.exit_premium.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t.contracts}x contracts · IV: {(t.iv_used * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Stock: {t.underlying_pct_change >= 0 ? '+' : ''}{t.underlying_pct_change.toFixed(2)}%
+                            </span>
+                            <span className={`font-semibold font-mono text-xs ${
+                              t.profit >= 0 ? 'text-teal-400' : 'text-red-500'
+                            }`}>
+                              {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
+                              {' '}({t.leverage_multiple >= 0 ? '+' : ''}{(t.leverage_multiple * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        ))}
+                        {(!day.tickers || day.tickers.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">No options traded on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.dow_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.dow_return >= 0 ? '+' : ''}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.sp_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.sp_return >= 0 ? '+' : ''}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.nasdaq_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.nasdaq_return >= 0 ? '+' : ''}{day.nasdaq_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${
+                      day.daily_profit >= 0 ? 'text-teal-400' : 'text-red-500'
                     }`}>
                       {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
                     </td>
