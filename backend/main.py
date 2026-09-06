@@ -8,7 +8,7 @@ from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
 from services.rh_client import RHClient
-from services.backtester import execute_30d_backtest, execute_options_backtest
+from services.backtester import execute_30d_backtest, execute_options_backtest, execute_trend_options_backtest, execute_slope_options_backtest, execute_slope_options_2day_backtest
 from services.options_service import generate_and_save_options_data
 from services.call_option_stats_service import generate_call_option_stats
 from services.email_service import send_email_with_attachment
@@ -810,6 +810,48 @@ def get_options_backtest(period: str = "1m", exit_mode: str = "intraday"):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Options backtest execution failed: {str(e)}")
+
+
+@app.get("/api/backtest-30d/options-trend")
+def get_options_trend_backtest(period: str = "1m"):
+    """
+    Trend-Filtered 1-Month Call Options Backtest Endpoint (Held 1 Week).
+    Screens tickers on day T by Volume, RSI, MACD, and positive Trend (Slope % / Std %).
+    Ranks top 5 by Trend score, purchases 1-month ATM calls ($2k per trade), and exits 1 week later.
+    """
+    try:
+        result = execute_trend_options_backtest(period=period)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Trend Options backtest execution failed: {str(e)}")
+
+
+@app.get("/api/backtest-30d/options-slope")
+def get_options_slope_backtest(period: str = "1m", slope_period: str = "2w"):
+    """
+    Slope % Filtered 1-Month Call Options Backtest Endpoint (Held 1 Week).
+    Screens tickers on day T by Volume, RSI, MACD, and positive Slope % over selected Call Option Stats Matrix period.
+    Ranks top 5 by Slope % descending, purchases 1-month ATM calls ($2k per trade), and exits 1 week later.
+    """
+    try:
+        result = execute_slope_options_backtest(period=period, slope_period=slope_period)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Slope Options backtest execution failed: {str(e)}")
+
+
+@app.get("/api/backtest-30d/options-slope-2day")
+def get_options_slope_2day_backtest(period: str = "1m", slope_period: str = "2w"):
+    """
+    Slope % Filtered 1-Month Call Options Backtest Endpoint (Held 2 Days).
+    Screens tickers on day T by Volume, RSI, MACD, and positive Slope % over selected Call Option Stats Matrix period.
+    Ranks top 5 by Slope % descending, purchases 1-month ATM calls ($2k per trade), and exits 2 days later.
+    """
+    try:
+        result = execute_slope_options_2day_backtest(period=period, slope_period=slope_period)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Slope 2-Day Options backtest execution failed: {str(e)}")
 
 
 @app.post("/api/get-options-data")
