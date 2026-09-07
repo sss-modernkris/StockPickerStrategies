@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "robinhood-sandbox-trading": {
+      "command": "python",
+      "args": ["backend/mcp/rh_mcp_server.py"],
+      "env": {
+        "ROBINHOOD_ENV": "SIMULATION_SANDBOX",
+        "ROBINHOOD_ACCOUNT": "RH-SIM-SANDBOX-001"
+      }
+    }
+  }
+}

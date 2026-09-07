@@ -65,7 +65,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [backtestOptionsError, setBacktestOptionsError] = useState<string | null>(null);
   const [csvSavingOptions, setCsvSavingOptions] = useState<boolean>(false);
   const [csvSaveSuccessOptions, setCsvSaveSuccessOptions] = useState<boolean>(false);
-  const [optionsExitMode, setOptionsExitMode] = useState<'intraday' | 'expiry'>('intraday');
+  const [optionsExitMode, setOptionsExitMode] = useState<string>('intraday_2');
 
   // Trend-Filtered Options Strategy State variables
   const [backtestTrendOptionsLoading, setBacktestTrendOptionsLoading] = useState<boolean>(false);
@@ -92,6 +92,15 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
   const [csvSavingSlope2DayOptions, setCsvSavingSlope2DayOptions] = useState<boolean>(false);
   const [csvSaveSuccessSlope2DayOptions, setCsvSaveSuccessSlope2DayOptions] = useState<boolean>(false);
   const [slope2DayMatrixPeriod, setSlope2DayMatrixPeriod] = useState<string>('2w');
+
+  // Top Tickers 5-Point Screener Call Options Strategy State variables
+  const [backtestTopTickersOptionsLoading, setBacktestTopTickersOptionsLoading] = useState<boolean>(false);
+  const [backtestTopTickersOptionsResult, setBacktestTopTickersOptionsResult] = useState<any>(null);
+  const [showTopTickersOptionsLedger, setShowTopTickersOptionsLedger] = useState<boolean>(false);
+  const [backtestTopTickersOptionsError, setBacktestTopTickersOptionsError] = useState<string | null>(null);
+  const [csvSavingTopTickersOptions, setCsvSavingTopTickersOptions] = useState<boolean>(false);
+  const [csvSaveSuccessTopTickersOptions, setCsvSaveSuccessTopTickersOptions] = useState<boolean>(false);
+
 
   // Options Data Generator State Variables
   const [optionsDataLoading, setOptionsDataLoading] = useState<boolean>(false);
@@ -1126,13 +1135,127 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
       setTimeout(() => setCsvSaveSuccessSlope2DayOptions(false), 3000);
     } catch (err: any) {
       console.error(err);
-      setError(`Failed to save 2-Day Slope Options backtest ledger CSV: ${err.message}`);
     } finally {
       setCsvSavingSlope2DayOptions(false);
     }
   };
 
+  const runTopTickersOptionsBacktest = async () => {
+    setBacktestTopTickersOptionsLoading(true);
+    setBacktestTopTickersOptionsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/backtest-30d/options-toptickers?period=${backtestPeriod}`);
+      if (!res.ok) {
+        throw new Error(`Top Tickers Options Backtest failed (Status ${res.status})`);
+      }
+      const data = await res.json();
+      setBacktestTopTickersOptionsResult(data);
+      setShowTopTickersOptionsLedger(true);
+    } catch (err: any) {
+      console.error(err);
+      setBacktestTopTickersOptionsError(err.message || "Failed to run Top Tickers Options backtest.");
+    } finally {
+      setBacktestTopTickersOptionsLoading(false);
+    }
+  };
+
+  const saveTopTickersOptionsBacktestCsv = async () => {
+    if (!backtestTopTickersOptionsResult || !backtestTopTickersOptionsResult.trades || backtestTopTickersOptionsResult.trades.length === 0) return;
+
+    setCsvSavingTopTickersOptions(true);
+    try {
+      const headers = [
+        "Screen Date",
+        "Buy Date",
+        "Sell Date",
+        "Ticker",
+        "Strike",
+        "Expiry Date",
+        "Underlying Entry",
+        "Underlying Exit",
+        "Underlying Move (%)",
+        "1-Wk Willy Value ($)",
+        "Entry Premium",
+        "Exit Premium",
+        "Contracts",
+        "Cost of Position",
+        "Exit Value",
+        "Option P&L ($)",
+        "Leverage Multiple",
+        "IV Used",
+        "Dow Return (%)",
+        "S&P Return (%)",
+        "Nasdaq Return (%)",
+        "Daily P&L ($)",
+        "Daily P&L (%)"
+      ];
+
+      const rows: string[] = [];
+      backtestTopTickersOptionsResult.trades.forEach((day: any) => {
+        const dowRet = (day.dow_return ?? 0.0).toFixed(2);
+        const spRet = (day.sp_return ?? 0.0).toFixed(2);
+        const ndxRet = (day.nasdaq_return ?? 0.0).toFixed(2);
+        const dailyProfitPct = ((day.daily_profit / 10000.0) * 100.0).toFixed(2);
+
+        if (!day.tickers || day.tickers.length === 0) {
+          rows.push([
+            day.screen_date, day.buy_date, day.sell_date,
+            "N/A", "0", "N/A", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+            dowRet, spRet, ndxRet, day.daily_profit.toFixed(2), dailyProfitPct
+          ].map(v => `"${v}"`).join(","));
+        } else {
+          day.tickers.forEach((t: any) => {
+            rows.push([
+              day.screen_date,
+              day.buy_date,
+              day.sell_date,
+              t.ticker,
+              t.strike.toFixed(2),
+              t.expiry_date,
+              t.underlying_entry.toFixed(2),
+              t.underlying_exit.toFixed(2),
+              t.underlying_pct_change.toFixed(2),
+              (t.strategy_value ?? 0.0).toFixed(2),
+              t.entry_premium.toFixed(4),
+              t.exit_premium.toFixed(4),
+              t.contracts,
+              t.cost_of_position.toFixed(2),
+              t.exit_value.toFixed(2),
+              t.profit.toFixed(2),
+              t.leverage_multiple.toFixed(4),
+              (t.iv_used * 100).toFixed(1) + "%",
+              dowRet,
+              spRet,
+              ndxRet,
+              day.daily_profit.toFixed(2),
+              dailyProfitPct
+            ].map(v => `"${v}"`).join(","));
+          });
+        }
+      });
+
+      const csvContent = [headers.map(h => `"${h}"`).join(","), ...rows].join("\n") + "\n";
+
+      const res = await fetch(`${API_BASE_URL}/api/save_csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'Backtest_Ledger_TopTickers_Options.csv', content: csvContent })
+      });
+
+      if (!res.ok) throw new Error(`Failed to save CSV (Status ${res.status})`);
+
+      setCsvSaveSuccessTopTickersOptions(true);
+      setTimeout(() => setCsvSaveSuccessTopTickersOptions(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Failed to save Top Tickers Options backtest ledger CSV: ${err.message}`);
+    } finally {
+      setCsvSavingTopTickersOptions(false);
+    }
+  };
+
   // Filter global analysisData to only show tickers belonging to the selected indexes
+
   const filteredData = indexTickers.reduce((acc, ticker) => {
     if (analysisData[ticker]) {
       acc[ticker] = analysisData[ticker];
@@ -1455,12 +1578,22 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               {/* Exit Mode Toggle */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80 font-mono">Options Exit:</span>
-                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5">
-                  {[{ label: 'T+2 Intraday (BS)', value: 'intraday' }, { label: 'Hold to Expiry', value: 'expiry' }].map((mode) => (
+                <div className="flex bg-muted/80 p-0.5 rounded-md border gap-0.5 flex-wrap">
+                  {[
+                    { label: 'T+2 Intraday', value: 'intraday_2' },
+                    { label: 'T+3 Intraday', value: 'intraday_3' },
+                    { label: 'T+5 Intraday', value: 'intraday_5' },
+                    { label: 'T+7 Intraday', value: 'intraday_7' },
+                    { label: 'T+10 Intraday', value: 'intraday_10' },
+                    { label: 'T+12 Intraday', value: 'intraday_12' },
+                    { label: 'T+14 Intraday', value: 'intraday_14' },
+                    { label: 'T+21 Intraday', value: 'intraday_21' },
+                    { label: 'Hold to Expiry', value: 'expiry' }
+                  ].map((mode) => (
                     <Button
                       key={mode.value}
                       variant={optionsExitMode === mode.value ? 'secondary' : 'ghost'}
-                      onClick={() => setOptionsExitMode(mode.value as 'intraday' | 'expiry')}
+                      onClick={() => setOptionsExitMode(mode.value)}
                       size="sm"
                       className={`h-6 px-2.5 text-xs font-bold rounded-sm transition-all ${
                         optionsExitMode === mode.value
@@ -1497,6 +1630,14 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                       </span>
                       )
                     </span>
+                    {backtestOptionsResult && backtestOptionsResult.hold_roi_pct !== undefined && (
+                      <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                        Hold :{" "}
+                        <span className={backtestOptionsResult.hold_roi_pct >= 0 ? "text-amber-400 font-bold" : "text-red-500 font-bold"}>
+                          {backtestOptionsResult.hold_roi_pct >= 0 ? "+" : ""}{backtestOptionsResult.hold_roi_pct.toFixed(2)}%
+                        </span>
+                      </span>
+                    )}
                     {backtestOptionsResult && backtestOptionsResult.sp500_pct_change !== undefined && (
                       <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
                         S&P 500:{" "}
@@ -1507,7 +1648,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
                     )}
                     {backtestOptionsResult && (
                       <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal text-amber-500/80">
-                        Mode: {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to Expiry' : 'T+2 Intraday'}
+                        Mode: {backtestOptionsResult.mode_label || (backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to Expiry' : (backtestOptionsResult.exit_mode?.includes('intraday') ? `T+${backtestOptionsResult.exit_mode.replace(/\D/g, '') || '2'} Intraday` : backtestOptionsResult.exit_mode))}
                       </span>
                     )}
                   </span>
@@ -1736,7 +1877,56 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
             </div>
           </div>
         )}
+
+        {/* Top Tickers 5-Point Screener 1-Wk Call Option Strategy Backtest Card */}
+        <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 space-y-3 mt-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={runTopTickersOptionsBacktest}
+                disabled={backtestTopTickersOptionsLoading}
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md shadow-sm w-full sm:w-auto"
+              >
+                {backtestTopTickersOptionsLoading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {backtestTopTickersOptionsLoading ? "Running Top Tickers Call Options..." : `Run ${backtestPeriod.toUpperCase()} Top Tickers 5-Point Call Options Backtest (30-Day Exp, 1-Wk Hold)`}
+              </Button>
+              <span className="text-sm font-semibold text-muted-foreground font-mono flex items-center gap-2 flex-wrap">
+                <span>
+                  Top Tickers Options P&L:{" "}
+                  <span className={backtestTopTickersOptionsResult ? (backtestTopTickersOptionsResult.total_profit >= 0 ? "text-indigo-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtestTopTickersOptionsResult ? (backtestTopTickersOptionsResult.total_profit >= 0 ? "+" : "-") : ""}${backtestTopTickersOptionsResult ? Math.abs(backtestTopTickersOptionsResult.total_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </span>{" "}
+                  (
+                  <span className={backtestTopTickersOptionsResult ? (backtestTopTickersOptionsResult.roi_pct >= 0 ? "text-indigo-400 font-bold" : "text-red-500 font-bold") : "text-muted-foreground"}>
+                    {backtestTopTickersOptionsResult ? (backtestTopTickersOptionsResult.roi_pct >= 0 ? "+" : "-") : ""}{backtestTopTickersOptionsResult ? Math.abs(backtestTopTickersOptionsResult.roi_pct).toFixed(1) : "0.0"}%
+                  </span>
+                  )
+                </span>
+                {backtestTopTickersOptionsResult && backtestTopTickersOptionsResult.sp500_pct_change !== undefined && (
+                  <span className="text-xs border-l pl-2 border-muted-foreground/30 font-normal">
+                    S&P 500:{" "}
+                    <span className={backtestTopTickersOptionsResult.sp500_pct_change >= 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                      {backtestTopTickersOptionsResult.sp500_pct_change >= 0 ? "+" : ""}{backtestTopTickersOptionsResult.sp500_pct_change.toFixed(2)}%
+                    </span>
+                  </span>
+                )}
+              </span>
+            </div>
+            {backtestTopTickersOptionsResult && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowTopTickersOptionsLedger(!showTopTickersOptionsLedger)}
+                size="sm"
+                className="rounded-md font-semibold text-indigo-400 hover:bg-indigo-500/10 self-end sm:self-auto"
+              >
+                {showTopTickersOptionsLedger ? "Hide Top Tickers Options Ledger" : "Show Top Tickers Options Ledger"}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
+
 
       {backtestError && (
         <div className="bg-destructive/10 text-destructive border border-destructive/20 p-4 rounded-lg flex items-start gap-3">
@@ -2077,7 +2267,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
               <p className="text-xs text-muted-foreground">
                 Black-Scholes synthetic pricing. Same Strategy 1 screening (5 filters). $2,000/position. Exit mode:{" "}
                 <span className="font-bold text-amber-500">
-                  {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to weekly expiry (intrinsic value at T+7)' : 'Intraday T+2 11:00 AM (BS re-priced)'}
+                  {backtestOptionsResult.exit_mode === 'expiry' ? 'Hold to weekly expiry (intrinsic value at T+7)' : `${backtestOptionsResult.mode_label || 'Intraday'} 11:00 AM (BS re-priced)`}
                 </span>
               </p>
             </div>
@@ -2590,6 +2780,140 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           </div>
         </div>
       )}
+
+      {backtestTopTickersOptionsError && (
+        <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <Info className="w-5 h-5 mt-0.5 shrink-0" />
+          <div className="text-sm font-medium">{backtestTopTickersOptionsError}</div>
+        </div>
+      )}
+
+      {showTopTickersOptionsLedger && backtestTopTickersOptionsResult && (
+        <div className="p-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-md shadow-sm space-y-4 mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between border-b pb-3 border-indigo-500/20">
+            <div className="space-y-1">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-400">
+                <Check className="w-5 h-5 text-indigo-400" />
+                Top Tickers 5-Point Screener Call Options Ledger — 30-Day Expiry (1-Wk Hold)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Black-Scholes pricing. Tickers filtered by 5-Point Top Tickers Buy Screener. Ranked by 1-Wk Willy Backtest value. $2,000/position (max $10,000 daily budget). Liquidated at 11:00 AM on T+5.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveTopTickersOptionsBacktestCsv}
+                disabled={csvSavingTopTickersOptions}
+                size="sm"
+                className={`font-bold rounded-md shadow-sm transition-all duration-300 ${
+                  csvSaveSuccessTopTickersOptions
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+              >
+                {csvSavingTopTickersOptions && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                {csvSaveSuccessTopTickersOptions ? 'Saved!' : 'Save to Backtest_Ledger_TopTickers_Options.csv'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowTopTickersOptionsLedger(false)}
+                size="sm"
+                className="rounded-md"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-indigo-500/20">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-indigo-500/10 sticky top-0 z-10 text-xs uppercase text-indigo-400/80">
+                <tr>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20">Screen Date</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20">Entry Date</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20">Exit Date</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20">Options Traded & 1-Wk Willy Value</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20 text-right">Dow</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20 text-right">S&P</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20 text-right">Nasdaq</th>
+                  <th className="p-3 font-semibold border-b border-indigo-500/20 text-right">Daily P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {backtestTopTickersOptionsResult.trades.map((day: any, dIdx: number) => (
+                  <tr key={dIdx} className="hover:bg-indigo-500/5 transition-colors">
+                    <td className="p-3 font-medium font-mono">{day.screen_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.buy_date}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{day.sell_date}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-2">
+                        {day.tickers && day.tickers.map((t: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className="text-xs p-2 rounded-md border border-indigo-500/20 bg-indigo-500/5 flex flex-col gap-0.5 shadow-xs min-w-[130px]"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-indigo-400">{t.ticker}</span>
+                              <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-1 py-0.5 rounded font-mono">
+                                ${t.strike} C
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              1-Wk Willy Val: ${t.strategy_value.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Exp: {t.expiry_date}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Prem: ${t.entry_premium.toFixed(2)} → ${t.exit_premium.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t.contracts}x contracts · IV: {(t.iv_used * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Stock: {t.underlying_pct_change >= 0 ? '+' : ''}{t.underlying_pct_change.toFixed(2)}%
+                            </span>
+                            <span className={`font-semibold font-mono text-xs ${
+                              t.profit >= 0 ? 'text-indigo-400' : 'text-red-500'
+                            }`}>
+                              {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
+                              {' '}({t.leverage_multiple >= 0 ? '+' : ''}{(t.leverage_multiple * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        ))}
+                        {(!day.tickers || day.tickers.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">No options traded on this day</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.dow_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.dow_return >= 0 ? '+' : ''}{day.dow_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.sp_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.sp_return >= 0 ? '+' : ''}{day.sp_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono ${
+                      day.nasdaq_return >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {day.nasdaq_return >= 0 ? '+' : ''}{day.nasdaq_return.toFixed(2)}%
+                    </td>
+                    <td className={`p-3 text-right font-mono font-bold ${
+                      day.daily_profit >= 0 ? 'text-indigo-400' : 'text-red-500'
+                    }`}>
+                      {day.daily_profit >= 0 ? '+' : ''}${day.daily_profit.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
 
       {screenRun && (
         <div className="p-5 rounded-xl border bg-card/60 backdrop-blur-md shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">

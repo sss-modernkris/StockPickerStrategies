@@ -41,7 +41,7 @@
 
 #### Technical Analysis Chart
 
-![AVGO Technical Chart](frontend/public/images_advanced/AVGO_advanced_chart.png)
+![AVGO Technical Chart](../frontend/public/images_advanced/AVGO_advanced_chart.png)
 
 ---
 
@@ -59,7 +59,7 @@
 
 #### Technical Analysis Chart
 
-![GOOG Technical Chart](frontend/public/images_advanced/GOOG_advanced_chart.png)
+![GOOG Technical Chart](../frontend/public/images_advanced/GOOG_advanced_chart.png)
 
 ---
 
@@ -77,7 +77,7 @@
 
 #### Technical Analysis Chart
 
-![META Technical Chart](frontend/public/images_advanced/META_advanced_chart.png)
+![META Technical Chart](../frontend/public/images_advanced/META_advanced_chart.png)
 
 ---
 
@@ -95,7 +95,7 @@
 
 #### Technical Analysis Chart
 
-![MSFT Technical Chart](frontend/public/images_advanced/MSFT_advanced_chart.png)
+![MSFT Technical Chart](../frontend/public/images_advanced/MSFT_advanced_chart.png)
 
 ---
 
@@ -113,7 +113,7 @@
 
 #### Technical Analysis Chart
 
-![MU Technical Chart](frontend/public/images_advanced/MU_advanced_chart.png)
+![MU Technical Chart](../frontend/public/images_advanced/MU_advanced_chart.png)
 
 ---
 
@@ -131,7 +131,7 @@
 
 #### Technical Analysis Chart
 
-![NVDA Technical Chart](frontend/public/images_advanced/NVDA_advanced_chart.png)
+![NVDA Technical Chart](../frontend/public/images_advanced/NVDA_advanced_chart.png)
 
 ---
 
@@ -149,7 +149,7 @@
 
 #### Technical Analysis Chart
 
-![PLTR Technical Chart](frontend/public/images_advanced/PLTR_advanced_chart.png)
+![PLTR Technical Chart](../frontend/public/images_advanced/PLTR_advanced_chart.png)
 
 ---
 
@@ -167,7 +167,7 @@
 
 #### Technical Analysis Chart
 
-![SATS Technical Chart](frontend/public/images_advanced/SATS_advanced_chart.png)
+![SATS Technical Chart](../frontend/public/images_advanced/SATS_advanced_chart.png)
 
 ---
 
@@ -185,7 +185,7 @@
 
 #### Technical Analysis Chart
 
-![SMCI Technical Chart](frontend/public/images_advanced/SMCI_advanced_chart.png)
+![SMCI Technical Chart](../frontend/public/images_advanced/SMCI_advanced_chart.png)
 
 ---
 
@@ -203,6 +203,6 @@
 
 #### Technical Analysis Chart
 
-![TSLA Technical Chart](frontend/public/images_advanced/TSLA_advanced_chart.png)
+![TSLA Technical Chart](../frontend/public/images_advanced/TSLA_advanced_chart.png)
 
 ---

@@ -10,6 +10,10 @@ from typing import Optional, Tuple, Dict, List, Any
 from scipy.stats import norm
 from strategies.willy_algo import calculate_willy_vwap
 
+def norm_cdf(x: float) -> float:
+    """Standard normal cumulative distribution function using pure python math.erf."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
 # Paths
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_DIR = os.path.dirname(BACKEND_DIR)
@@ -373,7 +377,7 @@ def black_scholes_call(S: float, K: float, T_years: float, r: float, sigma: floa
         return max(S - K, 0.0)
     d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T_years) / (sigma * math.sqrt(T_years))
     d2 = d1 - sigma * math.sqrt(T_years)
-    price = S * norm.cdf(d1) - K * math.exp(-r * T_years) * norm.cdf(d2)
+    price = S * norm_cdf(d1) - K * math.exp(-r * T_years) * norm_cdf(d2)
     return max(float(price), 0.0)
 
 
@@ -383,7 +387,7 @@ def black_scholes_put(S: float, K: float, T_years: float, r: float, sigma: float
         return max(K - S, 0.0)
     d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T_years) / (sigma * math.sqrt(T_years))
     d2 = d1 - sigma * math.sqrt(T_years)
-    price = K * math.exp(-r * T_years) * norm.cdf(-d2) - S * norm.cdf(-d1)
+    price = K * math.exp(-r * T_years) * norm_cdf(-d2) - S * norm_cdf(-d1)
     return max(float(price), 0.0)
 
 
@@ -427,16 +431,12 @@ def execute_options_backtest(period: str = "1m", exit_mode: str = "intraday") ->
     Uses the same Strategy 1 screening criteria (5 filters + top-5 ranking).
     For each trading day T:
       - Screen tickers on T (same as Strategy 1)
-      - Buy ATM weekly CALL options at T+1 3:00 PM open using Black-Scholes pricing
-      - Exit either:
-          exit_mode='intraday' → Reprice via BS at T+2 11:00 AM  (same timing as Strategy 1)
-          exit_mode='expiry'   → Hold to next weekly expiry (7 calendar days from entry)
-
-    Capital per position: $2,000.
-    Contracts = floor(2000 / (entry_premium_per_share * 100)).
-    Min 1 contract if premium is affordable, else 0 contracts (skip).
-    Risk-free rate: 5% annually.
+      - Buy ATM CALL options at T+1 3:00 PM open using Black-Scholes pricing
+      - Exit according to exit_mode:
+          'expiry'      → Hold to weekly expiry (7 calendar days from entry, intrinsic value)
+          'intraday_N'  → Reprice via BS at T+N 11:00 AM (e.g. N=2, 3, 5, 7, 10, 12, 14, 21)
     """
+    import re
     tickers = load_universe_tickers()
     indicators, daily_data, data_30m = get_backtest_data(tickers)
 
@@ -457,24 +457,26 @@ def execute_options_backtest(period: str = "1m", exit_mode: str = "intraday") ->
 
     RISK_FREE_RATE = 0.05          # 5% annual risk-free rate
     CAPITAL_PER_TRADE = 2000.0    # $2,000 per options position
-    WEEKLY_EXPIRY_DAYS = 7        # Target next weekly expiry ~7 calendar days out
+    WEEKLY_EXPIRY_DAYS = 7        # Default weekly expiry ~7 calendar days out
 
-    trades_ledger = []
-    total_profit = 0.0
+    # Determine mode configuration
+    exit_mode_lower = str(exit_mode).lower().strip()
+    is_expiry_mode = (exit_mode_lower == 'expiry')
+    if is_expiry_mode:
+        selected_exit_days = 7
+        mode_label = "Hold to Expiry"
+    else:
+        match = re.search(r'\d+', exit_mode_lower)
+        selected_exit_days = int(match.group()) if match else 2
+        mode_label = f"T+{selected_exit_days} Intraday"
 
+    # Pre-screen top 5 tickers for each trading day T
+    screened_by_date = {}
     for T in trading_days:
         idx = all_dates.index(T)
-        if idx + 2 >= len(all_dates):
+        if idx + 1 >= len(all_dates):
             continue
 
-        T_plus_1 = all_dates[idx + 1]
-        T_plus_2 = all_dates[idx + 2]
-
-        T_str = T.strftime('%Y-%m-%d')
-        T_plus_1_str = T_plus_1.strftime('%Y-%m-%d')
-        T_plus_2_str = T_plus_2.strftime('%Y-%m-%d')
-
-        # ── Screen tickers (same 5-filter Strategy 1 criteria) ───────────────
         selected_tickers = []
         for ticker in tickers:
             df = indicators.get(ticker)
@@ -515,186 +517,214 @@ def execute_options_backtest(period: str = "1m", exit_mode: str = "intraday") ->
 
             selected_tickers.append((ticker, strat_val_1w))
 
-        # Sort by 1-wk strategy value, take top 5
         selected_tickers.sort(key=lambda x: x[1], reverse=True)
-        top_5 = selected_tickers[:5]
+        screened_by_date[T] = selected_tickers[:5]
 
-        # ── Execute options trades ────────────────────────────────────────────
-        daily_profit = 0.0
-        traded_items = []
+    def _simulate(eval_is_expiry: bool, eval_exit_days: int):
+        total_profit = 0.0
+        trades_ledger = []
 
-        for ticker, strat_val in top_5:
-            try:
-                df = indicators.get(ticker)
-                if df is None:
+        for T in trading_days:
+            top_5 = screened_by_date.get(T, [])
+            if not top_5:
+                continue
+
+            idx = all_dates.index(T)
+            if idx + 1 >= len(all_dates):
+                continue
+            T_plus_1 = all_dates[idx + 1]
+            T_str = T.strftime('%Y-%m-%d')
+            T_plus_1_str = T_plus_1.strftime('%Y-%m-%d')
+
+            if eval_is_expiry:
+                expiry_date = T_plus_1.date() + datetime.timedelta(days=WEEKLY_EXPIRY_DAYS)
+                expiry_ts = None
+                for d in reversed(all_dates):
+                    if d.date() <= expiry_date:
+                        expiry_ts = d
+                        break
+                if expiry_ts is None:
                     continue
+                T_exit = expiry_ts
+                T_exit_str = T_exit.strftime('%Y-%m-%d')
+                time_from_entry_to_exit_years = 0.0
+                total_T_years = WEEKLY_EXPIRY_DAYS / 365.0
+                expiry_display = (T_plus_1.date() + datetime.timedelta(days=WEEKLY_EXPIRY_DAYS)).strftime('%Y-%m-%d')
+            else:
+                if idx + eval_exit_days >= len(all_dates):
+                    continue
+                T_exit = all_dates[idx + eval_exit_days]
+                T_exit_str = T_exit.strftime('%Y-%m-%d')
+                # Time elapsed in trading days: (N - 1.5) trading days
+                time_from_entry_to_exit_years = max((eval_exit_days - 1.5), 0.5) / 252.0
+                expiry_cal_days = max(7, int(math.ceil(eval_exit_days * 1.5 + 4)))
+                total_T_years = expiry_cal_days / 365.0
+                expiry_display = (T_plus_1.date() + datetime.timedelta(days=expiry_cal_days)).strftime('%Y-%m-%d')
 
-                # ── Get underlying entry price (T+1 3:00 PM open in 30m data) ──
-                buy_dt = pd.Timestamp(f"{T_plus_1_str} 15:00:00", tz='America/New_York')
-                underlying_entry = None
-                if buy_dt in data_30m.index:
-                    v = data_30m.loc[buy_dt, ('Open', ticker)]
-                    if pd.notna(v):
-                        underlying_entry = float(v)
-                if underlying_entry is None or underlying_entry <= 0:
-                    # Fallback to daily close
-                    if T_plus_1 in daily_data.index:
-                        v = daily_data.loc[T_plus_1, ('Close', ticker)]
+            daily_profit = 0.0
+            traded_items = []
+
+            for ticker, strat_val in top_5:
+                try:
+                    df = indicators.get(ticker)
+                    if df is None:
+                        continue
+
+                    # Underlying entry price (T+1 3:00 PM open in 30m data)
+                    buy_dt = pd.Timestamp(f"{T_plus_1_str} 15:00:00", tz='America/New_York')
+                    underlying_entry = None
+                    if buy_dt in data_30m.index:
+                        v = data_30m.loc[buy_dt, ('Open', ticker)]
                         if pd.notna(v):
                             underlying_entry = float(v)
-                if underlying_entry is None or underlying_entry <= 0:
-                    continue
+                    if underlying_entry is None or underlying_entry <= 0:
+                        if T_plus_1 in daily_data.index:
+                            v = daily_data.loc[T_plus_1, ('Close', ticker)]
+                            if pd.notna(v):
+                                underlying_entry = float(v)
+                    if underlying_entry is None or underlying_entry <= 0:
+                        continue
 
-                # ── Get underlying exit price ─────────────────────────────────
-                if exit_mode == 'intraday':
-                    # Exit T+2 11:00 AM (same as Strategy 1)
-                    sell_dt = pd.Timestamp(f"{T_plus_2_str} 11:00:00", tz='America/New_York')
-                    underlying_exit = None
-                    if sell_dt in data_30m.index:
-                        v = data_30m.loc[sell_dt, ('Open', ticker)]
-                        if pd.notna(v):
-                            underlying_exit = float(v)
-                    if underlying_exit is None or underlying_exit <= 0:
-                        if T_plus_2 in daily_data.index:
-                            v = daily_data.loc[T_plus_2, ('Close', ticker)]
+                    # Underlying exit price
+                    if eval_is_expiry:
+                        if T_exit in daily_data.index:
+                            v = daily_data.loc[T_exit, ('Close', ticker)]
                             if pd.notna(v):
                                 underlying_exit = float(v)
-                    if underlying_exit is None or underlying_exit <= 0:
-                        continue
-                    # Time from entry to exit: approximately 0.5 trading day = 0.002 years
-                    time_from_entry_to_exit_years = 0.5 / 252
-                else:
-                    # Hold to expiry: weekly expiry ~7 calendar days from T+1
-                    expiry_date = T_plus_1.date() + datetime.timedelta(days=WEEKLY_EXPIRY_DAYS)
-                    # Find nearest trading day <= expiry
-                    expiry_ts = None
-                    for d in reversed(all_dates):
-                        if d.date() <= expiry_date:
-                            expiry_ts = d
-                            break
-                    if expiry_ts is None:
-                        continue
-                    if expiry_ts in daily_data.index:
-                        v = daily_data.loc[expiry_ts, ('Close', ticker)]
-                        if pd.notna(v):
-                            underlying_exit = float(v)
+                            else:
+                                continue
                         else:
                             continue
                     else:
-                        continue
-                    time_from_entry_to_exit_years = 0  # At expiry, T=0 → intrinsic only
+                        sell_dt = pd.Timestamp(f"{T_exit_str} 11:00:00", tz='America/New_York')
+                        underlying_exit = None
+                        if sell_dt in data_30m.index:
+                            v = data_30m.loc[sell_dt, ('Open', ticker)]
+                            if pd.notna(v):
+                                underlying_exit = float(v)
+                        if underlying_exit is None or underlying_exit <= 0:
+                            if T_exit in daily_data.index:
+                                v = daily_data.loc[T_exit, ('Close', ticker)]
+                                if pd.notna(v):
+                                    underlying_exit = float(v)
+                        if underlying_exit is None or underlying_exit <= 0:
+                            continue
 
-                # ── Compute Historical Volatility at T ─────────────────────────
-                hv_window = 30
-                closes_up_to_T = df.loc[:T, 'Close'].dropna()
-                sigma = calc_historical_volatility(closes_up_to_T, window=hv_window)
+                    # Compute Historical Volatility at T
+                    closes_up_to_T = df.loc[:T, 'Close'].dropna()
+                    sigma = calc_historical_volatility(closes_up_to_T, window=30)
+                    strike = get_atm_strike(underlying_entry)
 
-                # ── Option parameters ─────────────────────────────────────────
-                strike = get_atm_strike(underlying_entry)
-                # Time to expiry from entry to weekly expiry (~7 cal days)
-                total_T_years = WEEKLY_EXPIRY_DAYS / 365.0
-
-                # ── Price option at ENTRY (T+1 3:00 PM) ──────────────────────
-                entry_premium = black_scholes_call(
-                    S=underlying_entry,
-                    K=strike,
-                    T_years=total_T_years,
-                    r=RISK_FREE_RATE,
-                    sigma=sigma
-                )
-                if entry_premium <= 0:
-                    continue
-
-                # Contracts = floor(capital / (premium_per_share * 100))
-                # Each contract = 100 shares
-                contracts = int(CAPITAL_PER_TRADE / (entry_premium * 100))
-                if contracts < 1:
-                    contracts = 1  # Always buy at least 1 contract if affordable
-
-                cost_of_position = contracts * entry_premium * 100
-                if cost_of_position > CAPITAL_PER_TRADE * 1.5:
-                    # Too expensive even for 1 contract — skip
-                    continue
-
-                # ── Price option at EXIT ──────────────────────────────────────
-                if exit_mode == 'intraday':
-                    remaining_T_years = total_T_years - time_from_entry_to_exit_years
-                    exit_premium = black_scholes_call(
-                        S=underlying_exit,
+                    # Price option at ENTRY (T+1 3:00 PM)
+                    entry_premium = black_scholes_call(
+                        S=underlying_entry,
                         K=strike,
-                        T_years=max(remaining_T_years, 0.0),
+                        T_years=total_T_years,
                         r=RISK_FREE_RATE,
-                        sigma=sigma  # Using same vol (vol of vol would be more realistic)
+                        sigma=sigma
                     )
-                else:
-                    # At expiry: intrinsic value only = max(S - K, 0)
-                    exit_premium = max(underlying_exit - strike, 0.0)
+                    if entry_premium <= 0:
+                        continue
 
-                exit_value = contracts * exit_premium * 100
-                profit = exit_value - cost_of_position
-                daily_profit += profit
+                    contracts = int(CAPITAL_PER_TRADE / (entry_premium * 100))
+                    if contracts < 1:
+                        contracts = 1
 
-                underlying_pct_change = ((underlying_exit - underlying_entry) / underlying_entry) * 100.0
-                leverage_multiple = (profit / cost_of_position) if cost_of_position > 0 else 0.0
+                    cost_of_position = contracts * entry_premium * 100
+                    if cost_of_position > CAPITAL_PER_TRADE * 1.5:
+                        continue
 
-                # Expiry date for display
-                expiry_display = (T_plus_1.date() + datetime.timedelta(days=WEEKLY_EXPIRY_DAYS)).strftime('%Y-%m-%d')
+                    # Price option at EXIT
+                    if eval_is_expiry:
+                        exit_premium = max(underlying_exit - strike, 0.0)
+                    else:
+                        remaining_T_years = max(total_T_years - time_from_entry_to_exit_years, 0.0)
+                        exit_premium = black_scholes_call(
+                            S=underlying_exit,
+                            K=strike,
+                            T_years=remaining_T_years,
+                            r=RISK_FREE_RATE,
+                            sigma=sigma
+                        )
 
-                traded_items.append({
-                    "ticker": ticker,
-                    "strike": float(strike),
-                    "expiry_date": expiry_display,
-                    "underlying_entry": float(underlying_entry),
-                    "underlying_exit": float(underlying_exit),
-                    "underlying_pct_change": float(underlying_pct_change),
-                    "entry_premium": float(entry_premium),
-                    "exit_premium": float(exit_premium),
-                    "contracts": contracts,
-                    "cost_of_position": float(cost_of_position),
-                    "exit_value": float(exit_value),
-                    "profit": float(profit),
-                    "leverage_multiple": float(leverage_multiple),
-                    "strategy_value": float(strat_val),
-                    "iv_used": float(sigma)
-                })
+                    exit_value = contracts * exit_premium * 100
+                    profit = exit_value - cost_of_position
+                    daily_profit += profit
 
-            except Exception as e:
-                print(f"[OPTIONS BACKTEST] Error on ticker {ticker} for {T_str}: {e}")
-                continue
+                    underlying_pct_change = ((underlying_exit - underlying_entry) / underlying_entry) * 100.0
+                    leverage_multiple = (profit / cost_of_position) if cost_of_position > 0 else 0.0
 
-        total_profit += daily_profit
+                    traded_items.append({
+                        "ticker": ticker,
+                        "strike": float(strike),
+                        "expiry_date": expiry_display,
+                        "underlying_entry": float(underlying_entry),
+                        "underlying_exit": float(underlying_exit),
+                        "underlying_pct_change": float(underlying_pct_change),
+                        "entry_premium": float(entry_premium),
+                        "exit_premium": float(exit_premium),
+                        "contracts": contracts,
+                        "cost_of_position": float(cost_of_position),
+                        "exit_value": float(exit_value),
+                        "profit": float(profit),
+                        "leverage_multiple": float(leverage_multiple),
+                        "strategy_value": float(strat_val),
+                        "iv_used": float(sigma)
+                    })
+                except Exception as e:
+                    print(f"[OPTIONS BACKTEST] Error on ticker {ticker} for {T_str}: {e}")
+                    continue
 
-        # ── Index returns for comparison ──────────────────────────────────────
-        dow_ret = 0.0
-        sp_ret = 0.0
-        nasdaq_ret = 0.0
-        if daily_data is not None and not daily_data.empty:
-            try:
-                if T_plus_1 in daily_data.index and T_plus_2 in daily_data.index:
-                    for symbol, name in [('^DJI', 'dow'), ('^GSPC', 'sp'), ('^NDX', 'nasdaq')]:
-                        if ('Close', symbol) in daily_data.columns or ('Close' in daily_data and symbol in daily_data['Close']):
-                            p_start = daily_data.loc[T_plus_1, ('Close', symbol)]
-                            p_end = daily_data.loc[T_plus_2, ('Close', symbol)]
-                            if pd.notna(p_start) and pd.notna(p_end) and p_start > 0:
-                                val = float((p_end - p_start) / p_start * 100.0)
-                                if name == 'dow': dow_ret = val
-                                elif name == 'sp': sp_ret = val
-                                elif name == 'nasdaq': nasdaq_ret = val
-            except Exception as e:
-                print(f"[OPTIONS BACKTEST] Error calculating index returns for {T_str}: {e}")
+            total_profit += daily_profit
 
-        trades_ledger.append({
-            "screen_date": T_str,
-            "buy_date": T_plus_1_str,
-            "sell_date": T_plus_2_str,
-            "tickers": traded_items,
-            "daily_profit": float(daily_profit),
-            "dow_return": dow_ret,
-            "sp_return": sp_ret,
-            "nasdaq_return": nasdaq_ret
-        })
+            # Index returns for comparison
+            dow_ret = 0.0
+            sp_ret = 0.0
+            nasdaq_ret = 0.0
+            if daily_data is not None and not daily_data.empty:
+                try:
+                    if T_plus_1 in daily_data.index and T_exit in daily_data.index:
+                        for symbol, name in [('^DJI', 'dow'), ('^GSPC', 'sp'), ('^NDX', 'nasdaq')]:
+                            if ('Close', symbol) in daily_data.columns or ('Close' in daily_data and symbol in daily_data['Close']):
+                                p_start = daily_data.loc[T_plus_1, ('Close', symbol)]
+                                p_end = daily_data.loc[T_exit, ('Close', symbol)]
+                                if pd.notna(p_start) and pd.notna(p_end) and p_start > 0:
+                                    val = float((p_end - p_start) / p_start * 100.0)
+                                    if name == 'dow': dow_ret = val
+                                    elif name == 'sp': sp_ret = val
+                                    elif name == 'nasdaq': nasdaq_ret = val
+                except Exception as e:
+                    print(f"[OPTIONS BACKTEST] Error calculating index returns for {T_str}: {e}")
 
-    roi_pct = (total_profit / 10000.0) * 100.0
+            trades_ledger.append({
+                "screen_date": T_str,
+                "buy_date": T_plus_1_str,
+                "sell_date": T_exit_str,
+                "tickers": traded_items,
+                "daily_profit": float(daily_profit),
+                "dow_return": dow_ret,
+                "sp_return": sp_ret,
+                "nasdaq_return": nasdaq_ret
+            })
+
+        roi_pct = (total_profit / 10000.0) * 100.0
+        return total_profit, roi_pct, trades_ledger
+
+    # Run simulation for selected exit mode
+    total_profit, roi_pct, trades_ledger = _simulate(is_expiry_mode, selected_exit_days)
+
+    # Run baseline Hold to Expiry simulation for comparison
+    if is_expiry_mode:
+        hold_total_profit = total_profit
+        hold_roi_pct = roi_pct
+    else:
+        hold_total_profit, hold_roi_pct, _ = _simulate(True, 7)
+
+    # Calculate relative performance percentage relative to the Hold to Expiry baseline
+    if hold_total_profit != 0:
+        relative_to_hold_pct = float(((total_profit - hold_total_profit) / abs(hold_total_profit)) * 100.0)
+    else:
+        relative_to_hold_pct = 0.0
 
     # Overall S&P 500 change for the period
     sp500_pct_change = 0.0
@@ -715,8 +745,12 @@ def execute_options_backtest(period: str = "1m", exit_mode: str = "intraday") ->
     return {
         "total_profit": float(total_profit),
         "roi_pct": float(roi_pct),
+        "hold_total_profit": float(hold_total_profit),
+        "hold_roi_pct": float(hold_roi_pct),
+        "relative_to_hold_pct": float(relative_to_hold_pct),
         "sp500_pct_change": float(sp500_pct_change),
         "exit_mode": exit_mode,
+        "mode_label": mode_label,
         "trades": trades_ledger
     }
 
@@ -1550,6 +1584,274 @@ def execute_slope_options_2day_backtest(period: str = "1m", slope_period: str = 
         "slope_period": slope_period,
         "trades": trades_ledger
     }
+
+
+def execute_toptickers_options_backtest(period: str = "1m") -> dict:
+    """
+    Top Tickers 5-Point Buy Screener 1-Wk Call Option Strategy Backtest.
+    Screening Criteria on Day T across Dow 30, Nasdaq 100, S&P 500 (~170 tickers):
+      1. Willy Market = Bull (Price > Willy VWAP)
+      2. 1-Wk Willy Backtest final value > $10,000
+      3. MACD Hist between -0.5 and 0.5
+      4. MACD Slope > 0
+      5. RSI 14 between 30 and 70
+    Selection & Ranking:
+      - Ranks qualified candidates by 1-Wk Willy Backtest final value descending.
+      - Selects top 5 candidates for trade execution on Day T.
+    Trade Specs:
+      - Buy 30-day expiration ATM Call options ($2,000 capital per position, max $10,000 daily budget) on entry date T+1 using Black-Scholes.
+      - Exit 1 week later at 11:00 AM on T+5 (7 calendar days / 5 trading days) with 23 days remaining to expiry.
+      - Re-price options via Black-Scholes formula at exit.
+      - Cumulative P&L, ROI %, and full transaction ledger maintained.
+    """
+    tickers = load_universe_tickers()
+    indicators, daily_data, data_30m = get_backtest_data(tickers)
+
+    PERIOD_DAYS_MAP = {
+        "1w": 7,
+        "1m": 30,
+        "3m": 90,
+        "6m": 180,
+        "1y": 365
+    }
+    lookback_days = PERIOD_DAYS_MAP.get(period.lower(), 30)
+
+    today = datetime.datetime.now().date()
+    start_date = today - datetime.timedelta(days=lookback_days)
+
+    all_dates = sorted(list(daily_data.index))
+    trading_days = [d for d in all_dates if d.date() >= start_date]
+
+    RISK_FREE_RATE = 0.05          # 5% annual risk-free rate
+    CAPITAL_PER_TRADE = 2000.0    # $2,000 per options position
+    OPTION_EXPIRY_DAYS = 30       # 30-day expiration Call option
+    HOLDING_DAYS = 7              # 1-week holding period (7 calendar days / 5 trading days)
+
+    trades_ledger = []
+    total_profit = 0.0
+
+    for T in trading_days:
+        idx = all_dates.index(T)
+        # Entry on T+1, Exit 1 week later (T+5 trading days)
+        if idx + 5 >= len(all_dates):
+            continue
+
+        T_plus_1 = all_dates[idx + 1]
+        T_plus_exit = all_dates[min(idx + 5, len(all_dates) - 1)]
+
+        T_str = T.strftime('%Y-%m-%d')
+        T_plus_1_str = T_plus_1.strftime('%Y-%m-%d')
+        T_exit_str = T_plus_exit.strftime('%Y-%m-%d')
+
+        # ── Screen & Rank Tickers using 5-Point Top Tickers Buy Screener ───────
+        selected_tickers = []
+        for ticker in tickers:
+            df = indicators.get(ticker)
+            if df is None or T not in df.index:
+                continue
+
+            close_T = df.loc[T, 'Close']
+            willy_vwap_T = df.loc[T, 'willy_vwap']
+            macd_hist_T = df.loc[T, 'macd_hist']
+            macd_slope_T = df.loc[T, 'macd_slope']
+            rsi_T = df.loc[T, 'rsi_14']
+
+            if pd.isna(close_T) or pd.isna(willy_vwap_T) or pd.isna(macd_hist_T) or pd.isna(macd_slope_T) or pd.isna(rsi_T):
+                continue
+
+            # 1. Willy Market = Bull (Price > Willy VWAP)
+            if close_T <= willy_vwap_T:
+                continue
+
+            # 2. 1-Wk Willy Backtest final value > $10,000
+            one_week_start = T - datetime.timedelta(days=7)
+            slice_df = df.loc[one_week_start:T]
+            strat_val_1w = run_willy_backtest_py(slice_df, 10000.0)
+            if strat_val_1w <= 10000.0:
+                continue
+
+            # 3. MACD Hist between -0.5 and 0.5
+            if macd_hist_T <= -0.5 or macd_hist_T >= 0.5:
+                continue
+
+            # 4. MACD Slope > 0
+            if macd_slope_T <= 0:
+                continue
+
+            # 5. RSI 14 between 30 and 70
+            if rsi_T <= 30 or rsi_T >= 70:
+                continue
+
+            selected_tickers.append((ticker, strat_val_1w))
+
+        # Sort by 1-Wk Willy Backtest value descending, select top 5
+        selected_tickers.sort(key=lambda x: x[1], reverse=True)
+        top_5 = selected_tickers[:5]
+
+        # ── Execute 30-Day Call Options (Held 1 Week / Liquidated at 11:00 AM on T+5) ──
+        daily_profit = 0.0
+        traded_items = []
+
+        for ticker, strat_val in top_5:
+            try:
+                df = indicators.get(ticker)
+                if df is None:
+                    continue
+
+                # ── Underlying Entry Price (T+1 3:00 PM or daily close) ───────
+                buy_dt = pd.Timestamp(f"{T_plus_1_str} 15:00:00", tz='America/New_York')
+                underlying_entry = None
+                if buy_dt in data_30m.index:
+                    v = data_30m.loc[buy_dt, ('Open', ticker)]
+                    if pd.notna(v):
+                        underlying_entry = float(v)
+                if underlying_entry is None or underlying_entry <= 0:
+                    if T_plus_1 in daily_data.index:
+                        v = daily_data.loc[T_plus_1, ('Close', ticker)]
+                        if pd.notna(v):
+                            underlying_entry = float(v)
+                if underlying_entry is None or underlying_entry <= 0:
+                    continue
+
+                # ── Underlying Exit Price (T+exit 11:00 AM or daily close) ───
+                sell_dt = pd.Timestamp(f"{T_exit_str} 11:00:00", tz='America/New_York')
+                underlying_exit = None
+                if sell_dt in data_30m.index:
+                    v = data_30m.loc[sell_dt, ('Open', ticker)]
+                    if pd.notna(v):
+                        underlying_exit = float(v)
+                if underlying_exit is None or underlying_exit <= 0:
+                    if T_plus_exit in daily_data.index:
+                        v = daily_data.loc[T_plus_exit, ('Close', ticker)]
+                        if pd.notna(v):
+                            underlying_exit = float(v)
+                if underlying_exit is None or underlying_exit <= 0:
+                    continue
+
+                # ── Historical Volatility at T ────────────────────────────────
+                closes_up_to_T = df.loc[:T, 'Close'].dropna()
+                sigma = calc_historical_volatility(closes_up_to_T, window=30)
+
+                # ── Option Parameters ─────────────────────────────────────────
+                strike = get_atm_strike(underlying_entry)
+                entry_time_years = OPTION_EXPIRY_DAYS / 365.0                  # 30 days = 0.0822 yrs
+                exit_time_years = (OPTION_EXPIRY_DAYS - HOLDING_DAYS) / 365.0  # 23 days = 0.0630 yrs
+
+                # ── Option Entry Premium (Black-Scholes 30-day Call) ─────────
+                entry_premium = black_scholes_call(
+                    S=underlying_entry,
+                    K=strike,
+                    T_years=entry_time_years,
+                    r=RISK_FREE_RATE,
+                    sigma=sigma
+                )
+                if entry_premium <= 0:
+                    continue
+
+                contracts = int(CAPITAL_PER_TRADE / (entry_premium * 100))
+                if contracts < 1:
+                    contracts = 1
+
+                cost_of_position = contracts * entry_premium * 100
+                if cost_of_position > CAPITAL_PER_TRADE * 1.5:
+                    continue
+
+                # ── Option Exit Premium (Black-Scholes 23-day Call at T+5 11:00 AM) ──
+                exit_premium = black_scholes_call(
+                    S=underlying_exit,
+                    K=strike,
+                    T_years=exit_time_years,
+                    r=RISK_FREE_RATE,
+                    sigma=sigma
+                )
+
+                exit_value = contracts * exit_premium * 100
+                profit = exit_value - cost_of_position
+                daily_profit += profit
+
+                underlying_pct_change = ((underlying_exit - underlying_entry) / underlying_entry) * 100.0
+                leverage_multiple = (profit / cost_of_position) if cost_of_position > 0 else 0.0
+                expiry_display = (T_plus_1.date() + datetime.timedelta(days=OPTION_EXPIRY_DAYS)).strftime('%Y-%m-%d')
+
+                traded_items.append({
+                    "ticker": ticker,
+                    "strike": float(strike),
+                    "expiry_date": expiry_display,
+                    "underlying_entry": float(underlying_entry),
+                    "underlying_exit": float(underlying_exit),
+                    "underlying_pct_change": float(underlying_pct_change),
+                    "entry_premium": float(entry_premium),
+                    "exit_premium": float(exit_premium),
+                    "contracts": contracts,
+                    "cost_of_position": float(cost_of_position),
+                    "exit_value": float(exit_value),
+                    "profit": float(profit),
+                    "leverage_multiple": float(leverage_multiple),
+                    "strategy_value": float(strat_val),
+                    "iv_used": float(sigma)
+                })
+
+            except Exception as e:
+                print(f"[TOP TICKERS OPTIONS BACKTEST] Error on ticker {ticker} for {T_str}: {e}")
+                continue
+
+        total_profit += daily_profit
+
+        # ── Index returns ─────────────────────────────────────────────────────
+        dow_ret = 0.0
+        sp_ret = 0.0
+        nasdaq_ret = 0.0
+        if daily_data is not None and not daily_data.empty:
+            try:
+                if T_plus_1 in daily_data.index and T_plus_exit in daily_data.index:
+                    for symbol, name in [('^DJI', 'dow'), ('^GSPC', 'sp'), ('^NDX', 'nasdaq')]:
+                        if ('Close', symbol) in daily_data.columns or ('Close' in daily_data and symbol in daily_data['Close']):
+                            p_start = daily_data.loc[T_plus_1, ('Close', symbol)]
+                            p_end = daily_data.loc[T_plus_exit, ('Close', symbol)]
+                            if pd.notna(p_start) and pd.notna(p_end) and p_start > 0:
+                                val = float((p_end - p_start) / p_start * 100.0)
+                                if name == 'dow': dow_ret = val
+                                elif name == 'sp': sp_ret = val
+                                elif name == 'nasdaq': nasdaq_ret = val
+            except Exception as e:
+                print(f"[TOP TICKERS OPTIONS BACKTEST] Error calculating index returns for {T_str}: {e}")
+
+        trades_ledger.append({
+            "screen_date": T_str,
+            "buy_date": T_plus_1_str,
+            "sell_date": T_exit_str,
+            "tickers": traded_items,
+            "daily_profit": float(daily_profit),
+            "dow_return": dow_ret,
+            "sp_return": sp_ret,
+            "nasdaq_return": nasdaq_ret
+        })
+
+    roi_pct = (total_profit / 10000.0) * 100.0
+
+    sp500_pct_change = 0.0
+    try:
+        if len(trading_days) > 0 and '^GSPC' in daily_data['Close'].columns:
+            first_day = trading_days[0]
+            last_day = pd.Timestamp(trades_ledger[-1]["sell_date"]) if trades_ledger else trading_days[-1]
+            sp500_closes = daily_data['Close']['^GSPC'].dropna()
+            start_series = sp500_closes[sp500_closes.index <= first_day]
+            sp500_start = float(start_series.iloc[-1]) if not start_series.empty else float(sp500_closes.iloc[0])
+            end_series = sp500_closes[sp500_closes.index <= last_day]
+            sp500_end = float(end_series.iloc[-1]) if not end_series.empty else float(sp500_closes.iloc[-1])
+            if sp500_start > 0:
+                sp500_pct_change = float(((sp500_end - sp500_start) / sp500_start) * 100.0)
+    except Exception as e:
+        print(f"[TOP TICKERS OPTIONS BACKTEST] Error calculating S&P 500 % change: {e}")
+
+    return {
+        "total_profit": float(total_profit),
+        "roi_pct": float(roi_pct),
+        "sp500_pct_change": float(sp500_pct_change),
+        "strategy_name": "Top Tickers 5-Point Screener 1-Wk Call Option Strategy (30-Day Call, 1-Wk Hold)",
+        "trades": trades_ledger
+    }
+
 
 
 

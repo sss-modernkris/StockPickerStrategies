@@ -1,0 +1,5 @@
+{
+  "name": "robinhood-agentic-trading",
+  "version": "1.0.0",
+  "description": "Specialized AI Agents (Backtester Agent & Broker Agent) for automated daily stock screening and simulated sandbox execution via Robinhood Model Context Protocol (MCP)."
+}
