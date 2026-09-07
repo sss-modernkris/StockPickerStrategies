@@ -130,5 +130,5 @@ To https://github.com/sss-modernkris/StockPickerStrategies.git
 | Component | Status | Verification Detail |
 |---|---|---|
 | **Backend API** | ✅ Active | Endpoint `/api/backtest-30d/options-toptickers` returning HTTP 200 on port 8080 |
-| **Frontend UI** | ✅ Active | Top Tickers Options button & Compare Charts Deselect All button active on `http://localhost:3000` |
-| **GitHub Main** | ✅ Synced | Pushed to `main` branch (`a1ff48f`, `ead2824`, `4343e83`) |
+| **Frontend UI** | ✅ Active | Top Tickers Options button, Deselect All button, & Volume column active on `http://localhost:3000` |
+| **GitHub Main** | ✅ Synced | Pushed to `main` branch (`a1ff48f`, `ead2824`, `4343e83`, `d91863a`) |
