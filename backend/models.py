@@ -9,6 +9,7 @@ class StrategyResult(BaseModel):
 class PricePoint(BaseModel):
     date: str
     close: float
+    volume: Optional[float] = None
     open: Optional[float] = None
     high: Optional[float] = None
     low: Optional[float] = None

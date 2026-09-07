@@ -73,6 +73,14 @@ const CHART_COLORS = [
     '#eab308'  // yellow-500
 ];
 
+const formatVolume = (vol: number | null | undefined): string => {
+    if (vol === null || vol === undefined || isNaN(vol) || vol === 0) return 'N/A';
+    if (vol >= 1e9) return `${(vol / 1e9).toFixed(2)}B`;
+    if (vol >= 1e6) return `${(vol / 1e6).toFixed(2)}M`;
+    if (vol >= 1e3) return `${(vol / 1e3).toFixed(1)}K`;
+    return vol.toLocaleString();
+};
+
 export function NormalizedComparePanel({ availableTickers, selectedTickers, onSelectTickers, period, onPeriodChange, analysisData }: NormalizedComparePanelProps) {
     const [historyData, setHistoryData] = useState<TickerHistory[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -164,6 +172,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let stdDev: number | null = null;
             let stdDevPct: number | null = null;
             let trendValue: number | null = null;
+            let volume: number | null = null;
             let mlAlpha: number | null = null;
             let stratAvg: number | null = null;
             let macdHist: number | null = null;
@@ -178,6 +187,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let stdDevStr = 'N/A';
             let stdDevPctStr = 'N/A';
             let trendValueStr = 'N/A';
+            let volumeStr = 'N/A';
             let mlAlphaStr = 'N/A';
             let stratAvgStr = 'N/A';
             let macdHistStr = 'N/A';
@@ -192,6 +202,10 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 const latest = pts[n - 1];
                 currentPrice = latest.close;
                 currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                if (latest.volume !== undefined && latest.volume !== null) {
+                    volume = latest.volume;
+                }
 
                 if (n >= 2) {
                     let sumX = 0;
@@ -252,7 +266,15 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 const latest = tData.price_history[tData.price_history.length - 1];
                 currentPrice = latest.close;
                 currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                if (latest.volume !== undefined && latest.volume !== null) {
+                    volume = latest.volume;
+                }
             }
+
+            if (volume === null && tData?.technical_indicators?.volume) {
+                volume = tData.technical_indicators.volume;
+            }
+            volumeStr = formatVolume(volume);
 
             if (tData) {
                 if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
@@ -301,6 +323,8 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 stdDevStr,
                 stdDevPct,
                 stdDevPctStr,
+                volume,
+                volumeStr,
                 mlAlpha,
                 mlAlphaStr,
                 stratAvg,
@@ -660,6 +684,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('volume')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Volume
+                                            {SortIcon('volume')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('mlAlpha')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             ML Alpha Proba
                                             {SortIcon('mlAlpha')}
@@ -721,6 +751,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             {row.slopeStr}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">{row.stdDevStr}</TableCell>
+                                        <TableCell className="text-right font-mono text-muted-foreground font-semibold" title={row.volume !== null ? row.volume.toLocaleString() : undefined}>
+                                            {row.volumeStr}
+                                        </TableCell>
                                         <TableCell className="text-right font-mono">{row.mlAlphaStr}</TableCell>
                                         <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.strategyValueStr}</TableCell>

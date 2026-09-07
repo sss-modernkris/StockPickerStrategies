@@ -7,6 +7,7 @@ export interface StrategyResult {
 export interface PricePoint {
     date: string;
     close: number;
+    volume?: number | null;
     open?: number | null;
     high?: number | null;
     low?: number | null;
