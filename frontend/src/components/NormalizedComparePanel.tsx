@@ -470,16 +470,20 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                                if (selectedTickers.length === availableTickers.length) {
-                                    onSelectTickers([]);
-                                } else {
-                                    onSelectTickers([...availableTickers]);
-                                }
-                            }}
+                            onClick={() => onSelectTickers([...availableTickers])}
+                            disabled={selectedTickers.length === availableTickers.length}
                             className="rounded-lg font-semibold text-primary hover:bg-primary/10"
                         >
-                            {selectedTickers.length === availableTickers.length ? "Deselect All" : "Select All"}
+                            Select All
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onSelectTickers([])}
+                            disabled={selectedTickers.length === 0}
+                            className="rounded-lg font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                            Deselect All
                         </Button>
                         <span className="text-xs text-muted-foreground ml-2">
                             {selectedTickers.length} of {availableTickers.length} selected
