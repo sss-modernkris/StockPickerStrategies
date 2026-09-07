@@ -276,6 +276,13 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             }
             volumeStr = formatVolume(volume);
 
+            const ptsForBacktest = (tData?.price_history && tData.price_history.length > 0) ? tData.price_history : (hData?.history || []);
+            if (ptsForBacktest.length > 0) {
+                const backtest = runWillyBacktest(ptsForBacktest, 10000, mapPeriodToBacktestPeriod(period));
+                strategyValue = backtest.finalValue;
+                strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+
             if (tData) {
                 if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
                     mlAlpha = tData.alpha_probability;
@@ -302,17 +309,23 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         rsi = latestPoint.rsi_14;
                         rsiStr = rsi.toFixed(2);
                     }
-                    
-                    const backtest = runWillyBacktest(tData.price_history, 10000, mapPeriodToBacktestPeriod(period));
-                    strategyValue = backtest.finalValue;
-                    strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 }
+            }
+
+            // Calculate VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000
+            let vst: number | null = null;
+            let vstStr = 'N/A';
+            if (trendValue !== null && volume !== null && strategyValue !== null && !isNaN(trendValue) && !isNaN(volume) && !isNaN(strategyValue)) {
+                vst = (trendValue * volume * strategyValue) / (10000 * 1000000);
+                vstStr = (vst >= 0 ? '+' : '') + vst.toFixed(2);
             }
 
             return {
                 symbol: ticker,
                 currentPrice,
                 currentPriceStr,
+                vst,
+                vstStr,
                 trendValue,
                 trendValueStr,
                 slope,
@@ -654,6 +667,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('vst')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold text-indigo-400" title="VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000">
+                                            VST
+                                            {SortIcon('vst')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('trendValue')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             Trend (Slope%/Std%)
                                             {SortIcon('trendValue')}
@@ -738,6 +757,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             {row.symbol}
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.currentPriceStr}</TableCell>
+                                        <TableCell className={`text-right font-mono ${row.vst !== null && row.vst > 0 ? 'text-indigo-400 font-bold' : row.vst !== null && row.vst < 0 ? 'text-red-500 font-bold' : ''}`} title="VST = Trend * Volume * Strategy Value / 1e10">
+                                            {row.vstStr}
+                                        </TableCell>
                                         <TableCell className={`text-right font-mono ${row.trendValue !== null && row.trendValue > 0 ? 'text-emerald-500 font-bold' : row.trendValue !== null && row.trendValue < 0 ? 'text-red-500 font-bold' : ''}`}>
                                             {row.trendValueStr}
                                         </TableCell>
