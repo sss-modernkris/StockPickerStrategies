@@ -200,10 +200,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 const pts = hData.history;
                 const n = pts.length;
                 const latest = pts[n - 1];
-                currentPrice = latest.close;
-                currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                if (latest && typeof latest.close === 'number' && isFinite(latest.close)) {
+                    currentPrice = latest.close;
+                    currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
 
-                if (latest.volume !== undefined && latest.volume !== null) {
+                if (latest && latest.volume !== undefined && latest.volume !== null && isFinite(latest.volume)) {
                     volume = latest.volume;
                 }
 
@@ -215,7 +217,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
 
                     for (let i = 0; i < n; i++) {
                         const x = i;
-                        const y = pts[i].close;
+                        const y = pts[i].close || 0;
                         sumX += x;
                         sumY += y;
                         sumXY += x * y;
@@ -230,82 +232,106 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                     if (denominator !== 0) {
                         const m = numerator / denominator;
                         const c = meanY - m * meanX;
-                        slope = m;
-                        slopeStr = (m >= 0 ? '+' : '') + m.toFixed(4);
+                        if (isFinite(m)) {
+                            slope = m;
+                            slopeStr = (m >= 0 ? '+' : '') + m.toFixed(4);
 
-                        let sumResidualSq = 0;
-                        for (let i = 0; i < n; i++) {
-                            const x = i;
-                            const y = pts[i].close;
-                            const yFit = m * x + c;
-                            const residual = y - yFit;
-                            sumResidualSq += residual * residual;
+                            let sumResidualSq = 0;
+                            for (let i = 0; i < n; i++) {
+                                const x = i;
+                                const y = pts[i].close || 0;
+                                const yFit = m * x + c;
+                                const residual = y - yFit;
+                                sumResidualSq += residual * residual;
+                            }
+
+                            const variance = sumResidualSq / n;
+                            stdDev = Math.sqrt(variance);
+                            if (isFinite(stdDev)) {
+                                stdDevStr = stdDev.toFixed(2);
+                            }
                         }
-
-                        const variance = sumResidualSq / n;
-                        stdDev = Math.sqrt(variance);
-                        stdDevStr = stdDev.toFixed(2);
                     }
                 }
 
                 if (currentPrice !== null && currentPrice > 0) {
-                    if (slope !== null) {
+                    if (slope !== null && isFinite(slope)) {
                         slopePct = (slope * 100) / currentPrice;
-                        slopePctStr = (slopePct >= 0 ? '+' : '') + slopePct.toFixed(2) + '%';
+                        if (isFinite(slopePct)) {
+                            slopePctStr = (slopePct >= 0 ? '+' : '') + slopePct.toFixed(2) + '%';
+                        }
                     }
-                    if (stdDev !== null) {
+                    if (stdDev !== null && isFinite(stdDev)) {
                         stdDevPct = (stdDev * 100) / currentPrice;
-                        stdDevPctStr = stdDevPct.toFixed(2) + '%';
+                        if (isFinite(stdDevPct)) {
+                            stdDevPctStr = stdDevPct.toFixed(2) + '%';
+                        }
                     }
-                    if (slopePct !== null && stdDevPct !== null && stdDevPct > 0) {
-                        trendValue = slopePct / stdDevPct;
-                        trendValueStr = (trendValue >= 0 ? '+' : '') + trendValue.toFixed(2);
+                    if (slopePct !== null && stdDevPct !== null && stdDevPct > 0 && isFinite(slopePct) && isFinite(stdDevPct)) {
+                        const rawTrend = slopePct / stdDevPct;
+                        if (isFinite(rawTrend)) {
+                            trendValue = rawTrend;
+                            trendValueStr = (trendValue >= 0 ? '+' : '') + trendValue.toFixed(2);
+                        }
                     }
                 }
             } else if (tData?.price_history && tData.price_history.length > 0) {
                 const latest = tData.price_history[tData.price_history.length - 1];
-                currentPrice = latest.close;
-                currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                if (latest.volume !== undefined && latest.volume !== null) {
+                if (latest && typeof latest.close === 'number' && isFinite(latest.close)) {
+                    currentPrice = latest.close;
+                    currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+                if (latest && latest.volume !== undefined && latest.volume !== null && isFinite(latest.volume)) {
                     volume = latest.volume;
                 }
             }
 
-            if (volume === null && tData?.technical_indicators?.volume) {
+            if (volume === null && tData?.technical_indicators?.volume && isFinite(tData.technical_indicators.volume)) {
                 volume = tData.technical_indicators.volume;
             }
             volumeStr = formatVolume(volume);
 
             const ptsForBacktest = (tData?.price_history && tData.price_history.length > 0) ? tData.price_history : (hData?.history || []);
             if (ptsForBacktest.length > 0) {
-                const backtest = runWillyBacktest(ptsForBacktest, 10000, mapPeriodToBacktestPeriod(period));
-                strategyValue = backtest.finalValue;
-                strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                try {
+                    const backtest = runWillyBacktest(ptsForBacktest, 10000, mapPeriodToBacktestPeriod(period));
+                    if (backtest && typeof backtest.finalValue === 'number' && isFinite(backtest.finalValue)) {
+                        strategyValue = backtest.finalValue;
+                        strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    }
+                } catch (bErr) {
+                    console.warn("Backtest calculation error for", ticker, bErr);
+                }
             }
 
             if (tData) {
-                if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
+                if (tData.alpha_probability !== undefined && tData.alpha_probability !== null && isFinite(tData.alpha_probability)) {
                     mlAlpha = tData.alpha_probability;
                     mlAlphaStr = `${(mlAlpha * 100).toFixed(1)}%`;
                 }
 
                 if (tData.strategies && tData.strategies.length > 0) {
-                    const sum = tData.strategies.reduce((acc, strat) => acc + strat.match_percentage, 0);
+                    const sum = tData.strategies.reduce((acc, strat) => acc + (strat.match_percentage || 0), 0);
                     stratAvg = sum / tData.strategies.length;
-                    stratAvgStr = `${stratAvg.toFixed(1)}%`;
+                    if (isFinite(stratAvg)) {
+                        stratAvgStr = `${stratAvg.toFixed(1)}%`;
+                    }
                 }
 
                 if (tData.price_history && tData.price_history.length > 0) {
                     const latestPoint = tData.price_history[tData.price_history.length - 1];
-                    if (latestPoint.macd_hist !== undefined && latestPoint.macd_hist !== null) {
+                    if (latestPoint.macd_hist !== undefined && latestPoint.macd_hist !== null && isFinite(latestPoint.macd_hist)) {
                         macdHist = latestPoint.macd_hist;
                         macdHistStr = macdHist.toFixed(2);
                     }
-                    if (latestPoint.macd_signal !== undefined && latestPoint.macd_signal !== null && latestPoint.macd_signal !== 0 && macdHist !== null) {
-                        macdRel = macdHist / latestPoint.macd_signal;
-                        macdRelStr = macdRel.toFixed(3);
+                    if (latestPoint.macd_signal !== undefined && latestPoint.macd_signal !== null && latestPoint.macd_signal !== 0 && macdHist !== null && isFinite(latestPoint.macd_signal)) {
+                        const rawRel = macdHist / latestPoint.macd_signal;
+                        if (isFinite(rawRel)) {
+                            macdRel = rawRel;
+                            macdRelStr = macdRel.toFixed(3);
+                        }
                     }
-                    if (latestPoint.rsi_14 !== undefined && latestPoint.rsi_14 !== null) {
+                    if (latestPoint.rsi_14 !== undefined && latestPoint.rsi_14 !== null && isFinite(latestPoint.rsi_14)) {
                         rsi = latestPoint.rsi_14;
                         rsiStr = rsi.toFixed(2);
                     }
@@ -315,9 +341,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             // Calculate VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000
             let vst: number | null = null;
             let vstStr = 'N/A';
-            if (trendValue !== null && volume !== null && strategyValue !== null && !isNaN(trendValue) && !isNaN(volume) && !isNaN(strategyValue)) {
-                vst = (trendValue * volume * strategyValue) / (10000 * 1000000);
-                vstStr = (vst >= 0 ? '+' : '') + vst.toFixed(2);
+            if (trendValue !== null && volume !== null && strategyValue !== null && isFinite(trendValue) && isFinite(volume) && isFinite(strategyValue)) {
+                const rawVst = (trendValue * volume * strategyValue) / (10000 * 1000000);
+                if (isFinite(rawVst)) {
+                    vst = rawVst;
+                    vstStr = (vst >= 0 ? '+' : '') + vst.toFixed(2);
+                }
             }
 
             return {
