@@ -37,8 +37,8 @@ def evaluate_can_slim(data: Dict[str, Any]) -> StrategyResult:
 
     # Volume
     if history is not None and len(history) >= 50:
-        recent_vol = history["Volume"].iloc[-1]
-        avg_vol = history["Volume"].iloc[-50:].mean()
+        recent_vol = float(history["Volume"].iloc[-1])
+        avg_vol = float(history["Volume"].iloc[-50:].mean())
         if recent_vol > avg_vol:
             score += 1
             justifications.append(f"Recent volume ({recent_vol:,.0f}) exceeds 50-day average ({avg_vol:,.0f}).")
@@ -49,8 +49,8 @@ def evaluate_can_slim(data: Dict[str, Any]) -> StrategyResult:
 
     # RS proxy (1 year return positive)
     if history is not None and len(history) >= 252:
-        start_price = history["Close"].iloc[-252]
-        end_price = history["Close"].iloc[-1]
+        start_price = float(history["Close"].iloc[-252])
+        end_price = float(history["Close"].iloc[-1])
         ret = (end_price - start_price) / start_price
         if ret > 0.2:
             score += 1

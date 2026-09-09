@@ -35,6 +35,24 @@ def fetch_ticker_data(ticker_symbol: str) -> Dict[str, Any]:
 
     if history is None:
         history = pd.DataFrame()
+    elif not history.empty:
+        if isinstance(history.columns, pd.MultiIndex):
+            try:
+                if symbol_to_fetch in history.columns.levels[1]:
+                    history = history.xs(symbol_to_fetch, level=1, axis=1)
+                else:
+                    history.columns = history.columns.get_level_values(0)
+            except Exception:
+                history.columns = history.columns.get_level_values(0)
+
+        clean_cols = {}
+        for col in history.columns:
+            col_data = history[col]
+            if isinstance(col_data, pd.DataFrame):
+                col_data = col_data.iloc[:, 0]
+            clean_cols[col] = col_data
+
+        history = pd.DataFrame(clean_cols)
 
     # 2. Financials & Info (wrap in try-except to avoid rate-limiting/scraper failures)
     info = {}

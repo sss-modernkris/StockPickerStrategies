@@ -26,8 +26,8 @@ def evaluate_sentiment(data: Dict[str, Any]) -> StrategyResult:
         else:
             justifications.append("Options Sentiment Proxy: Implied bearish skew (Puts > Calls proxy).")
             
-        recent_vol = history["Volume"].iloc[-5:].mean()
-        hist_vol = history["Volume"].iloc[-20:].mean()
+        recent_vol = float(history["Volume"].iloc[-5:].mean())
+        hist_vol = float(history["Volume"].iloc[-20:].mean())
         
         if recent_vol > hist_vol:
             score += 1
