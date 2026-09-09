@@ -18,52 +18,56 @@ from strategies.willy_algo import evaluate_willy_algo, calculate_willy_vwap
 def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
     history = data.get("history")
     
-    if history is None or history.empty or len(history) < 200:
+    if history is None or history.empty or len(history) < 2:
         return None
 
     try:
         closes = history["Close"]
+        min_len = len(closes)
         
-        # SMA 50 & 200
-        sma_50 = closes.rolling(window=50).mean().iloc[-1]
-        sma_200 = closes.rolling(window=200).mean().iloc[-1]
+        # SMA 50 & 200 (adapt window size to min_len if history is shorter)
+        sma_50 = closes.rolling(window=min(50, min_len), min_periods=1).mean().iloc[-1]
+        sma_200 = closes.rolling(window=min(200, min_len), min_periods=1).mean().iloc[-1]
         
         # EMA 20
-        ema_20 = closes.ewm(span=20, adjust=False).mean().iloc[-1]
+        ema_20 = closes.ewm(span=min(20, min_len), adjust=False, min_periods=1).mean().iloc[-1]
         
         # RSI 14
         delta = closes.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
+        rsi_win = min(14, max(2, min_len))
+        gain = (delta.where(delta > 0, 0)).rolling(window=rsi_win, min_periods=1).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_win, min_periods=1).mean()
+        rs = gain / loss.replace(0, 1e-9)
         rsi_series = 100 - (100 / (1 + rs))
         rsi_14 = rsi_series.iloc[-1]
-        rsi_slope = rsi_series.diff().iloc[-1]
+        rsi_slope = rsi_series.diff().iloc[-1] if len(rsi_series) > 1 else 0.0
         
         # MACD
-        exp1 = closes.ewm(span=12, adjust=False).mean()
-        exp2 = closes.ewm(span=26, adjust=False).mean()
+        exp1 = closes.ewm(span=min(12, min_len), adjust=False, min_periods=1).mean()
+        exp2 = closes.ewm(span=min(26, min_len), adjust=False, min_periods=1).mean()
         macd_series = exp1 - exp2
-        signal_series = macd_series.ewm(span=9, adjust=False).mean()
+        signal_series = macd_series.ewm(span=min(9, min_len), adjust=False, min_periods=1).mean()
         macd_line = macd_series.iloc[-1]
         macd_signal = signal_series.iloc[-1]
-        macd_slope = macd_series.diff().iloc[-1]
+        macd_slope = macd_series.diff().iloc[-1] if len(macd_series) > 1 else 0.0
         
         # Bollinger Bands (20-day SMA +/- 2 std dev)
-        sma_20 = closes.rolling(window=20).mean()
-        std_20 = closes.rolling(window=20).std()
+        bb_win = min(20, min_len)
+        sma_20 = closes.rolling(window=bb_win, min_periods=1).mean()
+        std_20 = closes.rolling(window=bb_win, min_periods=1).std().fillna(0)
         boll_upper = (sma_20 + (std_20 * 2)).iloc[-1]
         boll_middle = sma_20.iloc[-1]
         boll_lower = (sma_20 - (std_20 * 2)).iloc[-1]
         
         # Volume
-        volume_series = history["Volume"]
-        volume = int(volume_series.iloc[-1])
-        volume_avg_20 = float(volume_series.rolling(window=20).mean().iloc[-1])
+        volume_series = history["Volume"] if "Volume" in history.columns else pd.Series([0]*min_len, index=history.index)
+        volume = int(volume_series.iloc[-1]) if not volume_series.empty and pd.notna(volume_series.iloc[-1]) else 0
+        vol_win = min(20, min_len)
+        volume_avg_20 = float(volume_series.rolling(window=vol_win, min_periods=1).mean().iloc[-1]) if not volume_series.empty else 0.0
         
         # WillyAlgo VWAP
         willy_vwap_series = calculate_willy_vwap(history)
-        willy_vwap = willy_vwap_series.iloc[-1]
+        willy_vwap = willy_vwap_series.iloc[-1] if not willy_vwap_series.empty else None
         
         # Calculate ratio of current close to Willy VWAP
         current_close = float(closes.iloc[-1])

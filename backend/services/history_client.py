@@ -6,18 +6,19 @@ def fetch_batch_history(tickers: List[str], period: str = "1y") -> Dict[str, Any
     """
     Fetches historical data for multiple tickers at once.
     Period can be "1mo", "3mo", "6mo", "1y", "5y", etc.
+    Normalizes symbols (e.g. BRK.B -> BRK-B) for yfinance and maps results back to requested symbols.
     """
     if not tickers:
         return {"data": []}
 
     try:
-        # download automatically handles multiple tickers
-        # It returns a MultiIndex DataFrame if len(tickers) > 1, else a regular DataFrame
-        tickers_str = " ".join(tickers)
+        # Create map from requested symbol to yfinance symbol (dots to hyphens)
+        ticker_map = {t.strip().upper(): t.strip().upper().replace('.', '-') for t in tickers if t.strip()}
+        download_tickers = list(set(ticker_map.values()))
+        tickers_str = " ".join(download_tickers)
+        
         data = yf.download(tickers_str, period=period, group_by='column', progress=False, threads=False)
         
-        # If there's an error fetching the data, yfinance might not raise an exception,
-        # but the dataframe could be empty
         if data.empty:
             return {"data": [], "error": "No data returned from Yahoo Finance."}
 
@@ -27,24 +28,34 @@ def fetch_batch_history(tickers: List[str], period: str = "1y") -> Dict[str, Any
             
         close_data = data['Close']
         if isinstance(close_data, pd.Series):
-            close_data = pd.DataFrame({tickers[0]: close_data})
+            first_yf_sym = download_tickers[0]
+            close_data = pd.DataFrame({first_yf_sym: close_data})
             
         volume_data = data['Volume'] if 'Volume' in data.columns else None
         if isinstance(volume_data, pd.Series):
-            volume_data = pd.DataFrame({tickers[0]: volume_data})
+            first_yf_sym = download_tickers[0]
+            volume_data = pd.DataFrame({first_yf_sym: volume_data})
 
-        for ticker in tickers:
-            if ticker in close_data.columns:
-                ticker_series = close_data[ticker]
+        for original_ticker, yf_ticker in ticker_map.items():
+            found_col = None
+            if yf_ticker in close_data.columns:
+                found_col = yf_ticker
+            elif original_ticker in close_data.columns:
+                found_col = original_ticker
+
+            if found_col is not None:
+                ticker_series = close_data[found_col]
                 if isinstance(ticker_series, pd.DataFrame):
                     ticker_series = ticker_series.iloc[:, 0]
                 ticker_series = ticker_series.dropna()
                 
                 vol_series = None
-                if volume_data is not None and ticker in volume_data.columns:
-                    vol_series = volume_data[ticker]
-                    if isinstance(vol_series, pd.DataFrame):
-                        vol_series = vol_series.iloc[:, 0]
+                if volume_data is not None:
+                    vol_col = found_col if found_col in volume_data.columns else (yf_ticker if yf_ticker in volume_data.columns else None)
+                    if vol_col:
+                        vol_series = volume_data[vol_col]
+                        if isinstance(vol_series, pd.DataFrame):
+                            vol_series = vol_series.iloc[:, 0]
 
                 history = []
                 for date, close_price in ticker_series.items():
@@ -61,7 +72,7 @@ def fetch_batch_history(tickers: List[str], period: str = "1y") -> Dict[str, Any
                     history.append(item)
                     
                 results.append({
-                    "symbol": ticker,
+                    "symbol": original_ticker,
                     "history": history
                 })
 
@@ -69,3 +80,4 @@ def fetch_batch_history(tickers: List[str], period: str = "1y") -> Dict[str, Any
 
     except Exception as e:
         return {"data": [], "error": str(e)}
+

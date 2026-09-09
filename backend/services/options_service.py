@@ -249,14 +249,14 @@ def generate_and_save_options_data() -> dict:
                 
             if stock_price is None or pd.isna(stock_price) or stock_price <= 0:
                 # Fallback ticker lookup
-                t_obj = yf.Ticker(symbol)
+                t_obj = yf.Ticker(symbol.replace('.', '-'))
                 stock_price = t_obj.fast_info.last_price
                 
             if stock_price is None or pd.isna(stock_price) or stock_price <= 0:
                 continue
                 
             atm_strike = get_atm_strike(stock_price)
-            t_obj = yf.Ticker(symbol)
+            t_obj = yf.Ticker(symbol.replace('.', '-'))
             
             # Fetch 1W (7d), 2W (14d), 3W (21d) Call/Put prices & Option Greeks
             c_1w, p_1w, iv_1w, g_1w = get_live_or_bs_option_price(t_obj, symbol, stock_price, atm_strike, 7, closes)

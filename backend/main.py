@@ -364,11 +364,13 @@ def get_history(tickers: str, period: str = "1y") -> HistoryResponse:
 @app.get("/api/price/{ticker}")
 def get_current_price(ticker: str):
     try:
-        t = yf.Ticker(ticker.upper())
+        clean_symbol = ticker.strip().upper().replace('.', '-')
+        t = yf.Ticker(clean_symbol)
         price = t.fast_info.last_price
         return {"price": price}
     except Exception as e:
         raise HTTPException(status_code=404, detail="Ticker not found or price unavailable")
+
 
 import yfinance as yf
 
