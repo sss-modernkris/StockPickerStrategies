@@ -33,9 +33,9 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
 
   // Sync selected ticker when changed from sidebar
   useEffect(() => {
-    if (selectedTicker && selectedTicker !== symbol) {
-      setSymbol(selectedTicker);
-      fetchLivePrice(selectedTicker);
+    if (selectedTicker) {
+      setSymbol(selectedTicker.toUpperCase());
+      fetchLiveTickerData(selectedTicker.toUpperCase());
     }
   }, [selectedTicker]);
 
@@ -51,20 +51,37 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
     }
   }, [bidPrice, askPrice, inputMode]);
 
-  const fetchLivePrice = async (targetSymbol: string) => {
+  const fetchLiveTickerData = async (targetSymbol: string) => {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/price/${targetSymbol}`);
+      const cleanSym = targetSymbol.trim().toUpperCase();
+      const daysParam = parseInt(daysToExpiration) || 30;
+      const res = await fetch(`${API_BASE_URL}/api/volatility-calculator/${cleanSym}?days_to_expiration=${daysParam}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.price && data.price > 0) {
-          setStockPrice(data.price.toFixed(2));
-          const p = data.price;
-          const roundedStrike = Math.round(p / 5) * 5;
-          setStrikePrice(roundedStrike.toString());
+        const data: VolatilityCalculationResponse = await res.json();
+        setSymbol(data.symbol);
+        if (data.stock_price) setStockPrice(data.stock_price.toFixed(2));
+        if (data.strike_price) setStrikePrice(data.strike_price.toFixed(2));
+        if (data.days_to_expiration) setDaysToExpiration(data.days_to_expiration.toString());
+        if (data.bid_price !== null && data.bid_price !== undefined) {
+          setBidPrice(data.bid_price.toFixed(2));
         }
+        if (data.ask_price !== null && data.ask_price !== undefined) {
+          setAskPrice(data.ask_price.toFixed(2));
+        }
+        if (data.option_premium) setOptionPremium(data.option_premium.toFixed(2));
+        setResult(data);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.detail || 'Failed to fetch ticker volatility analytics');
       }
-    } catch {
-      // Fallback silently
+    } catch (err: unknown) {
+      console.error('Fetch live ticker data error:', err);
+      const msg = err instanceof Error ? err.message : 'Error fetching live ticker analytics';
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -117,7 +134,7 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
   };
 
   useEffect(() => {
-    handleCalculate();
+    fetchLiveTickerData(selectedTicker || 'SNDK');
   }, []);
 
   return (
@@ -182,18 +199,40 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
                 <span>Stock Ticker</span>
-                {availableTickers.length > 0 && <span className="text-[10px] text-blue-400">Available from list</span>}
+                {availableTickers.length > 0 && <span className="text-[10px] text-blue-400 font-medium">Live Option Sync</span>}
               </label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. SNDK"
-                />
-                <Button variant="outline" size="sm" onClick={() => fetchLivePrice(symbol)} title="Fetch latest stock price">
-                  <RefreshCw className="w-3.5 h-3.5" />
+                {availableTickers.length > 0 ? (
+                  <select
+                    value={symbol}
+                    onChange={(e) => {
+                      const sym = e.target.value.toUpperCase();
+                      setSymbol(sym);
+                      fetchLiveTickerData(sym);
+                    }}
+                    className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {!availableTickers.includes(symbol) && <option value={symbol}>{symbol}</option>}
+                    {availableTickers.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        fetchLiveTickerData(symbol);
+                      }
+                    }}
+                    className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g. SNDK"
+                  />
+                )}
+                <Button variant="outline" size="sm" onClick={() => fetchLiveTickerData(symbol)} title="Fetch live stock & option prices">
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
