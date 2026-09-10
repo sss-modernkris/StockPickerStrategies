@@ -17,7 +17,8 @@ import {
     Bot,
     Flame,
     Building2,
-    Percent
+    Percent,
+    Sparkles
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -520,7 +521,164 @@ export function StrategyGlossary() {
             )
         },
         {
+            id: "iv-hv-volatility-calculator",
+            icon: <Percent className="w-5 h-5 text-blue-400" />,
+            title: "% IV/HV Calc: Volatility & Options Sensitivity Analytics",
+            badge: "IV & Volatility Analytics",
+            description: "A comprehensive guide to 20-Day Historical Volatility (HV), Black-Scholes Implied Volatility (IV) backward inversion, the Volatility Spread (IV - HV), and Option Greeks (Call Delta, Call Theta, Gamma, Vega).",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Header Overview Banner */}
+                    <div className="bg-gradient-to-r from-blue-950/40 via-background to-purple-950/30 p-4 rounded-lg border border-border/50 text-xs space-y-2">
+                        <p className="font-semibold text-foreground text-sm flex items-center gap-2">
+                            <Percent className="w-4 h-4 text-blue-400" /> Overview of % IV/HV Calculator
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            The <strong className="text-foreground">% IV/HV Calc</strong> tab enables quantitative evaluation of Call option pricing by comparing <strong className="text-foreground">20-day realized Historical Volatility (HV)</strong> against market-implied pricing (<strong className="text-foreground">Implied Volatility, IV</strong>) inverted backward from call premiums using the Black-Scholes model.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Historical Volatility vs Implied Volatility */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">1. Historical Volatility (HV) vs. Implied Volatility (IV)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-card/70 p-4 rounded-lg border border-blue-500/30 space-y-2">
+                                <h5 className="font-semibold text-blue-400 text-sm flex items-center gap-2">
+                                    <Activity className="w-4 h-4" /> 20-Day Historical Volatility (HV)
+                                </h5>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">What it measures:</strong> Actual realized price fluctuations of the underlying stock over the past 20 trading sessions.
+                                </p>
+                                <div className="bg-muted/60 p-2.5 rounded font-mono text-[11px] text-foreground">
+                                    σ_hist = sqrt(252) * std(ln(S_t / S_t-1), ddof=1)
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Key Purpose:</strong> Backward-looking measure answering: <em>&ldquo;How volatile has the stock actually been in recent sessions?&rdquo;</em>
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-emerald-500/30 space-y-2">
+                                <h5 className="font-semibold text-emerald-400 text-sm flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4" /> Implied Volatility (IV)
+                                </h5>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">What it measures:</strong> The annualized volatility incorporated into the current call option market premium.
+                                </p>
+                                <div className="bg-muted/60 p-2.5 rounded font-mono text-[11px] text-foreground">
+                                    C_BS(σ) = S * e^(-qT) * N(d1) - K * e^(-rT) * N(d2) = C_market
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Key Purpose:</strong> Forward-looking measure answering: <em>&ldquo;How much future price movement is currently priced into the option premium?&rdquo;</em>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Significance of Volatility Spread (IV - HV) */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">2. Significance of the Volatility Spread (IV − HV)</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            The <strong className="text-foreground">Volatility Spread</strong> (IV − HV) compares what option traders expect going forward against what the stock has actually realized.
+                        </p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Spread Condition</th>
+                                        <th className="p-3 w-1/4">Numeric Range</th>
+                                        <th className="p-3 w-1/2">Market Significance &amp; Actionable Meaning</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-amber-400">Elevated IV Premium</td>
+                                        <td className="p-3 font-mono font-bold">IV &gt; HV + 5.0%</td>
+                                        <td className="p-3 text-muted-foreground">
+                                            Option market is pricing significantly higher volatility than recent stock price action. Calls are relatively expensive, often indicating an approaching earnings announcement, product launch, or market catalyst.
+                                        </td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-indigo-400">Fairly Priced</td>
+                                        <td className="p-3 font-mono font-bold">IV ≈ HV (±3.0%)</td>
+                                        <td className="p-3 text-muted-foreground">
+                                            Option implied volatility aligns closely with recent realized stock movements. Premium is reasonably priced without excessive volatility surcharge.
+                                        </td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-emerald-400">Low IV / Discount</td>
+                                        <td className="p-3 font-mono font-bold">IV &lt; HV − 3.0%</td>
+                                        <td className="p-3 text-muted-foreground">
+                                            Option market is pricing lower volatility than recent stock price fluctuations. Call premiums are relatively cheap, offering favorable entry risk/reward for long directional call buyers.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Option Greeks Explained */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">3. Option Greeks Breakdown</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-blue-400 text-sm">Call Delta (Δ)</h5>
+                                    <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-mono">Directional Exposure</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The dollar change in option price for every $1.00 move in the underlying stock price.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Optimal Band:</strong> <code className="bg-muted px-1 py-0.5 rounded font-mono text-foreground font-semibold">0.30 to 0.70</code>. A Delta of 0.50 means the call option gains approximately $0.50 for every $1.00 increase in the stock.
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-purple-400 text-sm">Gamma (Γ)</h5>
+                                    <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-mono">Delta Acceleration</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The rate of change in Call Delta for every $1.00 move in the underlying stock price.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Significance:</strong> Measures how fast your Delta increases as the stock moves in your favor, accelerating profits on breakout swings.
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-red-400 text-sm">Call Theta (Θ)</h5>
+                                    <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-mono">Time Decay</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The daily reduction in call option premium resulting from the passage of one day.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Significance:</strong> A Theta of -$1.60/day means the option loses $1.60 per contract daily if the stock stays static. Lower Theta % protects holding capital.
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-emerald-400 text-sm">Vega (V)</h5>
+                                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-mono">IV Sensitivity</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The change in option price for a 1 percentage point (+1.0%) change in Implied Volatility.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Significance:</strong> A Vega of $2.02 means the call price increases by $2.02 if IV rises from 45% to 46%, and drops $2.02 if IV collapses (IV crush).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
             id: "can-slim",
+
             icon: <TrendingUp className="w-5 h-5 text-blue-500" />,
             title: "1. CAN SLIM (The Momentum Growth Model)",
             badge: "High-Pass Filter",

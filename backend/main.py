@@ -3,13 +3,13 @@ from typing import List, Optional
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest, CallOptionStatsResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest, CallOptionStatsResponse, VolatilityCalculationRequest, VolatilityCalculationResponse
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
 from services.rh_client import RHClient
 from services.backtester import execute_30d_backtest, execute_options_backtest, execute_trend_options_backtest, execute_slope_options_backtest, execute_slope_options_2day_backtest, execute_toptickers_options_backtest
-from services.options_service import generate_and_save_options_data
+from services.options_service import generate_and_save_options_data, compute_ticker_volatility_analytics
 from services.call_option_stats_service import generate_call_option_stats
 from services.email_service import send_email_with_attachment
 import csv
@@ -980,3 +980,51 @@ def get_call_option_stats():
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Call Option Stats evaluation failed: {str(e)}")
+
+
+@app.post("/api/volatility-calculator", response_model=VolatilityCalculationResponse)
+@app.get("/api/volatility-calculator/{ticker}")
+def calculate_volatility_analytics_endpoint(
+    req: Optional[VolatilityCalculationRequest] = None,
+    ticker: Optional[str] = None,
+    stock_price: Optional[float] = None,
+    strike_price: Optional[float] = None,
+    option_premium: Optional[float] = None,
+    bid_price: Optional[float] = None,
+    ask_price: Optional[float] = None,
+    days_to_expiration: Optional[int] = 30,
+    risk_free_rate: Optional[float] = 0.04,
+    dividend_yield: Optional[float] = 0.0
+) -> VolatilityCalculationResponse:
+    """
+    Computes 20-day Historical Volatility, Black-Scholes Call Option Implied Volatility (IV),
+    Option Greeks, Breakeven, and Volatility Spread (IV - HV) for a stock ticker.
+    """
+    try:
+        sym = ticker or (req.symbol if req else "AAPL")
+        sp = stock_price or (req.stock_price if req else None)
+        kp = strike_price or (req.strike_price if req else None)
+        prem = option_premium or (req.option_premium if req else None)
+        bid = bid_price or (req.bid_price if req else None)
+        ask = ask_price or (req.ask_price if req else None)
+        exp_date = req.expiration_date if req else None
+        days = days_to_expiration or (req.days_to_expiration if req else 30)
+        r = risk_free_rate or (req.risk_free_rate if req else 0.04)
+        q = dividend_yield or (req.dividend_yield if req else 0.0)
+
+        res = compute_ticker_volatility_analytics(
+            symbol=sym,
+            stock_price=sp,
+            strike_price=kp,
+            option_premium=prem,
+            bid_price=bid,
+            ask_price=ask,
+            expiration_date=exp_date,
+            days_to_expiration=days,
+            risk_free_rate=r,
+            dividend_yield=q
+        )
+        return VolatilityCalculationResponse(**res)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Volatility calculation failed: {str(e)}")
+

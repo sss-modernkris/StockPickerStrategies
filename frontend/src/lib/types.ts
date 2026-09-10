@@ -173,3 +173,49 @@ export interface CallOptionStatsResponse {
   status: string;
 }
 
+export interface VolatilityCalculationRequest {
+  symbol: string;
+  stock_price?: number | null;
+  strike_price?: number | null;
+  option_premium?: number | null;
+  bid_price?: number | null;
+  ask_price?: number | null;
+  expiration_date?: string | null;
+  days_to_expiration?: number | null;
+  risk_free_rate?: number | null;
+  dividend_yield?: number | null;
+}
+
+export interface VolatilityCalculationResponse {
+  symbol: string;
+  stock_price: number;
+  strike_price: number;
+  days_to_expiration: number;
+  option_premium: number;
+  midpoint_premium?: number | null;
+  bid_price?: number | null;
+  ask_price?: number | null;
+  historical_volatility_20d: number;
+  implied_volatility: number;
+  implied_volatility_bid?: number | null;
+  implied_volatility_ask?: number | null;
+  volatility_spread: number;
+  volatility_spread_pct: number;
+  interpretation: string;
+  breakeven_price: number;
+  required_move_pct: number;
+  greeks: {
+    call_delta: number;
+    put_delta: number;
+    gamma: number;
+    call_theta: number;
+    put_theta: number;
+    vega: number;
+    call_rho: number;
+    put_rho: number;
+  };
+  status?: string;
+  message?: string | null;
+}
+
+

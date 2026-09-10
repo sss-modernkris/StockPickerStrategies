@@ -4,7 +4,25 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 1. Release v20260906 - 2-Day Slope-Ranked Options Backtesting Engine & UI Panel Integration
+## 1. Release v20260909 - Volatility Analytics & Call Option Implied Volatility (IV) Calculator
+
+### 📊 20-Day Historical Volatility & Black-Scholes IV Inversion Engine (`backend/services/options_service.py`)
+- **Black-Scholes IV Inversion**:
+  - Solves Implied Volatility ($\text{IV}$) backward from call option market premiums or Bid/Ask midpoints using Brent's root-finding method (`scipy.optimize.brentq`).
+  - Computes 20-day annualized realized Historical Volatility ($\text{HV}$), Bid/Ask IV sensitivity ranges, Volatility Spread ($\text{IV} - \text{HV}$), and full Black-Scholes Option Greeks ($\Delta$, $\Gamma$, $\Theta$, $V$, $\rho$).
+- **FastAPI Endpoints** ([backend/main.py](../backend/main.py)):
+  - Exposed `/api/volatility-calculator` POST and GET endpoints returning quantitative volatility analytics, breakeven stock prices, and required percentage return gain metrics.
+
+### 🖥️ Interactive IV/HV Calculator UI Tab (`frontend/src/components/VolatilityCalculatorPanel.tsx`)
+- **Dedicated Volatility Analytics View**:
+  - Integrated dedicated **IV/HV Calc** navigation tab (`%` icon) allowing real-time volatility calculations, ATM strike auto-filling, midpoint calculator, metric cards, option greeks, and comprehensive methodology glossary entry ([frontend/src/components/StrategyGlossary.tsx](../frontend/src/components/StrategyGlossary.tsx)).
+
+### 🏷️ Version Synchronization (`v20260909`)
+- Synchronized platform version tags across `README.md`, `frontend/src/app/page.tsx`, and `frontend/src/components/TickerSidebar.tsx`.
+
+---
+
+## 2. Release v20260906 - 2-Day Slope-Ranked Options Backtesting Engine & UI Panel Integration
 
 ### 📈 2-Day Slope-Ranked Options Backtesting Engine (`backend/services/backtester.py`)
 - **Fast 2-Day Holding Period Backtester** (`execute_slope_options_2day_backtest`):

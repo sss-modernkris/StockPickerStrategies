@@ -2,9 +2,13 @@ import os
 import csv
 import math
 import datetime
+from typing import Optional, List, Dict, Tuple, Any
 import pandas as pd
+
 import numpy as np
 import yfinance as yf
+from scipy.stats import norm
+from scipy.optimize import brentq
 from services.backtester import black_scholes_call, black_scholes_put, calc_historical_volatility, get_atm_strike
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -329,4 +333,230 @@ def generate_and_save_options_data() -> dict:
         "filepath": OPTIONS_DATA_CSV,
         "timestamp": current_time_str
     }
+
+
+def black_scholes_call_full(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
+    """
+    Black-Scholes European call option pricing.
+    S: Stock price
+    K: Strike price
+    T: Time to expiration in years
+    r: Risk-free rate
+    sigma: Volatility
+    q: Dividend yield
+    """
+    T = max(T, 0.0001)
+    sigma = max(sigma, 0.0001)
+    d1 = (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    return float(S * np.exp(-q * T) * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2))
+
+
+def call_implied_volatility_solver(
+    market_price: float,
+    S: float,
+    K: float,
+    days_to_expiration: int,
+    r: float = 0.04,
+    q: float = 0.0
+) -> float:
+    """
+    Calculates implied volatility of a call option given market premium, stock price,
+    strike, days to expiration, risk-free rate, and dividend yield using Brent's method.
+    """
+    T = max(days_to_expiration, 1) / 365.0
+
+    minimum_price = max(S * np.exp(-q * T) - K * np.exp(-r * T), 0.0)
+    maximum_price = S * np.exp(-q * T)
+
+    # Bound check
+    if market_price <= minimum_price:
+        adj_price = minimum_price + 0.01
+    elif market_price >= maximum_price:
+        adj_price = maximum_price - 0.01
+    else:
+        adj_price = market_price
+
+    def pricing_error(sigma):
+        theoretical = black_scholes_call_full(S=S, K=K, T=T, r=r, sigma=sigma, q=q)
+        return theoretical - adj_price
+
+    try:
+        iv = brentq(pricing_error, 0.0001, 5.0)
+    except Exception:
+        best_iv = 0.25
+        min_err = float('inf')
+        for iv_cand in np.linspace(0.001, 3.0, 300):
+            err = abs(pricing_error(iv_cand))
+            if err < min_err:
+                min_err = err
+                best_iv = float(iv_cand)
+        iv = best_iv
+
+    return float(iv)
+
+
+def calculate_20d_historical_volatility(closes: pd.Series) -> float:
+    """
+    Computes 20-day annualized historical volatility from daily log returns.
+    """
+    if len(closes) < 2:
+        return 0.25
+    sub_closes = closes.tail(21).values
+    log_returns = np.diff(np.log(sub_closes))
+    if len(log_returns) < 2:
+        return 0.25
+    daily_volatility = np.std(log_returns, ddof=1)
+    annualized_volatility = daily_volatility * np.sqrt(252)
+    return float(annualized_volatility)
+
+
+def compute_ticker_volatility_analytics(
+    symbol: str,
+    stock_price: Optional[float] = None,
+    strike_price: Optional[float] = None,
+    option_premium: Optional[float] = None,
+    bid_price: Optional[float] = None,
+    ask_price: Optional[float] = None,
+    expiration_date: Optional[str] = None,
+    days_to_expiration: Optional[int] = 30,
+    risk_free_rate: float = 0.04,
+    dividend_yield: float = 0.0
+) -> dict:
+    """
+    Master volatility analysis function combining 20d Historical Volatility,
+    Call Option Implied Volatility (IV) inversion, Option Greeks, and Volatility Spread.
+    """
+    symbol = symbol.strip().upper()
+    days_to_exp = days_to_expiration if (days_to_expiration and days_to_expiration > 0) else 30
+
+    if expiration_date:
+        try:
+            exp_d = datetime.datetime.strptime(expiration_date, "%Y-%m-%d").date()
+            today = datetime.date.today()
+            calc_days = (exp_d - today).days
+            if calc_days > 0:
+                days_to_exp = calc_days
+        except Exception:
+            pass
+
+    # Fetch 20d historical price data if stock price or HV needed
+    t_obj = yf.Ticker(symbol.replace('.', '-'))
+    history = pd.DataFrame()
+    try:
+        history = t_obj.history(period="3mo")
+    except Exception:
+        pass
+
+    closes = history['Close'].dropna() if not history.empty and 'Close' in history else pd.Series(dtype=float)
+
+    if stock_price is None or stock_price <= 0:
+        if not closes.empty:
+            stock_price = float(closes.iloc[-1])
+        else:
+            try:
+                stock_price = float(t_obj.fast_info.last_price)
+            except Exception:
+                stock_price = 100.0
+
+    if strike_price is None or strike_price <= 0:
+        strike_price = get_atm_strike(stock_price)
+
+    # Determine Option Premium & Midpoint
+    midpoint = None
+    if bid_price is not None and ask_price is not None and bid_price > 0 and ask_price > 0:
+        midpoint = round((bid_price + ask_price) / 2.0, 2)
+
+    if option_premium is None or option_premium <= 0:
+        if midpoint is not None:
+            option_premium = midpoint
+        else:
+            # Default BS call estimate if no premium provided
+            hv_est = calculate_20d_historical_volatility(closes) if not closes.empty else 0.25
+            t_yrs = days_to_exp / 365.0
+            option_premium = round(black_scholes_call_full(stock_price, strike_price, t_yrs, risk_free_rate, hv_est, dividend_yield), 2)
+
+    # 1. 20-Day Historical Volatility
+    hv_20d = calculate_20d_historical_volatility(closes) if not closes.empty else 0.25
+
+    # 2. Implied Volatility (IV)
+    iv_mid = call_implied_volatility_solver(
+        market_price=option_premium,
+        S=stock_price,
+        K=strike_price,
+        days_to_expiration=days_to_exp,
+        r=risk_free_rate,
+        q=dividend_yield
+    )
+
+    iv_bid = None
+    if bid_price is not None and bid_price > 0:
+        iv_bid = call_implied_volatility_solver(
+            market_price=bid_price,
+            S=stock_price,
+            K=strike_price,
+            days_to_expiration=days_to_exp,
+            r=risk_free_rate,
+            q=dividend_yield
+        )
+
+    iv_ask = None
+    if ask_price is not None and ask_price > 0:
+        iv_ask = call_implied_volatility_solver(
+            market_price=ask_price,
+            S=stock_price,
+            K=strike_price,
+            days_to_expiration=days_to_exp,
+            r=risk_free_rate,
+            q=dividend_yield
+        )
+
+    # 3. Volatility Spread (IV - HV)
+    vol_spread = iv_mid - hv_20d
+    vol_spread_pct = (vol_spread / hv_20d * 100.0) if hv_20d > 0 else 0.0
+
+    if vol_spread > 0.10:
+        interpretation = "Significantly Elevated (High IV Premium — Market expects substantial price movement or imminent event)"
+    elif vol_spread > 0.03:
+        interpretation = "Moderately Elevated (Option premium is pricing higher volatility than recent price action)"
+    elif vol_spread >= -0.03:
+        interpretation = "Balanced / Fairly Priced (Option IV aligns closely with recent 20-day historical volatility)"
+    else:
+        interpretation = "Discount / Low IV (Option premium is pricing lower volatility than recent stock price fluctuations)"
+
+    # 4. Option Greeks
+    greeks = calculate_option_greeks(
+        S=stock_price,
+        K=strike_price,
+        target_days=days_to_exp,
+        sigma=iv_mid,
+        r=risk_free_rate
+    )
+
+    # 5. Breakeven & Required Return
+    breakeven = strike_price + option_premium
+    req_move_pct = ((breakeven - stock_price) / stock_price * 100.0) if stock_price > 0 else 0.0
+
+    return {
+        "symbol": symbol,
+        "stock_price": round(stock_price, 2),
+        "strike_price": round(strike_price, 2),
+        "days_to_expiration": days_to_exp,
+        "option_premium": round(option_premium, 2),
+        "midpoint_premium": midpoint,
+        "bid_price": round(bid_price, 2) if bid_price else None,
+        "ask_price": round(ask_price, 2) if ask_price else None,
+        "historical_volatility_20d": round(hv_20d, 4),
+        "implied_volatility": round(iv_mid, 4),
+        "implied_volatility_bid": round(iv_bid, 4) if iv_bid else None,
+        "implied_volatility_ask": round(iv_ask, 4) if iv_ask else None,
+        "volatility_spread": round(vol_spread, 4),
+        "volatility_spread_pct": round(vol_spread_pct, 2),
+        "interpretation": interpretation,
+        "breakeven_price": round(breakeven, 2),
+        "required_move_pct": round(req_move_pct, 2),
+        "greeks": greeks,
+        "status": "success"
+    }
+
 

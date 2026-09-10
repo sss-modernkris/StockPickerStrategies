@@ -168,3 +168,38 @@ class CallOptionStatsResponse(BaseModel):
     items: List[TickerCallStats]
     status: str = "success"
 
+class VolatilityCalculationRequest(BaseModel):
+    symbol: str
+    stock_price: Optional[float] = None
+    strike_price: Optional[float] = None
+    option_premium: Optional[float] = None
+    bid_price: Optional[float] = None
+    ask_price: Optional[float] = None
+    expiration_date: Optional[str] = None
+    days_to_expiration: Optional[int] = 30
+    risk_free_rate: Optional[float] = 0.04
+    dividend_yield: Optional[float] = 0.0
+
+class VolatilityCalculationResponse(BaseModel):
+    symbol: str
+    stock_price: float
+    strike_price: float
+    days_to_expiration: int
+    option_premium: float
+    midpoint_premium: Optional[float] = None
+    bid_price: Optional[float] = None
+    ask_price: Optional[float] = None
+    historical_volatility_20d: float
+    implied_volatility: float
+    implied_volatility_bid: Optional[float] = None
+    implied_volatility_ask: Optional[float] = None
+    volatility_spread: float
+    volatility_spread_pct: float
+    interpretation: str
+    breakeven_price: float
+    required_move_pct: float
+    greeks: Dict[str, float]
+    status: str = "success"
+    message: Optional[str] = None
+
+

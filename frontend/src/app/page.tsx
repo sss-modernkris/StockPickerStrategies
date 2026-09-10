@@ -16,8 +16,9 @@ import { BrokersPanel } from '@/components/BrokersPanel';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { BxTrenderPanel } from '@/components/BxTrenderPanel';
 import { TopTickersPanel } from '@/components/TopTickersPanel';
+import { VolatilityCalculatorPanel } from '@/components/VolatilityCalculatorPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -25,7 +26,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx' | 'top-tickers'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx' | 'top-tickers' | 'volatility'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,7 +150,7 @@ export default function Dashboard() {
 
         {!selectedTicker ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260906</span></h2>
+            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260909</span></h2>
             <p>Add and select a ticker from the sidebar to view quant analysis.</p>
           </div>
         ) : loading ? (
@@ -175,6 +176,7 @@ export default function Dashboard() {
                   {viewMode === 'brokers' && 'Broker Management'}
                   {viewMode === 'analysis' && 'Portfolio Technical Analysis'}
                   {viewMode === 'bx' && `${currentData.symbol} BX Trender Analysis`}
+                  {viewMode === 'volatility' && `${currentData.symbol} IV & 20D Historical Volatility`}
                 </h1>
                 <p className="text-muted-foreground mt-1">
                   {viewMode === 'dashboard' && 'Comprehensive Strategy Breakdown & AI Analysis'}
@@ -189,9 +191,10 @@ export default function Dashboard() {
                   {viewMode === 'brokers' && 'Manage Interactive Brokers connection and view real-time portfolio data'}
                   {viewMode === 'analysis' && 'Willy VWAP dynamics, 2.0 ATR volatility boundaries, and high-precision visual summaries.'}
                   {viewMode === 'bx' && 'Dual-momentum oscillator calculations, short-term spreads, long-term background histograms, and automated crossover logs.'}
+                  {viewMode === 'volatility' && 'Invert Black-Scholes backward from Call option premium to extract Implied Volatility, compute 20d Historical Volatility, and Option Greeks.'}
                 </p>
               </div>
-              <div className="flex bg-muted/50 p-1 rounded-lg border">
+              <div className="flex bg-muted/50 p-1 rounded-lg border flex-wrap gap-1">
                 <Button variant={viewMode === 'dashboard' ? 'secondary' : 'ghost'} onClick={() => setViewMode('dashboard')} size="sm" className="rounded-md">
                   <LayoutGrid className="w-4 h-4 mr-2" /> Dashboard
                 </Button>
@@ -200,6 +203,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'top-tickers' ? 'secondary' : 'ghost'} onClick={() => setViewMode('top-tickers')} size="sm" className="rounded-md">
                   <ClipboardList className="w-4 h-4 mr-2" /> Top Tickers
+                </Button>
+                <Button variant={viewMode === 'volatility' ? 'secondary' : 'ghost'} onClick={() => setViewMode('volatility')} size="sm" className="rounded-md">
+                  <Percent className="w-4 h-4 mr-2" /> IV/HV Calc
                 </Button>
                 <Button variant={viewMode === 'normalized-compare' ? 'secondary' : 'ghost'} onClick={() => setViewMode('normalized-compare')} size="sm" className="rounded-md">
                   <TrendingUp className="w-4 h-4 mr-2" /> Compare Charts
@@ -229,6 +235,7 @@ export default function Dashboard() {
                   <TrendingUp className="w-4 h-4 mr-2" /> BX Trender
                 </Button>
               </div>
+
             </div>
 
             {viewMode === 'table' && (
@@ -329,6 +336,13 @@ export default function Dashboard() {
                 <BxTrenderPanel priceHistory={currentData.price_history || []} symbol={currentData.symbol} />
               </div>
             )}
+
+            {viewMode === 'volatility' && (
+              <div className="mt-2">
+                <VolatilityCalculatorPanel selectedTicker={selectedTicker} availableTickers={tickers} />
+              </div>
+            )}
+
           </div>
         ) : null}
       </main>
