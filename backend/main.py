@@ -1012,6 +1012,10 @@ def calculate_volatility_analytics_endpoint(
         r = risk_free_rate or (req.risk_free_rate if req else 0.04)
         q = dividend_yield or (req.dividend_yield if req else 0.0)
 
+        opt_vol = req.option_volume if req else None
+        oi_val = req.open_interest if req else None
+        stk_vol = req.stock_volume if req else None
+
         res = compute_ticker_volatility_analytics(
             symbol=sym,
             stock_price=sp,
@@ -1022,7 +1026,10 @@ def calculate_volatility_analytics_endpoint(
             expiration_date=exp_date,
             days_to_expiration=days,
             risk_free_rate=r,
-            dividend_yield=q
+            dividend_yield=q,
+            option_volume=opt_vol,
+            open_interest=oi_val,
+            stock_volume=stk_vol
         )
         return VolatilityCalculationResponse(**res)
     except Exception as e:

@@ -184,6 +184,9 @@ export interface VolatilityCalculationRequest {
   days_to_expiration?: number | null;
   risk_free_rate?: number | null;
   dividend_yield?: number | null;
+  option_volume?: number | null;
+  open_interest?: number | null;
+  stock_volume?: number | null;
 }
 
 export interface VolatilityCalculationResponse {
@@ -195,6 +198,12 @@ export interface VolatilityCalculationResponse {
   midpoint_premium?: number | null;
   bid_price?: number | null;
   ask_price?: number | null;
+  option_volume?: number | null;
+  open_interest?: number | null;
+  stock_volume?: number | null;
+  bid_ask_spread?: number | null;
+  bid_ask_spread_pct?: number | null;
+  liquidity_rating?: string | null;
   historical_volatility_20d: number;
   implied_volatility: number;
   implied_volatility_bid?: number | null;

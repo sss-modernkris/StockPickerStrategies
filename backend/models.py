@@ -179,6 +179,9 @@ class VolatilityCalculationRequest(BaseModel):
     days_to_expiration: Optional[int] = 30
     risk_free_rate: Optional[float] = 0.04
     dividend_yield: Optional[float] = 0.0
+    option_volume: Optional[int] = None
+    open_interest: Optional[int] = None
+    stock_volume: Optional[int] = None
 
 class VolatilityCalculationResponse(BaseModel):
     symbol: str
@@ -189,6 +192,12 @@ class VolatilityCalculationResponse(BaseModel):
     midpoint_premium: Optional[float] = None
     bid_price: Optional[float] = None
     ask_price: Optional[float] = None
+    option_volume: Optional[int] = None
+    open_interest: Optional[int] = None
+    stock_volume: Optional[int] = None
+    bid_ask_spread: Optional[float] = None
+    bid_ask_spread_pct: Optional[float] = None
+    liquidity_rating: Optional[str] = None
     historical_volatility_20d: float
     implied_volatility: float
     implied_volatility_bid: Optional[float] = None

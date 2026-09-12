@@ -421,7 +421,10 @@ def compute_ticker_volatility_analytics(
     expiration_date: Optional[str] = None,
     days_to_expiration: Optional[int] = 30,
     risk_free_rate: float = 0.04,
-    dividend_yield: float = 0.0
+    dividend_yield: float = 0.0,
+    option_volume: Optional[int] = None,
+    open_interest: Optional[int] = None,
+    stock_volume: Optional[int] = None
 ) -> dict:
     """
     Master volatility analysis function combining 20d Historical Volatility,
@@ -462,49 +465,68 @@ def compute_ticker_volatility_analytics(
     if strike_price is None or strike_price <= 0:
         strike_price = get_atm_strike(stock_price)
 
-    # Determine Option Premium, Bid, Ask, and Midpoint from live chain if missing
+    # Determine Option Premium, Bid, Ask, Midpoint, Option Volume, and Open Interest from live Yahoo Finance chain
     midpoint = None
-    if bid_price is None or ask_price is None or option_premium is None:
-        try:
-            expirations = t_obj.options
-            if expirations:
-                today = datetime.date.today()
-                target_date = today + datetime.timedelta(days=days_to_exp)
-                exp_dates = [datetime.datetime.strptime(exp, "%Y-%m-%d").date() for exp in expirations]
-                closest_exp = min(exp_dates, key=lambda d: abs((d - target_date).days))
-                calc_days = (closest_exp - today).days
-                if calc_days > 0:
-                    days_to_exp = calc_days
-                closest_exp_str = closest_exp.strftime("%Y-%m-%d")
+    live_option_volume = None
+    live_open_interest = None
+    try:
+        expirations = t_obj.options
+        if expirations:
+            today = datetime.date.today()
+            target_date = today + datetime.timedelta(days=days_to_exp)
+            exp_dates = [datetime.datetime.strptime(exp, "%Y-%m-%d").date() for exp in expirations]
+            closest_exp = min(exp_dates, key=lambda d: abs((d - target_date).days))
+            calc_days = (closest_exp - today).days
+            if calc_days > 0:
+                days_to_exp = calc_days
+            closest_exp_str = closest_exp.strftime("%Y-%m-%d")
+            
+            chain = t_obj.option_chain(closest_exp_str)
+            calls = chain.calls
+            if not calls.empty:
+                calls['strike_diff'] = (calls['strike'] - strike_price).abs()
+                best_call = calls.sort_values('strike_diff').iloc[0]
                 
-                chain = t_obj.option_chain(closest_exp_str)
-                calls = chain.calls
-                if not calls.empty:
-                    calls['strike_diff'] = (calls['strike'] - strike_price).abs()
-                    best_call = calls.sort_values('strike_diff').iloc[0]
-                    
-                    b = best_call.get('bid')
-                    a = best_call.get('ask')
-                    lp = best_call.get('lastPrice')
-                    
-                    if pd.notna(b) and pd.notna(a) and float(b) > 0 and float(a) > 0:
-                        if bid_price is None:
-                            bid_price = round(float(b), 2)
-                        if ask_price is None:
-                            ask_price = round(float(a), 2)
-                        midpoint = round((bid_price + ask_price) / 2.0, 2)
-                        if option_premium is None:
-                            option_premium = midpoint
-                    elif pd.notna(lp) and float(lp) > 0:
-                        if option_premium is None:
-                            option_premium = round(float(lp), 2)
-                        if bid_price is None:
-                            bid_price = round(option_premium * 0.98, 2)
-                        if ask_price is None:
-                            ask_price = round(option_premium * 1.02, 2)
-                        midpoint = round((bid_price + ask_price) / 2.0, 2)
-        except Exception:
-            pass
+                b = best_call.get('bid')
+                a = best_call.get('ask')
+                lp = best_call.get('lastPrice')
+                vol_contract = best_call.get('volume')
+                oi_contract = best_call.get('openInterest')
+                
+                if pd.notna(vol_contract):
+                    try:
+                        live_option_volume = int(vol_contract)
+                    except Exception:
+                        pass
+                if pd.notna(oi_contract):
+                    try:
+                        live_open_interest = int(oi_contract)
+                    except Exception:
+                        pass
+
+                if pd.notna(b) and pd.notna(a) and float(b) > 0 and float(a) > 0:
+                    if bid_price is None:
+                        bid_price = round(float(b), 2)
+                    if ask_price is None:
+                        ask_price = round(float(a), 2)
+                    midpoint = round((bid_price + ask_price) / 2.0, 2)
+                    if option_premium is None:
+                        option_premium = midpoint
+                elif pd.notna(lp) and float(lp) > 0:
+                    if option_premium is None:
+                        option_premium = round(float(lp), 2)
+                    if bid_price is None:
+                        bid_price = round(option_premium * 0.98, 2)
+                    if ask_price is None:
+                        ask_price = round(option_premium * 1.02, 2)
+                    midpoint = round((bid_price + ask_price) / 2.0, 2)
+    except Exception:
+        pass
+
+    if option_volume is None:
+        option_volume = live_option_volume
+    if open_interest is None:
+        open_interest = live_open_interest
 
     if bid_price is not None and ask_price is not None and bid_price > 0 and ask_price > 0:
         midpoint = round((bid_price + ask_price) / 2.0, 2)
@@ -524,6 +546,29 @@ def compute_ticker_volatility_analytics(
         ask_price = round(option_premium * 1.02, 2)
     if midpoint is None:
         midpoint = round((bid_price + ask_price) / 2.0, 2)
+
+    # Underlying stock 20d average trading volume
+    stock_volume = None
+    if not history.empty and 'Volume' in history:
+        vol_series = history['Volume'].dropna()
+        if not vol_series.empty:
+            try:
+                stock_volume = int(vol_series.tail(20).mean())
+            except Exception:
+                pass
+
+    # Bid-Ask spread & liquidity assessment
+    bid_ask_spread = round(ask_price - bid_price, 2) if (bid_price is not None and ask_price is not None) else None
+    bid_ask_spread_pct = round((bid_ask_spread / midpoint * 100.0), 2) if (bid_ask_spread is not None and midpoint and midpoint > 0) else None
+
+    liquidity_rating = "Moderate Liquidity"
+    if bid_ask_spread_pct is not None:
+        if bid_ask_spread_pct <= 3.5:
+            liquidity_rating = "High Liquidity (Tight Spread)"
+        elif bid_ask_spread_pct <= 8.5:
+            liquidity_rating = "Moderate Liquidity"
+        else:
+            liquidity_rating = "Low Liquidity (Wide Spread)"
 
     # 1. 20-Day Historical Volatility
     hv_20d = calculate_20d_historical_volatility(closes) if not closes.empty else 0.25
@@ -595,6 +640,12 @@ def compute_ticker_volatility_analytics(
         "midpoint_premium": midpoint,
         "bid_price": round(bid_price, 2) if bid_price else None,
         "ask_price": round(ask_price, 2) if ask_price else None,
+        "option_volume": option_volume,
+        "open_interest": open_interest,
+        "stock_volume": stock_volume,
+        "bid_ask_spread": bid_ask_spread,
+        "bid_ask_spread_pct": bid_ask_spread_pct,
+        "liquidity_rating": liquidity_rating,
         "historical_volatility_20d": round(hv_20d, 4),
         "implied_volatility": round(iv_mid, 4),
         "implied_volatility_bid": round(iv_bid, 4) if iv_bid else None,

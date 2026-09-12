@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { VolatilityCalculationResponse } from '@/lib/types';
 import { API_BASE_URL } from '@/lib/api';
-import { Activity, Percent, TrendingUp, HelpCircle, ShieldAlert, Sparkles, RefreshCw, Calculator, DollarSign, Calendar, ArrowRightLeft, CheckCircle2 } from 'lucide-react';
+import { Activity, Percent, TrendingUp, HelpCircle, ShieldAlert, Sparkles, RefreshCw, Calculator, DollarSign, Calendar, ArrowRightLeft, CheckCircle2, BarChart2, Layers, Droplets } from 'lucide-react';
 
 interface Props {
   selectedTicker?: string | null;
@@ -25,6 +25,9 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
   const [askPrice, setAskPrice] = useState<string>('91.16');
   const [riskFreeRate, setRiskFreeRate] = useState<string>('4.0');
   const [dividendYield, setDividendYield] = useState<string>('0.0');
+  const [optionVolume, setOptionVolume] = useState<string>('1450');
+  const [openInterest, setOpenInterest] = useState<string>('8200');
+  const [stockVolume, setStockVolume] = useState<string>('12500000');
 
   // Result States
   const [loading, setLoading] = useState<boolean>(false);
@@ -54,6 +57,9 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
   const fetchLiveTickerData = async (targetSymbol: string) => {
     setLoading(true);
     setError(null);
+    setOptionVolume('...');
+    setOpenInterest('...');
+    setStockVolume('...');
     try {
       const cleanSym = targetSymbol.trim().toUpperCase();
       const daysParam = parseInt(daysToExpiration) || 30;
@@ -71,6 +77,9 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
           setAskPrice(data.ask_price.toFixed(2));
         }
         if (data.option_premium) setOptionPremium(data.option_premium.toFixed(2));
+        setOptionVolume(data.option_volume !== null && data.option_volume !== undefined ? data.option_volume.toString() : '0');
+        setOpenInterest(data.open_interest !== null && data.open_interest !== undefined ? data.open_interest.toString() : '0');
+        setStockVolume(data.stock_volume !== null && data.stock_volume !== undefined ? data.stock_volume.toString() : '0');
         setResult(data);
       } else {
         const errData = await res.json();
@@ -97,6 +106,9 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
       const days = parseInt(daysToExpiration) || 30;
       const r = (parseFloat(riskFreeRate) || 4.0) / 100.0;
       const q = (parseFloat(dividendYield) || 0.0) / 100.0;
+      const optVol = parseInt(optionVolume) || null;
+      const oiVal = parseInt(openInterest) || null;
+      const stkVol = parseInt(stockVolume) || null;
 
       const payload = {
         symbol: symbol.toUpperCase(),
@@ -109,6 +121,9 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
         days_to_expiration: days,
         risk_free_rate: r,
         dividend_yield: q,
+        option_volume: optVol,
+        open_interest: oiVal,
+        stock_volume: stkVol,
       };
 
       const res = await fetch(`${API_BASE_URL}/api/volatility-calculator`, {
@@ -361,6 +376,67 @@ export function VolatilityCalculatorPanel({ selectedTicker = 'SNDK', availableTi
                 className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="4.0"
               />
+            </div>
+
+            {/* Option Volume */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <BarChart2 className="w-3.5 h-3.5 text-blue-400" /> Option Volume
+              </label>
+              <input
+                type="number"
+                value={optionVolume}
+                onChange={(e) => setOptionVolume(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="1450"
+              />
+            </div>
+
+            {/* Open Interest (Option Liquidity) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-purple-400" /> Open Interest (OI)
+              </label>
+              <input
+                type="number"
+                value={openInterest}
+                onChange={(e) => setOpenInterest(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="8200"
+              />
+            </div>
+
+            {/* Stock 20D Avg Volume */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <Droplets className="w-3.5 h-3.5 text-emerald-400" /> Stock 20D Avg Volume
+              </label>
+              <input
+                type="number"
+                value={stockVolume}
+                onChange={(e) => setStockVolume(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="12500000"
+              />
+            </div>
+
+            {/* Liquidity Indicator Badge */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                <span>Option Liquidity</span>
+                {result?.bid_ask_spread_pct != null && (
+                  <span className="text-[10px] font-mono text-muted-foreground">Spread: {result.bid_ask_spread_pct}%</span>
+                )}
+              </label>
+              <div className="flex items-center gap-2 bg-muted/50 border border-input rounded-md px-3 py-1.5 h-[34px]">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  result?.liquidity_rating?.includes('High') ? 'bg-emerald-400 animate-pulse' :
+                  result?.liquidity_rating?.includes('Moderate') ? 'bg-amber-400' : 'bg-red-400'
+                }`} />
+                <span className="text-xs font-medium font-mono truncate text-foreground">
+                  {result?.liquidity_rating || 'Moderate Liquidity'}
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>
