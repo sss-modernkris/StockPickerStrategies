@@ -64,6 +64,7 @@ class TickerAnalysis(BaseModel):
     top_factor: Optional[str] = None
     price_history: Optional[List[PricePoint]] = None
     technical_indicators: Optional[TechnicalIndicators] = None
+    option_analytics: Optional[Dict[str, Any]] = None
     raw_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 

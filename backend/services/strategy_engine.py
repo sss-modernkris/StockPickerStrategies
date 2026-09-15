@@ -94,6 +94,8 @@ def calculate_technical_indicators(data: Dict[str, Any]) -> TechnicalIndicators:
         print(f"Error calculating technical indicators: {e}")
         return None
 
+from services.options_service import compute_ticker_volatility_analytics
+
 def run_all_strategies(symbol: str) -> TickerAnalysis:
     try:
         data = fetch_ticker_data(symbol)
@@ -124,9 +126,12 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
     
     # Extract recent price history for frontend charts (e.g. last 6 months)
     price_history = []
+    current_close = None
     if data.get("history") is not None and not data["history"].empty:
         history_df = data["history"].copy()
         closes = history_df["Close"]
+        if not closes.empty:
+            current_close = float(closes.iloc[-1])
         
         # Precompute the requested historical series arrays
         history_df["sma_9"] = closes.rolling(window=9).mean()
@@ -221,6 +226,17 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
                 "vwap_lower": safe_float(row.get("vwap_lower")),
             })
 
+    # Compute Call Option Greeks, Volatility Spread, and Option Liquidity (~30 DTE ATM Call)
+    option_analytics = None
+    try:
+        option_analytics = compute_ticker_volatility_analytics(
+            symbol=symbol,
+            stock_price=current_close,
+            days_to_expiration=30
+        )
+    except Exception as e:
+        print(f"Error computing option analytics for {symbol}: {e}")
+
     return TickerAnalysis(
         symbol=symbol,
         strategies=results,
@@ -228,5 +244,6 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
         top_factor=top_factor,
         price_history=price_history,
         technical_indicators=calculate_technical_indicators(data),
+        option_analytics=option_analytics,
         raw_data=data.get("info")
     )

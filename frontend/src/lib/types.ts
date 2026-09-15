@@ -60,6 +60,7 @@ export interface TickerAnalysis {
     top_factor?: string;
     price_history?: PricePoint[];
     technical_indicators?: TechnicalIndicators;
+    option_analytics?: VolatilityCalculationResponse;
     raw_data?: Record<string, unknown>;
     error?: string;
 }
