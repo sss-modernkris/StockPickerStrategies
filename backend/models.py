@@ -209,6 +209,15 @@ class VolatilityCalculationResponse(BaseModel):
     breakeven_price: float
     required_move_pct: float
     greeks: Dict[str, float]
+    greeks_bullish_score: Optional[int] = 0
+    greeks_bullish_pct: Optional[float] = 0.0
+    stage1_score: Optional[int] = 0
+    stage2_score: Optional[int] = 0
+    delta_theta_ratio: Optional[float] = None
+    daily_theta_pct: Optional[float] = None
+    req_daily_stock_rise: Optional[float] = None
+    stage1_details: Optional[Dict[str, bool]] = None
+    stage2_details: Optional[Dict[str, bool]] = None
     status: str = "success"
     message: Optional[str] = None
 

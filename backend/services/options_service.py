@@ -631,6 +631,81 @@ def compute_ticker_volatility_analytics(
     breakeven = strike_price + option_premium
     req_move_pct = ((breakeven - stock_price) / stock_price * 100.0) if stock_price > 0 else 0.0
 
+    # 6. Options Alpha Rank Evaluation (Stage 1 Stock Setup + Stage 2 Option Greeks & Efficiency)
+    call_delta = float(greeks.get('call_delta', 0.50))
+    call_theta = abs(float(greeks.get('call_theta', 0.05)))
+
+    delta_theta_ratio = round(call_delta / call_theta, 2) if call_theta > 0 else 0.0
+    daily_theta_pct = round((call_theta / option_premium * 100.0), 2) if option_premium > 0 else 0.0
+    req_daily_stock_rise = round(call_theta / call_delta, 3) if call_delta > 0 else 0.0
+
+    # Stage 1: Bullish Stock Filters (7 Points)
+    if not closes.empty and len(closes) >= 20:
+        ema_20_val = float(closes.ewm(span=20, adjust=False).mean().iloc[-1])
+        sma_50_val = float(closes.rolling(window=min(50, len(closes))).mean().iloc[-1])
+        trend_ok = (stock_price > ema_20_val) and (ema_20_val >= sma_50_val * 0.98)
+    else:
+        trend_ok = stock_price > 0
+
+    slope_2w = (stock_price - float(closes.iloc[-10])) / stock_price if len(closes) >= 10 else 0.01
+    slope_4w = (stock_price - float(closes.iloc[-20])) / stock_price if len(closes) >= 20 else 0.01
+    slopes_ok = (slope_2w > 0) or (slope_4w > 0)
+
+    std_20 = float(closes.tail(20).std()) if len(closes) >= 20 else stock_price * 0.02
+    std_pct = (std_20 / stock_price * 100.0) if stock_price > 0 else 2.0
+    trend_quality_ok = std_pct <= 5.0
+
+    stock_1m_ret = ((stock_price / float(closes.iloc[-21])) - 1.0) * 100.0 if len(closes) >= 21 else 1.0
+    rs_ok = stock_1m_ret > 0.0
+
+    vol_curr = float(history['Volume'].iloc[-1]) if (not history.empty and 'Volume' in history) else 1.0
+    vol_avg_20 = float(history['Volume'].tail(20).mean()) if (not history.empty and 'Volume' in history) else 1.0
+    volume_ok = (vol_curr / vol_avg_20 >= 0.8) if vol_avg_20 > 0 else True
+
+    high_20d = float(history['High'].tail(20).max()) if (not history.empty and 'High' in history) else stock_price * 1.05
+    low_20d = float(history['Low'].tail(20).min()) if (not history.empty and 'Low' in history) else stock_price * 0.95
+    tr_val = (high_20d - low_20d) / 20.0
+    resistance_ok = (high_20d - stock_price) >= (1.5 * tr_val) or (stock_price >= high_20d * 0.99)
+
+    iv_hv_ratio = (iv_mid / hv_20d) if hv_20d > 0 else 1.0
+    earnings_ok = iv_hv_ratio <= 1.45
+
+    stage1_details = {
+        "trend_ma": trend_ok,
+        "positive_slopes": slopes_ok,
+        "trend_quality": trend_quality_ok,
+        "relative_strength": rs_ok,
+        "volume_surge": volume_ok,
+        "resistance_headroom": resistance_ok,
+        "event_risk_clear": earnings_ok,
+    }
+    stage1_score = sum(1 for v in stage1_details.values() if v)
+
+    # Stage 2: Call Option Greeks & Efficiency (8 Points)
+    dte_ok = 30 <= days_to_exp <= 45
+    delta_ok = 0.60 <= call_delta <= 0.75
+    theta_pct_ok = daily_theta_pct <= 1.5
+    eff_ratio_ok = delta_theta_ratio >= 5.0
+    req_rise_ok = req_daily_stock_rise <= 0.25
+    iv_level_ok = (iv_mid <= 0.50) or (iv_hv_ratio <= 1.30)
+    spread_ok = (bid_ask_spread_pct <= 5.0) if bid_ask_spread_pct is not None else True
+    liquidity_ok = (open_interest >= 500 if open_interest else True) or "High" in liquidity_rating
+
+    stage2_details = {
+        "dte_horizon_30_45": dte_ok,
+        "delta_target_60_75": delta_ok,
+        "daily_theta_pct_1_5": theta_pct_ok,
+        "delta_theta_efficiency": eff_ratio_ok,
+        "req_daily_rise_low": req_rise_ok,
+        "reasonable_iv": iv_level_ok,
+        "tight_spread_5pct": spread_ok,
+        "option_liquidity_oi": liquidity_ok,
+    }
+    stage2_score = sum(1 for v in stage2_details.values() if v)
+
+    greeks_bullish_score = stage1_score + stage2_score
+    greeks_bullish_pct = round((greeks_bullish_score / 15.0) * 100.0, 1)
+
     return {
         "symbol": symbol,
         "stock_price": round(stock_price, 2),
@@ -656,6 +731,15 @@ def compute_ticker_volatility_analytics(
         "breakeven_price": round(breakeven, 2),
         "required_move_pct": round(req_move_pct, 2),
         "greeks": greeks,
+        "greeks_bullish_score": greeks_bullish_score,
+        "greeks_bullish_pct": greeks_bullish_pct,
+        "stage1_score": stage1_score,
+        "stage2_score": stage2_score,
+        "delta_theta_ratio": delta_theta_ratio,
+        "daily_theta_pct": daily_theta_pct,
+        "req_daily_stock_rise": req_daily_stock_rise,
+        "stage1_details": stage1_details,
+        "stage2_details": stage2_details,
         "status": "success"
     }
 

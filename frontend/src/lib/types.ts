@@ -224,6 +224,15 @@ export interface VolatilityCalculationResponse {
     call_rho: number;
     put_rho: number;
   };
+  greeks_bullish_score?: number;
+  greeks_bullish_pct?: number;
+  stage1_score?: number;
+  stage2_score?: number;
+  delta_theta_ratio?: number | null;
+  daily_theta_pct?: number | null;
+  req_daily_stock_rise?: number | null;
+  stage1_details?: Record<string, boolean>;
+  stage2_details?: Record<string, boolean>;
   status?: string;
   message?: string | null;
 }

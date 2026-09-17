@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, AlertCircle, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, TrendingUp, AlertCircle, ArrowUpDown, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 import {
     LineChart,
     Line,
@@ -338,6 +338,24 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 }
             }
 
+            // Extract Options Alpha Rank from option_analytics
+            const optionAnalytics = tData?.option_analytics;
+            let optionsAlphaScore: number | null = null;
+            let optionsAlphaPct: number | null = null;
+            let stage1Score: number | null = null;
+            let stage2Score: number | null = null;
+            let stage1Details: Record<string, boolean> | null = null;
+            let stage2Details: Record<string, boolean> | null = null;
+
+            if (optionAnalytics?.greeks_bullish_score !== undefined && optionAnalytics?.greeks_bullish_score !== null) {
+                optionsAlphaScore = optionAnalytics.greeks_bullish_score;
+                optionsAlphaPct = optionAnalytics.greeks_bullish_pct ?? Math.round((optionsAlphaScore / 15) * 100);
+                stage1Score = optionAnalytics.stage1_score ?? null;
+                stage2Score = optionAnalytics.stage2_score ?? null;
+                stage1Details = optionAnalytics.stage1_details ?? null;
+                stage2Details = optionAnalytics.stage2_details ?? null;
+            }
+
             // Calculate VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000
             let vst: number | null = null;
             let vstStr = 'N/A';
@@ -353,6 +371,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 symbol: ticker,
                 currentPrice,
                 currentPriceStr,
+                optionsAlphaScore,
+                optionsAlphaPct,
+                stage1Score,
+                stage2Score,
+                stage1Details,
+                stage2Details,
                 vst,
                 vstStr,
                 trendValue,
@@ -696,6 +720,13 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('optionsAlphaScore')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold text-amber-400" title="Options Alpha Rank: 15-Point Quantitative Score (Stage 1 Stock Setup + Stage 2 Call Greeks)">
+                                            <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-400 inline" />
+                                            Options Alpha Rank
+                                            {SortIcon('optionsAlphaScore')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('vst')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold text-indigo-400" title="VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000">
                                             VST
                                             {SortIcon('vst')}
@@ -786,6 +817,24 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             {row.symbol}
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.currentPriceStr}</TableCell>
+                                        <TableCell className="text-right">
+                                            {row.optionsAlphaScore !== null && row.optionsAlphaScore !== undefined ? (
+                                                <span
+                                                    className={`inline-block font-mono text-xs font-bold px-2 py-0.5 rounded border cursor-help ${
+                                                        row.optionsAlphaScore >= 12
+                                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                                            : row.optionsAlphaScore >= 9
+                                                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                                            : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                                                    }`}
+                                                    title={`Options Alpha Rank: ${row.optionsAlphaScore}/15 (${row.optionsAlphaPct}%)\n\n• Stage 1 (Stock Bullishness): ${row.stage1Score}/7\n• Stage 2 (Call Option Greeks & Efficiency): ${row.stage2Score}/8`}
+                                                >
+                                                    {row.optionsAlphaScore}/15 ({row.optionsAlphaPct}%)
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs font-mono">N/A</span>
+                                            )}
+                                        </TableCell>
                                         <TableCell className={`text-right font-mono ${row.vst !== null && row.vst > 0 ? 'text-indigo-400 font-bold' : row.vst !== null && row.vst < 0 ? 'text-red-500 font-bold' : ''}`} title="VST = Trend * Volume * Strategy Value / 1e10">
                                             {row.vstStr}
                                         </TableCell>

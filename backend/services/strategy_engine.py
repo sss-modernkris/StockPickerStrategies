@@ -226,13 +226,13 @@ def run_all_strategies(symbol: str) -> TickerAnalysis:
                 "vwap_lower": safe_float(row.get("vwap_lower")),
             })
 
-    # Compute Call Option Greeks, Volatility Spread, and Option Liquidity (~30 DTE ATM Call)
+    # Compute Call Option Greeks, Volatility Spread, and Options Alpha Rank (30-45 DTE Target)
     option_analytics = None
     try:
         option_analytics = compute_ticker_volatility_analytics(
             symbol=symbol,
             stock_price=current_close,
-            days_to_expiration=30
+            days_to_expiration=35
         )
     except Exception as e:
         print(f"Error computing option analytics for {symbol}: {e}")

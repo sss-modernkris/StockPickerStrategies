@@ -246,7 +246,7 @@ export function runWillyBacktest(
     };
 }
 
-type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'strategy_value' | 'strategy_return' | 'call_delta' | 'gamma' | 'call_theta' | 'vega' | 'vol_spread' | 'open_interest' | string;
+type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'options_alpha_rank' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'call_delta' | 'gamma' | 'call_theta' | 'vega' | 'delta_theta_ratio' | 'vol_spread' | 'open_interest' | 'strategy_value' | 'strategy_return' | string;
 type SortDirection = 'asc' | 'desc';
 
 export function ComparisonTable({ analysisData }: ComparisonTableProps) {
@@ -431,6 +431,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         const hv20d = optionAnalytics?.historical_volatility_20d ?? null;
         const liquidityRating = optionAnalytics?.liquidity_rating ?? null;
         const openInterest = optionAnalytics?.open_interest ?? null;
+        const greeksBullishScore = optionAnalytics?.greeks_bullish_score ?? 0;
+        const greeksBullishPct = optionAnalytics?.greeks_bullish_pct ?? 0;
+        const stage1Score = optionAnalytics?.stage1_score ?? 0;
+        const stage2Score = optionAnalytics?.stage2_score ?? 0;
+        const deltaThetaRatio = optionAnalytics?.delta_theta_ratio ?? null;
+        const dailyThetaPct = optionAnalytics?.daily_theta_pct ?? null;
+        const reqDailyStockRise = optionAnalytics?.req_daily_stock_rise ?? null;
 
         return {
             symbol: data.symbol,
@@ -458,6 +465,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             hv_20d: hv20d,
             liquidity_rating: liquidityRating,
             open_interest: openInterest,
+            greeks_bullish_score: greeksBullishScore,
+            greeks_bullish_pct: greeksBullishPct,
+            stage1_score: stage1Score,
+            stage2_score: stage2Score,
+            delta_theta_ratio: deltaThetaRatio,
+            daily_theta_pct: dailyThetaPct,
+            req_daily_stock_rise: reqDailyStockRise,
             strats: stratMap,
             strategy_value: backtest.finalValue,
             strategy_return: backtest.totalReturn,
@@ -522,6 +536,12 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'strategy_return') {
             valA = a.strategy_return;
             valB = b.strategy_return;
+        } else if (sortKey === 'options_alpha_rank') {
+            valA = a.greeks_bullish_score ?? -99999;
+            valB = b.greeks_bullish_score ?? -99999;
+        } else if (sortKey === 'delta_theta_ratio') {
+            valA = a.delta_theta_ratio ?? -99999;
+            valB = b.delta_theta_ratio ?? -99999;
         } else if (sortKey === 'call_delta') {
             valA = a.call_delta ?? -99999;
             valB = b.call_delta ?? -99999;
@@ -567,9 +587,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const handleExportCsv = async () => {
         setIsExporting(true);
         const headers = [
-            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
+            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Options Alpha Rank Score (0-15)", "Options Alpha Rank (%)", "Stage 1 Stock Score (0-7)", "Stage 2 Options Score (0-8)", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
             "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope",
-            "Call Delta (30D ATM)", "Gamma", "Call Theta ($/d)", "Vega ($/%)", "IV (30D)", "HV (20D)", "Vol Spread (%)", "Option Liquidity Rating", "Open Interest",
+            "Call Delta (30-45D)", "Gamma", "Call Theta ($/d)", "Vega ($/%)", "Delta/Theta Ratio", "Daily Theta (%)", "Req Daily Rise ($/d)", "IV (30-45D)", "HV (20D)", "Vol Spread (%)", "Option Liquidity Rating", "Open Interest",
             ...STRATEGY_NAMES
         ];
 
@@ -580,6 +600,10 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.strat_avg.toFixed(1),
                 row.ranking,
                 row.rec,
+                row.greeks_bullish_score,
+                `${row.greeks_bullish_pct}%`,
+                row.stage1_score,
+                row.stage2_score,
                 row.willy_market,
                 row.strategy_value.toFixed(2),
                 row.strategy_return.toFixed(2),
@@ -596,6 +620,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.gamma !== null ? row.gamma.toFixed(4) : "N/A",
                 row.call_theta !== null ? row.call_theta.toFixed(4) : "N/A",
                 row.vega !== null ? row.vega.toFixed(4) : "N/A",
+                row.delta_theta_ratio !== null ? row.delta_theta_ratio.toFixed(2) : "N/A",
+                row.daily_theta_pct !== null ? row.daily_theta_pct.toFixed(2) + "%" : "N/A",
+                row.req_daily_stock_rise !== null ? row.req_daily_stock_rise.toFixed(3) : "N/A",
                 row.iv_mid !== null ? (row.iv_mid * 100).toFixed(2) + "%" : "N/A",
                 row.hv_20d !== null ? (row.hv_20d * 100).toFixed(2) + "%" : "N/A",
                 row.vol_spread !== null ? (row.vol_spread >= 0 ? `+${(row.vol_spread * 100).toFixed(2)}%` : `${(row.vol_spread * 100).toFixed(2)}%`) : "N/A",
@@ -796,6 +823,14 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         >
                             Rec {renderSortIcon("rec")}
                         </TableHead>
+                        {/* OPTIONS ALPHA RANK COLUMN (STAGE 1 STOCK + STAGE 2 CALL GREEKS SCORE) */}
+                        <TableHead
+                            className="font-bold text-emerald-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[145px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('options_alpha_rank')}
+                            title="Options Alpha Rank: Composite 15-point score combining Stage 1 Bullish Stock Filters (7 pts) and Stage 2 Call Option Greeks & Efficiency (8 pts) for 30-45 DTE contracts"
+                        >
+                            Options Alpha Rank {renderSortIcon("options_alpha_rank")}
+                        </TableHead>
                         <TableHead
                             className="font-bold text-orange-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('willy_market')}
@@ -887,9 +922,16 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         <TableHead
                             className="font-bold text-emerald-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[85px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('vega')}
-                            title="Vega (V): Option price change per +1% change in Implied Volatility (~30 DTE ATM Call)"
+                            title="Vega (V): Option price change per +1% change in Implied Volatility (~30-45 DTE Call)"
                         >
                             Vega {renderSortIcon("vega")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-teal-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('delta_theta_ratio')}
+                            title="Delta/Theta Efficiency Ratio (Δ / |Θ|): Directional delta leverage per unit of daily time decay (higher ratio is preferred)"
+                        >
+                            Δ / |Θ| Ratio {renderSortIcon("delta_theta_ratio")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-amber-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[115px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
@@ -949,6 +991,23 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className={`text-center font-bold ${row.rec === 'Hold' ? 'text-green-500' : row.rec === 'Sell' ? 'text-red-500' : 'text-muted-foreground'}`}>
                                         {row.rec}
+                                    </TableCell>
+                                    {/* OPTIONS ALPHA RANK DATA CELL */}
+                                    <TableCell className="text-center font-mono text-xs min-w-[145px]">
+                                        <div 
+                                            className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold shadow-xs cursor-help"
+                                            title={`Options Alpha Rank: ${row.greeks_bullish_score}/15 (${row.greeks_bullish_pct}%)\n\n• Stage 1 (Stock Bullishness): ${row.stage1_score}/7\n• Stage 2 (Call Option Greeks & Efficiency): ${row.stage2_score}/8\n• Delta/Theta Ratio: ${row.delta_theta_ratio ?? 'N/A'}x\n• Daily Theta: ${row.daily_theta_pct ?? 'N/A'}%/d\n• Required Daily Stock Rise: $${row.req_daily_stock_rise ?? 'N/A'}/d`}
+                                        >
+                                            <span className={`px-2 py-0.5 rounded-full font-extrabold ${
+                                                row.greeks_bullish_score >= 11
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                    : row.greeks_bullish_score >= 8
+                                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                    : 'bg-destructive/20 text-destructive border border-destructive/30'
+                                            }`}>
+                                                {row.greeks_bullish_score}/15 ({row.greeks_bullish_pct}%)
+                                            </span>
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${row.willy_market === 'Bull' ? 'bg-green-500/15 text-green-500 border border-green-500/30' : row.willy_market === 'Bear' ? 'bg-red-500/15 text-red-500 border border-red-500/30' : 'bg-muted text-muted-foreground'}`}>
@@ -1050,6 +1109,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                         {row.vega != null ? (
                                             <span className="text-emerald-400 font-semibold">
                                                 ${row.vega.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[110px]">
+                                        {row.delta_theta_ratio != null && row.delta_theta_ratio > 0 ? (
+                                            <span className={row.delta_theta_ratio >= 5.0 ? "text-emerald-400 font-bold" : "text-amber-300 font-semibold"} title={`Daily Theta %: ${row.daily_theta_pct ?? 'N/A'}%/d\nReq Daily Stock Rise: $${row.req_daily_stock_rise ?? 'N/A'}/d`}>
+                                                {row.delta_theta_ratio.toFixed(2)}x
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
