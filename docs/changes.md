@@ -2,9 +2,23 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
+## 1. Release v20260922 - Options Alpha Rank & Top Tickers All-Column Metrics Box
+
+### 🎯 Options Alpha Rank 15-Point Composite Score Engine (`backend/services/options_service.py`)
+- **Stage 1 (Bullish Setup, 7 Points)**: Price > 20d & 50d MAs, positive 20-30d slope ($m > 0$), low trend standard error ($\text{StdErr} \le 2.0\%$), outperformance vs SPY slope, volume surge, ATR resistance headroom, and clear event risk horizon.
+- **Stage 2 (Option Greeks & Liquidity, 8 Points)**: Target 30–45 DTE window, optimal Delta ($0.60 - 0.75$), daily theta decay ($\le 1.5\%$), Delta/Theta efficiency ratio ($\ge 5.0$), low required daily stock rise ($\le \$0.25/\text{day}$), implied volatility ($\text{IV} \le 45\%$), bid-ask spread ($\le 5.0\%$), and open interest depth ($\ge 500$).
+
+### 📊 Top Tickers Single-Screen All-Column Metrics Box (`frontend/src/components/ComparisonTable.tsx`)
+- **Array / Key-Value List View**: Renders all 37 base metrics and individual strategy scores in a single-screen 4-column indexed grid (`#01` to `#37`) without horizontal scrolling.
+- **Categorized Grid View**: Displays metrics grouped into 5 structured categories with color-coded badges.
+- **Interactive UI Controls**: Ticker row toggle, mode switcher, and Close Box button.
+
+### 🏷️ Version Synchronization (`v20260922`)
+- Synchronized platform version tags across `README.md`, `frontend/src/app/page.tsx`, `frontend/src/components/TickerSidebar.tsx`, and `docs/changes.md`.
+
 ---
 
-## 1. Release v20260909 - Volatility Analytics & Call Option Implied Volatility (IV) Calculator
+## 2. Release v20260909 - Volatility Analytics & Call Option Implied Volatility (IV) Calculator
 
 ### 📊 20-Day Historical Volatility & Black-Scholes IV Inversion Engine (`backend/services/options_service.py`)
 - **Black-Scholes IV Inversion**:

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, AreaChart, Area, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, YAxis, ComposedChart, ReferenceArea } from 'recharts';
-import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2, TrendingUp } from 'lucide-react';
+import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2, TrendingUp, X, Grid, List, Sparkles } from 'lucide-react';
 
 interface ComparisonTableProps {
     analysisData: Record<string, TickerAnalysis>;
@@ -255,6 +255,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
     const [selectedRowTicker, setSelectedRowTicker] = useState<string | null>(null);
+    const [metricsViewMode, setMetricsViewMode] = useState<'array' | 'categorized'>('array');
     const [backtestPeriod, setBacktestPeriod] = useState<string | number>('4m');
     const [initialCapital, setInitialCapital] = useState<number>(10000);
     const [capitalInput, setCapitalInput] = useState<string>("10,000");
@@ -1175,6 +1176,166 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 </TableBody>
             </table>
         </div>
+
+        {/* SELECTED TICKER FULL METRICS ARRAY BOX */}
+        {selectedRowTicker && selectedData && (() => {
+            const allColumnsArray = [
+                { index: 1, key: "Ticker Symbol", value: selectedData.symbol, category: "Core Signals", badgeColor: "text-foreground font-bold" },
+                { index: 2, key: "ML Alpha Proba", value: `${selectedData.ml_alpha.toFixed(1)}%`, category: "Core Signals", badgeColor: selectedData.ml_alpha >= 75 ? "text-emerald-400 font-bold" : selectedData.ml_alpha >= 40 ? "text-amber-400" : "text-rose-400" },
+                { index: 3, key: "Strat Avg Score", value: `${selectedData.strat_avg.toFixed(1)}%`, category: "Core Signals", badgeColor: selectedData.strat_avg >= 75 ? "text-emerald-400 font-bold" : selectedData.strat_avg >= 40 ? "text-amber-400" : "text-rose-400" },
+                { index: 4, key: "Ranking Score", value: `${selectedData.ranking}/8`, category: "Core Signals", badgeColor: "text-amber-400 font-bold" },
+                { index: 5, key: "Action Recommendation", value: selectedData.rec, category: "Core Signals", badgeColor: selectedData.rec === 'Hold' ? "text-emerald-400 font-bold" : selectedData.rec === 'Sell' ? "text-rose-400 font-bold" : "text-muted-foreground" },
+                { index: 6, key: "Options Alpha Rank", value: `${selectedData.greeks_bullish_score}/15 (${selectedData.greeks_bullish_pct}%)`, category: "Core Signals", badgeColor: selectedData.greeks_bullish_score >= 12 ? "text-emerald-400 font-bold" : selectedData.greeks_bullish_score >= 9 ? "text-amber-400 font-bold" : "text-rose-400 font-bold" },
+                
+                { index: 7, key: "Willy Market State", value: selectedData.willy_market === 'Bull' ? '🟢 Bull' : selectedData.willy_market === 'Bear' ? '🔴 Bear' : 'N/A', category: "Performance & State", badgeColor: selectedData.willy_market === 'Bull' ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 8, key: "Strategy Value ($)", value: `$${selectedData.strategy_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, category: "Performance & State", badgeColor: "text-amber-400 font-bold" },
+                { index: 9, key: "Strategy Return (%)", value: `${selectedData.strategy_return >= 0 ? '+' : ''}${selectedData.strategy_return.toFixed(1)}%`, category: "Performance & State", badgeColor: selectedData.strategy_return >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 10, key: "Buy & Hold Return (%)", value: `${selectedData.bh_return >= 0 ? '+' : ''}${selectedData.bh_return.toFixed(1)}%`, category: "Performance & State", badgeColor: selectedData.bh_return >= 0 ? "text-emerald-400" : "text-rose-400" },
+                
+                { index: 11, key: "Close Price ($)", value: selectedData.close_price != null ? `$${selectedData.close_price.toFixed(2)}` : "N/A", category: "Price & Technicals", badgeColor: "text-foreground font-semibold" },
+                { index: 12, key: "Close Slope", value: selectedData.close_slope, category: "Price & Technicals", badgeColor: selectedData.close_slope === '+' ? "text-emerald-400 font-bold" : selectedData.close_slope === '-' ? "text-rose-400 font-bold" : "text-foreground" },
+                { index: 13, key: "Price / Willy VWAP", value: selectedData.willy_vwap_ratio != null ? selectedData.willy_vwap_ratio.toFixed(3) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.willy_vwap_ratio ?? 0) >= 1.0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 14, key: "MACD Hist", value: selectedData.macd_hist != null ? (selectedData.macd_hist > 0 ? `+${selectedData.macd_hist.toFixed(2)}` : selectedData.macd_hist.toFixed(2)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.macd_hist ?? 0) > 0 ? "text-emerald-400" : "text-rose-400" },
+                { index: 15, key: "MACD Slope", value: selectedData.macd_slope != null ? (selectedData.macd_slope > 0 ? `+${selectedData.macd_slope.toFixed(3)}` : selectedData.macd_slope.toFixed(3)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.macd_slope ?? 0) > 0 ? "text-emerald-400" : "text-rose-400" },
+                { index: 16, key: "MACD Rel Ratio", value: selectedData.macd_rel != null ? (selectedData.macd_rel > 0 ? `+${selectedData.macd_rel.toFixed(3)}` : selectedData.macd_rel.toFixed(3)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.macd_rel ?? 0) > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 17, key: "RSI (14)", value: selectedData.rsi != null ? selectedData.rsi.toFixed(1) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.rsi ?? 0) > 70 ? "text-rose-400 font-bold" : (selectedData.rsi ?? 0) < 30 ? "text-emerald-400 font-bold" : "text-foreground" },
+                { index: 18, key: "RSI Slope", value: selectedData.rsi_slope != null ? (selectedData.rsi_slope > 0 ? `+${selectedData.rsi_slope.toFixed(2)}` : selectedData.rsi_slope.toFixed(2)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.rsi_slope ?? 0) > 0 ? "text-emerald-400" : "text-rose-400" },
+                
+                { index: 19, key: "Call Delta (Δ)", value: selectedData.call_delta != null ? selectedData.call_delta.toFixed(2) : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-purple-400 font-bold" },
+                { index: 20, key: "Gamma (Γ)", value: selectedData.gamma != null ? selectedData.gamma.toFixed(4) : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-purple-300 font-semibold" },
+                { index: 21, key: "Call Theta (Θ)", value: selectedData.call_theta != null ? `-$${Math.abs(selectedData.call_theta).toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-rose-400 font-semibold" },
+                { index: 22, key: "Vega (V)", value: selectedData.vega != null ? `$${selectedData.vega.toFixed(2)}` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-emerald-400 font-semibold" },
+                { index: 23, key: "Δ / |Θ| Ratio", value: selectedData.delta_theta_ratio != null ? `${selectedData.delta_theta_ratio.toFixed(2)}x` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.delta_theta_ratio ?? 0) >= 5.0 ? "text-emerald-400 font-bold" : "text-amber-300" },
+                { index: 24, key: "Daily Theta Decay %", value: selectedData.daily_theta_pct != null ? `${selectedData.daily_theta_pct.toFixed(2)}%/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-400" },
+                { index: 25, key: "Req Daily Stock Rise", value: selectedData.req_daily_stock_rise != null ? `$${selectedData.req_daily_stock_rise.toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-300" },
+                { index: 26, key: "Vol Spread (IV - HV)", value: selectedData.vol_spread != null ? `${selectedData.vol_spread >= 0 ? '+' : ''}${(selectedData.vol_spread * 100).toFixed(1)}%` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.vol_spread ?? 0) > 0.05 ? "text-amber-400" : "text-emerald-400" },
+                { index: 27, key: "Option Liquidity & OI", value: selectedData.liquidity_rating ? `${selectedData.liquidity_rating} (${selectedData.open_interest ?? 'N/A'} OI)` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-blue-400" },
+
+                ...STRATEGY_NAMES.map((name, i) => ({
+                    index: 28 + i,
+                    key: name,
+                    value: `${(selectedData.strats[name] || 0).toFixed(1)}%`,
+                    category: "10 Core Strategy Match Scores",
+                    badgeColor: getColorClass(selectedData.strats[name] || 0)
+                }))
+            ];
+
+            return (
+                <div className="mt-4 border border-amber-500/40 rounded-xl bg-card p-5 space-y-4 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                    {/* Header Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/50">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono font-black text-xl px-3 py-1 rounded-lg">
+                                {selectedData.symbol}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-bold text-lg text-foreground">
+                                        {selectedData.symbol} All Column Metrics Summary
+                                    </h3>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                        selectedData.rec === 'Hold' ? 'bg-emerald-500/20 text-emerald-400' : selectedData.rec === 'Sell' ? 'bg-rose-500/20 text-rose-400' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                        {selectedData.rec}
+                                    </span>
+                                    <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-mono font-bold">
+                                        Alpha Rank: {selectedData.greeks_bullish_score}/15 ({selectedData.greeks_bullish_pct}%)
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Displaying all {allColumnsArray.length} column metrics on one screen without horizontal scrolling.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Mode Toggle */}
+                            <div className="flex bg-muted p-1 rounded-lg border text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setMetricsViewMode('array')}
+                                    className={`px-3 py-1 font-semibold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        metricsViewMode === 'array' ? 'bg-background text-foreground shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    <List className="w-3.5 h-3.5 text-amber-400" />
+                                    Array List View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMetricsViewMode('categorized')}
+                                    className={`px-3 py-1 font-semibold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        metricsViewMode === 'categorized' ? 'bg-background text-foreground shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    <Grid className="w-3.5 h-3.5 text-blue-400" />
+                                    Categorized Grid
+                                </button>
+                            </div>
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedRowTicker(null)}
+                                className="h-8 w-8 p-0 rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                                title="Close Details Box"
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* View Mode 1: Array List View (Single-Screen Multi-Column List) */}
+                    {metricsViewMode === 'array' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-2">
+                            {allColumnsArray.map((col) => (
+                                <div 
+                                    key={col.index}
+                                    className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/40 hover:border-amber-500/40 transition-colors"
+                                >
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <span className="font-mono text-[10px] text-muted-foreground font-semibold bg-background px-1.5 py-0.5 rounded border shrink-0">
+                                            #{col.index.toString().padStart(2, '0')}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground font-medium truncate" title={col.key}>
+                                            {col.key}
+                                        </span>
+                                    </div>
+                                    <span className={`font-mono text-xs text-right pl-2 shrink-0 ${col.badgeColor}`}>
+                                        {col.value}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* View Mode 2: Categorized Grid View */}
+                    {metricsViewMode === 'categorized' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                            {Array.from(new Set(allColumnsArray.map(c => c.category))).map((cat) => {
+                                const items = allColumnsArray.filter(c => c.category === cat);
+                                return (
+                                    <div key={cat} className="bg-muted/30 border border-border/40 p-3.5 rounded-xl space-y-2.5">
+                                        <h4 className="font-bold text-xs uppercase tracking-wider text-amber-400 border-b border-border/40 pb-1.5 flex items-center justify-between">
+                                            <span>{cat}</span>
+                                            <span className="font-mono text-[10px] text-muted-foreground font-normal">{items.length} Metrics</span>
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {items.map(item => (
+                                                <div key={item.index} className="flex items-center justify-between text-xs py-0.5">
+                                                    <span className="text-muted-foreground font-medium">{item.key}</span>
+                                                    <span className={`font-mono ${item.badgeColor}`}>{item.value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        })()}
 
         {/* Willy VWAP Backtest Dashboard Panel */}
         {selectedRowTicker && selectedData && backtest && (() => {
