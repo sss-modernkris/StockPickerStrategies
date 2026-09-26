@@ -214,6 +214,7 @@ class VolatilityCalculationResponse(BaseModel):
     stage1_score: Optional[int] = 0
     stage2_score: Optional[int] = 0
     delta_theta_ratio: Optional[float] = None
+    theta_delta_ratio: Optional[float] = None
     daily_theta_pct: Optional[float] = None
     req_daily_stock_rise: Optional[float] = None
     stage1_details: Optional[Dict[str, bool]] = None

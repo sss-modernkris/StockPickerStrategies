@@ -636,6 +636,7 @@ def compute_ticker_volatility_analytics(
     call_theta = abs(float(greeks.get('call_theta', 0.05)))
 
     delta_theta_ratio = round(call_delta / call_theta, 2) if call_theta > 0 else 0.0
+    theta_delta_ratio = round(call_theta / call_delta, 4) if call_delta > 0 else 0.0
     daily_theta_pct = round((call_theta / option_premium * 100.0), 2) if option_premium > 0 else 0.0
     req_daily_stock_rise = round(call_theta / call_delta, 3) if call_delta > 0 else 0.0
 
@@ -736,6 +737,7 @@ def compute_ticker_volatility_analytics(
         "stage1_score": stage1_score,
         "stage2_score": stage2_score,
         "delta_theta_ratio": delta_theta_ratio,
+        "theta_delta_ratio": theta_delta_ratio,
         "daily_theta_pct": daily_theta_pct,
         "req_daily_stock_rise": req_daily_stock_rise,
         "stage1_details": stage1_details,

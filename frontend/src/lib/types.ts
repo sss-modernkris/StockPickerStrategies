@@ -229,6 +229,7 @@ export interface VolatilityCalculationResponse {
   stage1_score?: number;
   stage2_score?: number;
   delta_theta_ratio?: number | null;
+  theta_delta_ratio?: number | null;
   daily_theta_pct?: number | null;
   req_daily_stock_rise?: number | null;
   stage1_details?: Record<string, boolean>;

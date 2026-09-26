@@ -246,7 +246,7 @@ export function runWillyBacktest(
     };
 }
 
-type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'options_alpha_rank' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'call_delta' | 'gamma' | 'call_theta' | 'vega' | 'delta_theta_ratio' | 'vol_spread' | 'open_interest' | 'strategy_value' | 'strategy_return' | string;
+type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'options_alpha_rank' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'call_delta' | 'gamma' | 'call_theta' | 'vega' | 'delta_theta_ratio' | 'theta_delta_ratio' | 'vol_spread' | 'open_interest' | 'strategy_value' | 'strategy_return' | string;
 type SortDirection = 'asc' | 'desc';
 
 export function ComparisonTable({ analysisData }: ComparisonTableProps) {
@@ -437,6 +437,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         const stage1Score = optionAnalytics?.stage1_score ?? 0;
         const stage2Score = optionAnalytics?.stage2_score ?? 0;
         const deltaThetaRatio = optionAnalytics?.delta_theta_ratio ?? null;
+        const thetaDeltaRatio = optionAnalytics?.theta_delta_ratio ?? ((callTheta !== null && callDelta !== null && callDelta > 0) ? (callTheta / callDelta) : (deltaThetaRatio && deltaThetaRatio > 0 ? (1 / deltaThetaRatio) : null));
         const dailyThetaPct = optionAnalytics?.daily_theta_pct ?? null;
         const reqDailyStockRise = optionAnalytics?.req_daily_stock_rise ?? null;
 
@@ -471,6 +472,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             stage1_score: stage1Score,
             stage2_score: stage2Score,
             delta_theta_ratio: deltaThetaRatio,
+            theta_delta_ratio: thetaDeltaRatio,
             daily_theta_pct: dailyThetaPct,
             req_daily_stock_rise: reqDailyStockRise,
             strats: stratMap,
@@ -543,6 +545,9 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'delta_theta_ratio') {
             valA = a.delta_theta_ratio ?? -99999;
             valB = b.delta_theta_ratio ?? -99999;
+        } else if (sortKey === 'theta_delta_ratio') {
+            valA = a.theta_delta_ratio ?? 99999;
+            valB = b.theta_delta_ratio ?? 99999;
         } else if (sortKey === 'call_delta') {
             valA = a.call_delta ?? -99999;
             valB = b.call_delta ?? -99999;
@@ -590,7 +595,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         const headers = [
             "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Options Alpha Rank Score (0-15)", "Options Alpha Rank (%)", "Stage 1 Stock Score (0-7)", "Stage 2 Options Score (0-8)", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
             "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope",
-            "Call Delta (30-45D)", "Gamma", "Call Theta ($/d)", "Vega ($/%)", "Delta/Theta Ratio", "Daily Theta (%)", "Req Daily Rise ($/d)", "IV (30-45D)", "HV (20D)", "Vol Spread (%)", "Option Liquidity Rating", "Open Interest",
+            "Call Delta (30-45D)", "Gamma", "Call Theta ($/d)", "Vega ($/%)", "Delta/Theta Ratio", "Theta/Delta Ratio", "Daily Theta (%)", "Req Daily Rise ($/d)", "IV (30-45D)", "HV (20D)", "Vol Spread (%)", "Option Liquidity Rating", "Open Interest",
             ...STRATEGY_NAMES
         ];
 
@@ -622,6 +627,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.call_theta !== null ? row.call_theta.toFixed(4) : "N/A",
                 row.vega !== null ? row.vega.toFixed(4) : "N/A",
                 row.delta_theta_ratio !== null ? row.delta_theta_ratio.toFixed(2) : "N/A",
+                row.theta_delta_ratio !== null ? row.theta_delta_ratio.toFixed(4) : "N/A",
                 row.daily_theta_pct !== null ? row.daily_theta_pct.toFixed(2) + "%" : "N/A",
                 row.req_daily_stock_rise !== null ? row.req_daily_stock_rise.toFixed(3) : "N/A",
                 row.iv_mid !== null ? (row.iv_mid * 100).toFixed(2) + "%" : "N/A",
@@ -935,6 +941,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             Δ / |Θ| Ratio {renderSortIcon("delta_theta_ratio")}
                         </TableHead>
                         <TableHead
+                            className="font-bold text-teal-300 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('theta_delta_ratio')}
+                            title="Theta/Delta Ratio (|Θ| / Δ): Daily time decay dollar cost per unit of Delta directional gain (lower ratio indicates lower decay cost per unit of delta)"
+                        >
+                            |Θ| / Δ Ratio {renderSortIcon("theta_delta_ratio")}
+                        </TableHead>
+                        <TableHead
                             className="font-bold text-amber-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[115px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
                             onClick={() => handleSort('vol_spread')}
                             title="Volatility Spread: Implied Volatility minus 20-Day Historical Volatility (IV - 20d HV)"
@@ -1120,6 +1133,13 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[110px]">
+                                        {row.theta_delta_ratio != null && row.theta_delta_ratio > 0 ? (
+                                            <span className={row.theta_delta_ratio <= 0.20 ? "text-emerald-400 font-bold" : "text-amber-300 font-semibold"} title={`Daily Theta: -$${Math.abs(row.call_theta ?? 0).toFixed(2)}/d\nCall Delta: ${row.call_delta ?? 'N/A'}`}>
+                                                {row.theta_delta_ratio.toFixed(4)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
                                     <TableCell className="text-center font-mono text-sm max-w-[115px]">
                                         {row.vol_spread != null ? (
                                             <span className={`font-bold ${row.vol_spread > 0.05 ? 'text-amber-400' : row.vol_spread >= -0.03 ? 'text-indigo-300' : 'text-emerald-400'}`}>
@@ -1206,13 +1226,14 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 { index: 21, key: "Call Theta (Θ)", value: selectedData.call_theta != null ? `-$${Math.abs(selectedData.call_theta).toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-rose-400 font-semibold" },
                 { index: 22, key: "Vega (V)", value: selectedData.vega != null ? `$${selectedData.vega.toFixed(2)}` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-emerald-400 font-semibold" },
                 { index: 23, key: "Δ / |Θ| Ratio", value: selectedData.delta_theta_ratio != null ? `${selectedData.delta_theta_ratio.toFixed(2)}x` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.delta_theta_ratio ?? 0) >= 5.0 ? "text-emerald-400 font-bold" : "text-amber-300" },
-                { index: 24, key: "Daily Theta Decay %", value: selectedData.daily_theta_pct != null ? `${selectedData.daily_theta_pct.toFixed(2)}%/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-400" },
-                { index: 25, key: "Req Daily Stock Rise", value: selectedData.req_daily_stock_rise != null ? `$${selectedData.req_daily_stock_rise.toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-300" },
-                { index: 26, key: "Vol Spread (IV - HV)", value: selectedData.vol_spread != null ? `${selectedData.vol_spread >= 0 ? '+' : ''}${(selectedData.vol_spread * 100).toFixed(1)}%` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.vol_spread ?? 0) > 0.05 ? "text-amber-400" : "text-emerald-400" },
-                { index: 27, key: "Option Liquidity & OI", value: selectedData.liquidity_rating ? `${selectedData.liquidity_rating} (${selectedData.open_interest ?? 'N/A'} OI)` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-blue-400" },
+                { index: 24, key: "|Θ| / Δ Ratio", value: selectedData.theta_delta_ratio != null ? selectedData.theta_delta_ratio.toFixed(4) : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.theta_delta_ratio ?? 1) <= 0.20 ? "text-emerald-400 font-bold" : "text-amber-300" },
+                { index: 25, key: "Daily Theta Decay %", value: selectedData.daily_theta_pct != null ? `${selectedData.daily_theta_pct.toFixed(2)}%/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-400" },
+                { index: 26, key: "Req Daily Stock Rise", value: selectedData.req_daily_stock_rise != null ? `$${selectedData.req_daily_stock_rise.toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-300" },
+                { index: 27, key: "Vol Spread (IV - HV)", value: selectedData.vol_spread != null ? `${selectedData.vol_spread >= 0 ? '+' : ''}${(selectedData.vol_spread * 100).toFixed(1)}%` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.vol_spread ?? 0) > 0.05 ? "text-amber-400" : "text-emerald-400" },
+                { index: 28, key: "Option Liquidity & OI", value: selectedData.liquidity_rating ? `${selectedData.liquidity_rating} (${selectedData.open_interest ?? 'N/A'} OI)` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-blue-400" },
 
                 ...STRATEGY_NAMES.map((name, i) => ({
-                    index: 28 + i,
+                    index: 29 + i,
                     key: name,
                     value: `${(selectedData.strats[name] || 0).toFixed(1)}%`,
                     category: "10 Core Strategy Match Scores",
