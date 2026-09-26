@@ -17,8 +17,9 @@ import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { BxTrenderPanel } from '@/components/BxTrenderPanel';
 import { TopTickersPanel } from '@/components/TopTickersPanel';
 import { VolatilityCalculatorPanel } from '@/components/VolatilityCalculatorPanel';
+import { RawTechOptionPanel } from '@/components/RawTechOptionPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText, Percent } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText, Percent, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -26,7 +27,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx' | 'top-tickers' | 'volatility'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx' | 'top-tickers' | 'volatility' | 'raw-tech-option'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -219,6 +220,9 @@ export default function Dashboard() {
                 <Button variant={viewMode === 'raw-data' ? 'secondary' : 'ghost'} onClick={() => setViewMode('raw-data')} size="sm" className="rounded-md">
                   <Database className="w-4 h-4 mr-2" /> Raw Data
                 </Button>
+                <Button variant={viewMode === 'raw-tech-option' ? 'secondary' : 'ghost'} onClick={() => setViewMode('raw-tech-option')} size="sm" className="rounded-md font-bold text-amber-400 hover:text-amber-300">
+                  <Layers className="w-4 h-4 mr-2 text-amber-400" /> Raw/Tech/Option
+                </Button>
                 <Button variant={viewMode === 'glossary' ? 'secondary' : 'ghost'} onClick={() => setViewMode('glossary')} size="sm" className="rounded-md">
                   <BookOpen className="w-4 h-4 mr-2" /> Glossary
                 </Button>
@@ -306,6 +310,18 @@ export default function Dashboard() {
             {viewMode === 'raw-data' && !currentData.raw_data && (
               <div className="flex items-center justify-center h-[400px] text-muted-foreground mt-2 border rounded-lg bg-card border-dashed">
                 Loading or no raw data available for this ticker.
+              </div>
+            )}
+
+            {viewMode === 'raw-tech-option' && currentData && (
+              <div className="mt-2">
+                <RawTechOptionPanel
+                  currentData={currentData}
+                  analysisData={filteredAnalysisData}
+                  selectedTicker={selectedTicker || currentData.symbol}
+                  tickers={tickers}
+                  onSelectTicker={(t) => setSelectedTicker(t)}
+                />
               </div>
             )}
 
