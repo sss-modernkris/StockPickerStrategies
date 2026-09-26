@@ -58,10 +58,10 @@ def evaluate_willy_algo(data: Dict[str, Any]) -> StrategyResult:
     
     # Calculate indicators
     vwap_series = calculate_willy_vwap(history)
-    latest_vwap = vwap_series.iloc[-1]
+    latest_vwap = float(vwap_series.iloc[-1]) if (not vwap_series.empty and pd.notna(vwap_series.iloc[-1])) else np.nan
     
-    if current_price is None:
-        current_price = history["Close"].iloc[-1]
+    if current_price is None or pd.isna(current_price):
+        current_price = float(history["Close"].iloc[-1]) if not history["Close"].empty else 0.0
         
     score = 0
     justifications = []

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, AlertCircle, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, TrendingUp, AlertCircle, ArrowUpDown, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 import {
     LineChart,
     Line,
@@ -72,6 +72,14 @@ const CHART_COLORS = [
     '#d946ef', // fuchsia-500
     '#eab308'  // yellow-500
 ];
+
+const formatVolume = (vol: number | null | undefined): string => {
+    if (vol === null || vol === undefined || isNaN(vol) || vol === 0) return 'N/A';
+    if (vol >= 1e9) return `${(vol / 1e9).toFixed(2)}B`;
+    if (vol >= 1e6) return `${(vol / 1e6).toFixed(2)}M`;
+    if (vol >= 1e3) return `${(vol / 1e3).toFixed(1)}K`;
+    return vol.toLocaleString();
+};
 
 export function NormalizedComparePanel({ availableTickers, selectedTickers, onSelectTickers, period, onPeriodChange, analysisData }: NormalizedComparePanelProps) {
     const [historyData, setHistoryData] = useState<TickerHistory[]>([]);
@@ -164,6 +172,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let stdDev: number | null = null;
             let stdDevPct: number | null = null;
             let trendValue: number | null = null;
+            let volume: number | null = null;
             let mlAlpha: number | null = null;
             let stratAvg: number | null = null;
             let macdHist: number | null = null;
@@ -178,6 +187,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
             let stdDevStr = 'N/A';
             let stdDevPctStr = 'N/A';
             let trendValueStr = 'N/A';
+            let volumeStr = 'N/A';
             let mlAlphaStr = 'N/A';
             let stratAvgStr = 'N/A';
             let macdHistStr = 'N/A';
@@ -190,8 +200,14 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 const pts = hData.history;
                 const n = pts.length;
                 const latest = pts[n - 1];
-                currentPrice = latest.close;
-                currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                if (latest && typeof latest.close === 'number' && isFinite(latest.close)) {
+                    currentPrice = latest.close;
+                    currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+
+                if (latest && latest.volume !== undefined && latest.volume !== null && isFinite(latest.volume)) {
+                    volume = latest.volume;
+                }
 
                 if (n >= 2) {
                     let sumX = 0;
@@ -201,7 +217,7 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
 
                     for (let i = 0; i < n; i++) {
                         const x = i;
-                        const y = pts[i].close;
+                        const y = pts[i].close || 0;
                         sumX += x;
                         sumY += y;
                         sumXY += x * y;
@@ -216,74 +232,138 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                     if (denominator !== 0) {
                         const m = numerator / denominator;
                         const c = meanY - m * meanX;
-                        slope = m;
-                        slopeStr = (m >= 0 ? '+' : '') + m.toFixed(4);
+                        if (isFinite(m)) {
+                            slope = m;
+                            slopeStr = (m >= 0 ? '+' : '') + m.toFixed(4);
 
-                        let sumResidualSq = 0;
-                        for (let i = 0; i < n; i++) {
-                            const x = i;
-                            const y = pts[i].close;
-                            const yFit = m * x + c;
-                            const residual = y - yFit;
-                            sumResidualSq += residual * residual;
+                            let sumResidualSq = 0;
+                            for (let i = 0; i < n; i++) {
+                                const x = i;
+                                const y = pts[i].close || 0;
+                                const yFit = m * x + c;
+                                const residual = y - yFit;
+                                sumResidualSq += residual * residual;
+                            }
+
+                            const variance = sumResidualSq / n;
+                            stdDev = Math.sqrt(variance);
+                            if (isFinite(stdDev)) {
+                                stdDevStr = stdDev.toFixed(2);
+                            }
                         }
-
-                        const variance = sumResidualSq / n;
-                        stdDev = Math.sqrt(variance);
-                        stdDevStr = stdDev.toFixed(2);
                     }
                 }
 
                 if (currentPrice !== null && currentPrice > 0) {
-                    if (slope !== null) {
+                    if (slope !== null && isFinite(slope)) {
                         slopePct = (slope * 100) / currentPrice;
-                        slopePctStr = (slopePct >= 0 ? '+' : '') + slopePct.toFixed(2) + '%';
+                        if (isFinite(slopePct)) {
+                            slopePctStr = (slopePct >= 0 ? '+' : '') + slopePct.toFixed(2) + '%';
+                        }
                     }
-                    if (stdDev !== null) {
+                    if (stdDev !== null && isFinite(stdDev)) {
                         stdDevPct = (stdDev * 100) / currentPrice;
-                        stdDevPctStr = stdDevPct.toFixed(2) + '%';
+                        if (isFinite(stdDevPct)) {
+                            stdDevPctStr = stdDevPct.toFixed(2) + '%';
+                        }
                     }
-                    if (slopePct !== null && stdDevPct !== null && stdDevPct > 0) {
-                        trendValue = slopePct / stdDevPct;
-                        trendValueStr = (trendValue >= 0 ? '+' : '') + trendValue.toFixed(2);
+                    if (slopePct !== null && stdDevPct !== null && stdDevPct > 0 && isFinite(slopePct) && isFinite(stdDevPct)) {
+                        const rawTrend = slopePct / stdDevPct;
+                        if (isFinite(rawTrend)) {
+                            trendValue = rawTrend;
+                            trendValueStr = (trendValue >= 0 ? '+' : '') + trendValue.toFixed(2);
+                        }
                     }
                 }
             } else if (tData?.price_history && tData.price_history.length > 0) {
                 const latest = tData.price_history[tData.price_history.length - 1];
-                currentPrice = latest.close;
-                currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                if (latest && typeof latest.close === 'number' && isFinite(latest.close)) {
+                    currentPrice = latest.close;
+                    currentPriceStr = `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+                if (latest && latest.volume !== undefined && latest.volume !== null && isFinite(latest.volume)) {
+                    volume = latest.volume;
+                }
+            }
+
+            if (volume === null && tData?.technical_indicators?.volume && isFinite(tData.technical_indicators.volume)) {
+                volume = tData.technical_indicators.volume;
+            }
+            volumeStr = formatVolume(volume);
+
+            const ptsForBacktest = (tData?.price_history && tData.price_history.length > 0) ? tData.price_history : (hData?.history || []);
+            if (ptsForBacktest.length > 0) {
+                try {
+                    const backtest = runWillyBacktest(ptsForBacktest, 10000, mapPeriodToBacktestPeriod(period));
+                    if (backtest && typeof backtest.finalValue === 'number' && isFinite(backtest.finalValue)) {
+                        strategyValue = backtest.finalValue;
+                        strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    }
+                } catch (bErr) {
+                    console.warn("Backtest calculation error for", ticker, bErr);
+                }
             }
 
             if (tData) {
-                if (tData.alpha_probability !== undefined && tData.alpha_probability !== null) {
+                if (tData.alpha_probability !== undefined && tData.alpha_probability !== null && isFinite(tData.alpha_probability)) {
                     mlAlpha = tData.alpha_probability;
                     mlAlphaStr = `${(mlAlpha * 100).toFixed(1)}%`;
                 }
 
                 if (tData.strategies && tData.strategies.length > 0) {
-                    const sum = tData.strategies.reduce((acc, strat) => acc + strat.match_percentage, 0);
+                    const sum = tData.strategies.reduce((acc, strat) => acc + (strat.match_percentage || 0), 0);
                     stratAvg = sum / tData.strategies.length;
-                    stratAvgStr = `${stratAvg.toFixed(1)}%`;
+                    if (isFinite(stratAvg)) {
+                        stratAvgStr = `${stratAvg.toFixed(1)}%`;
+                    }
                 }
 
                 if (tData.price_history && tData.price_history.length > 0) {
                     const latestPoint = tData.price_history[tData.price_history.length - 1];
-                    if (latestPoint.macd_hist !== undefined && latestPoint.macd_hist !== null) {
+                    if (latestPoint.macd_hist !== undefined && latestPoint.macd_hist !== null && isFinite(latestPoint.macd_hist)) {
                         macdHist = latestPoint.macd_hist;
                         macdHistStr = macdHist.toFixed(2);
                     }
-                    if (latestPoint.macd_signal !== undefined && latestPoint.macd_signal !== null && latestPoint.macd_signal !== 0 && macdHist !== null) {
-                        macdRel = macdHist / latestPoint.macd_signal;
-                        macdRelStr = macdRel.toFixed(3);
+                    if (latestPoint.macd_signal !== undefined && latestPoint.macd_signal !== null && latestPoint.macd_signal !== 0 && macdHist !== null && isFinite(latestPoint.macd_signal)) {
+                        const rawRel = macdHist / latestPoint.macd_signal;
+                        if (isFinite(rawRel)) {
+                            macdRel = rawRel;
+                            macdRelStr = macdRel.toFixed(3);
+                        }
                     }
-                    if (latestPoint.rsi_14 !== undefined && latestPoint.rsi_14 !== null) {
+                    if (latestPoint.rsi_14 !== undefined && latestPoint.rsi_14 !== null && isFinite(latestPoint.rsi_14)) {
                         rsi = latestPoint.rsi_14;
                         rsiStr = rsi.toFixed(2);
                     }
-                    
-                    const backtest = runWillyBacktest(tData.price_history, 10000, mapPeriodToBacktestPeriod(period));
-                    strategyValue = backtest.finalValue;
-                    strategyValueStr = `$${strategyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+            }
+
+            // Extract Options Alpha Rank from option_analytics
+            const optionAnalytics = tData?.option_analytics;
+            let optionsAlphaScore: number | null = null;
+            let optionsAlphaPct: number | null = null;
+            let stage1Score: number | null = null;
+            let stage2Score: number | null = null;
+            let stage1Details: Record<string, boolean> | null = null;
+            let stage2Details: Record<string, boolean> | null = null;
+
+            if (optionAnalytics?.greeks_bullish_score !== undefined && optionAnalytics?.greeks_bullish_score !== null) {
+                optionsAlphaScore = optionAnalytics.greeks_bullish_score;
+                optionsAlphaPct = optionAnalytics.greeks_bullish_pct ?? Math.round((optionsAlphaScore / 15) * 100);
+                stage1Score = optionAnalytics.stage1_score ?? null;
+                stage2Score = optionAnalytics.stage2_score ?? null;
+                stage1Details = optionAnalytics.stage1_details ?? null;
+                stage2Details = optionAnalytics.stage2_details ?? null;
+            }
+
+            // Calculate VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000
+            let vst: number | null = null;
+            let vstStr = 'N/A';
+            if (trendValue !== null && volume !== null && strategyValue !== null && isFinite(trendValue) && isFinite(volume) && isFinite(strategyValue)) {
+                const rawVst = (trendValue * volume * strategyValue) / (10000 * 1000000);
+                if (isFinite(rawVst)) {
+                    vst = rawVst;
+                    vstStr = (vst >= 0 ? '+' : '') + vst.toFixed(2);
                 }
             }
 
@@ -291,6 +371,14 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 symbol: ticker,
                 currentPrice,
                 currentPriceStr,
+                optionsAlphaScore,
+                optionsAlphaPct,
+                stage1Score,
+                stage2Score,
+                stage1Details,
+                stage2Details,
+                vst,
+                vstStr,
                 trendValue,
                 trendValueStr,
                 slope,
@@ -301,6 +389,8 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                 stdDevStr,
                 stdDevPct,
                 stdDevPctStr,
+                volume,
+                volumeStr,
                 mlAlpha,
                 mlAlphaStr,
                 stratAvg,
@@ -470,16 +560,20 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                                if (selectedTickers.length === availableTickers.length) {
-                                    onSelectTickers([]);
-                                } else {
-                                    onSelectTickers([...availableTickers]);
-                                }
-                            }}
+                            onClick={() => onSelectTickers([...availableTickers])}
+                            disabled={selectedTickers.length === availableTickers.length}
                             className="rounded-lg font-semibold text-primary hover:bg-primary/10"
                         >
-                            {selectedTickers.length === availableTickers.length ? "Deselect All" : "Select All"}
+                            Select All
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onSelectTickers([])}
+                            disabled={selectedTickers.length === 0}
+                            className="rounded-lg font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                            Deselect All
                         </Button>
                         <span className="text-xs text-muted-foreground ml-2">
                             {selectedTickers.length} of {availableTickers.length} selected
@@ -626,6 +720,19 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('optionsAlphaScore')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold text-amber-400" title="Options Alpha Rank: 15-Point Quantitative Score (Stage 1 Stock Setup + Stage 2 Call Greeks)">
+                                            <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-400 inline" />
+                                            Options Alpha Rank
+                                            {SortIcon('optionsAlphaScore')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('vst')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold text-indigo-400" title="VST = Trend (Slope%/Std%) * Volume * Strategy Value ($) / 10,000 / 1,000,000">
+                                            VST
+                                            {SortIcon('vst')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
                                         <Button variant="ghost" onClick={() => handleSort('trendValue')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             Trend (Slope%/Std%)
                                             {SortIcon('trendValue')}
@@ -653,6 +760,12 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                         <Button variant="ghost" onClick={() => handleSort('stdDev')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
                                             Std
                                             {SortIcon('stdDev')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        <Button variant="ghost" onClick={() => handleSort('volume')} className="px-0 hover:bg-transparent justify-end w-full h-8 font-semibold">
+                                            Volume
+                                            {SortIcon('volume')}
                                         </Button>
                                     </TableHead>
                                     <TableHead className="font-semibold text-right">
@@ -704,6 +817,27 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             {row.symbol}
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.currentPriceStr}</TableCell>
+                                        <TableCell className="text-right">
+                                            {row.optionsAlphaScore !== null && row.optionsAlphaScore !== undefined ? (
+                                                <span
+                                                    className={`inline-block font-mono text-xs font-bold px-2 py-0.5 rounded border cursor-help ${
+                                                        row.optionsAlphaScore >= 12
+                                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                                            : row.optionsAlphaScore >= 9
+                                                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                                            : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                                                    }`}
+                                                    title={`Options Alpha Rank: ${row.optionsAlphaScore}/15 (${row.optionsAlphaPct}%)\n\n• Stage 1 (Stock Bullishness): ${row.stage1Score}/7\n• Stage 2 (Call Option Greeks & Efficiency): ${row.stage2Score}/8`}
+                                                >
+                                                    {row.optionsAlphaScore}/15 ({row.optionsAlphaPct}%)
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs font-mono">N/A</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className={`text-right font-mono ${row.vst !== null && row.vst > 0 ? 'text-indigo-400 font-bold' : row.vst !== null && row.vst < 0 ? 'text-red-500 font-bold' : ''}`} title="VST = Trend * Volume * Strategy Value / 1e10">
+                                            {row.vstStr}
+                                        </TableCell>
                                         <TableCell className={`text-right font-mono ${row.trendValue !== null && row.trendValue > 0 ? 'text-emerald-500 font-bold' : row.trendValue !== null && row.trendValue < 0 ? 'text-red-500 font-bold' : ''}`}>
                                             {row.trendValueStr}
                                         </TableCell>
@@ -717,6 +851,9 @@ export function NormalizedComparePanel({ availableTickers, selectedTickers, onSe
                                             {row.slopeStr}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">{row.stdDevStr}</TableCell>
+                                        <TableCell className="text-right font-mono text-muted-foreground font-semibold" title={row.volume !== null ? row.volume.toLocaleString() : undefined}>
+                                            {row.volumeStr}
+                                        </TableCell>
                                         <TableCell className="text-right font-mono">{row.mlAlphaStr}</TableCell>
                                         <TableCell className="text-right font-mono">{row.stratAvgStr}</TableCell>
                                         <TableCell className="text-right font-mono font-semibold">{row.strategyValueStr}</TableCell>

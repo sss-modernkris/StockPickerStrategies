@@ -9,6 +9,7 @@ class StrategyResult(BaseModel):
 class PricePoint(BaseModel):
     date: str
     close: float
+    volume: Optional[float] = None
     open: Optional[float] = None
     high: Optional[float] = None
     low: Optional[float] = None
@@ -63,6 +64,7 @@ class TickerAnalysis(BaseModel):
     top_factor: Optional[str] = None
     price_history: Optional[List[PricePoint]] = None
     technical_indicators: Optional[TechnicalIndicators] = None
+    option_analytics: Optional[Dict[str, Any]] = None
     raw_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
@@ -166,4 +168,64 @@ class CallOptionStatsResponse(BaseModel):
     total_tickers: int
     items: List[TickerCallStats]
     status: str = "success"
+
+class VolatilityCalculationRequest(BaseModel):
+    symbol: str
+    stock_price: Optional[float] = None
+    strike_price: Optional[float] = None
+    option_premium: Optional[float] = None
+    bid_price: Optional[float] = None
+    ask_price: Optional[float] = None
+    expiration_date: Optional[str] = None
+    days_to_expiration: Optional[int] = 30
+    risk_free_rate: Optional[float] = 0.04
+    dividend_yield: Optional[float] = 0.0
+    option_volume: Optional[int] = None
+    open_interest: Optional[int] = None
+    stock_volume: Optional[int] = None
+
+class VolatilityCalculationResponse(BaseModel):
+    symbol: str
+    stock_price: float
+    strike_price: float
+    days_to_expiration: int
+    option_premium: float
+    midpoint_premium: Optional[float] = None
+    bid_price: Optional[float] = None
+    ask_price: Optional[float] = None
+    option_volume: Optional[int] = None
+    open_interest: Optional[int] = None
+    stock_volume: Optional[int] = None
+    bid_ask_spread: Optional[float] = None
+    bid_ask_spread_pct: Optional[float] = None
+    liquidity_rating: Optional[str] = None
+    historical_volatility_20d: float
+    implied_volatility: float
+    implied_volatility_bid: Optional[float] = None
+    implied_volatility_ask: Optional[float] = None
+    volatility_spread: float
+    volatility_spread_pct: float
+    interpretation: str
+    breakeven_price: float
+    required_move_pct: float
+    greeks: Dict[str, float]
+    greeks_bullish_score: Optional[int] = 0
+    greeks_bullish_pct: Optional[float] = 0.0
+    stage1_score: Optional[int] = 0
+    stage2_score: Optional[int] = 0
+    delta_theta_ratio: Optional[float] = None
+    theta_delta_ratio: Optional[float] = None
+    daily_theta_pct: Optional[float] = None
+    req_daily_stock_rise: Optional[float] = None
+    stage1_details: Optional[Dict[str, bool]] = None
+    stage2_details: Optional[Dict[str, bool]] = None
+    status: str = "success"
+    message: Optional[str] = None
+
+
+class SaveRawTechOptionRequest(BaseModel):
+    ticker: str
+    data: Dict[str, Any]
+
+
 

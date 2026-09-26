@@ -7,6 +7,7 @@ export interface StrategyResult {
 export interface PricePoint {
     date: string;
     close: number;
+    volume?: number | null;
     open?: number | null;
     high?: number | null;
     low?: number | null;
@@ -59,6 +60,7 @@ export interface TickerAnalysis {
     top_factor?: string;
     price_history?: PricePoint[];
     technical_indicators?: TechnicalIndicators;
+    option_analytics?: VolatilityCalculationResponse;
     raw_data?: Record<string, unknown>;
     error?: string;
 }
@@ -171,4 +173,69 @@ export interface CallOptionStatsResponse {
   items: TickerCallStats[];
   status: string;
 }
+
+export interface VolatilityCalculationRequest {
+  symbol: string;
+  stock_price?: number | null;
+  strike_price?: number | null;
+  option_premium?: number | null;
+  bid_price?: number | null;
+  ask_price?: number | null;
+  expiration_date?: string | null;
+  days_to_expiration?: number | null;
+  risk_free_rate?: number | null;
+  dividend_yield?: number | null;
+  option_volume?: number | null;
+  open_interest?: number | null;
+  stock_volume?: number | null;
+}
+
+export interface VolatilityCalculationResponse {
+  symbol: string;
+  stock_price: number;
+  strike_price: number;
+  days_to_expiration: number;
+  option_premium: number;
+  midpoint_premium?: number | null;
+  bid_price?: number | null;
+  ask_price?: number | null;
+  option_volume?: number | null;
+  open_interest?: number | null;
+  stock_volume?: number | null;
+  bid_ask_spread?: number | null;
+  bid_ask_spread_pct?: number | null;
+  liquidity_rating?: string | null;
+  historical_volatility_20d: number;
+  implied_volatility: number;
+  implied_volatility_bid?: number | null;
+  implied_volatility_ask?: number | null;
+  volatility_spread: number;
+  volatility_spread_pct: number;
+  interpretation: string;
+  breakeven_price: number;
+  required_move_pct: number;
+  greeks: {
+    call_delta: number;
+    put_delta: number;
+    gamma: number;
+    call_theta: number;
+    put_theta: number;
+    vega: number;
+    call_rho: number;
+    put_rho: number;
+  };
+  greeks_bullish_score?: number;
+  greeks_bullish_pct?: number;
+  stage1_score?: number;
+  stage2_score?: number;
+  delta_theta_ratio?: number | null;
+  theta_delta_ratio?: number | null;
+  daily_theta_pct?: number | null;
+  req_daily_stock_rise?: number | null;
+  stage1_details?: Record<string, boolean>;
+  stage2_details?: Record<string, boolean>;
+  status?: string;
+  message?: string | null;
+}
+
 

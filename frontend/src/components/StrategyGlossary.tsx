@@ -17,7 +17,8 @@ import {
     Bot,
     Flame,
     Building2,
-    Percent
+    Percent,
+    Sparkles
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -520,7 +521,335 @@ export function StrategyGlossary() {
             )
         },
         {
+            id: "iv-hv-volatility-calculator",
+            icon: <Percent className="w-5 h-5 text-blue-400" />,
+            title: "% IV/HV Calc: Volatility & Options Sensitivity Analytics",
+            badge: "IV & Volatility Analytics",
+            description: "A comprehensive guide to 20-Day Historical Volatility (HV), Black-Scholes Implied Volatility (IV) backward inversion, the Volatility Spread (IV - HV), and Option Greeks (Call Delta, Call Theta, Gamma, Vega).",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Header Overview Banner */}
+                    <div className="bg-gradient-to-r from-blue-950/40 via-background to-purple-950/30 p-4 rounded-lg border border-border/50 text-xs space-y-2">
+                        <p className="font-semibold text-foreground text-sm flex items-center gap-2">
+                            <Percent className="w-4 h-4 text-blue-400" /> Overview of % IV/HV Calculator
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            The <strong className="text-foreground">% IV/HV Calc</strong> tab enables quantitative evaluation of Call option pricing by comparing <strong className="text-foreground">20-day realized Historical Volatility (HV)</strong> against market-implied pricing (<strong className="text-foreground">Implied Volatility, IV</strong>) inverted backward from call premiums using the Black-Scholes model.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Historical Volatility vs Implied Volatility */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">1. Historical Volatility (HV) vs. Implied Volatility (IV)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-card/70 p-4 rounded-lg border border-blue-500/30 space-y-2">
+                                <h5 className="font-semibold text-blue-400 text-sm flex items-center gap-2">
+                                    <Activity className="w-4 h-4" /> 20-Day Historical Volatility (HV)
+                                </h5>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">What it measures:</strong> Actual realized price fluctuations of the underlying stock over the past 20 trading sessions.
+                                </p>
+                                <div className="bg-muted/60 p-2.5 rounded font-mono text-[11px] text-foreground">
+                                    σ_hist = sqrt(252) * std(ln(S_t / S_t-1), ddof=1)
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Key Purpose:</strong> Backward-looking measure answering: <em>&ldquo;How volatile has the stock actually been in recent sessions?&rdquo;</em>
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-emerald-500/30 space-y-2">
+                                <h5 className="font-semibold text-emerald-400 text-sm flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4" /> Implied Volatility (IV)
+                                </h5>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">What it measures:</strong> The annualized volatility incorporated into the current call option market premium.
+                                </p>
+                                <div className="bg-muted/60 p-2.5 rounded font-mono text-[11px] text-foreground">
+                                    C_BS(σ) = S * e^(-qT) * N(d1) - K * e^(-rT) * N(d2) = C_market
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Key Purpose:</strong> Forward-looking measure answering: <em>&ldquo;How much future price movement is currently priced into the option premium?&rdquo;</em>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Significance of Volatility Spread (IV - HV) */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">2. Significance of the Volatility Spread (IV − HV)</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            The <strong className="text-foreground">Volatility Spread</strong> (IV − HV) compares what option traders expect going forward against what the stock has actually realized.
+                        </p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Spread Condition</th>
+                                        <th className="p-3 w-1/4">Numeric Range</th>
+                                        <th className="p-3 w-1/2">Market Significance &amp; Actionable Meaning</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-amber-400">Elevated IV Premium</td>
+                                        <td className="p-3 font-mono font-bold">IV &gt; HV + 5.0%</td>
+                                        <td className="p-3 text-muted-foreground">
+                                            Option market is pricing significantly higher volatility than recent stock price action. Calls are relatively expensive, often indicating an approaching earnings announcement, product launch, or market catalyst.
+                                        </td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-indigo-400">Fairly Priced</td>
+                                        <td className="p-3 font-mono font-bold">IV ≈ HV (±3.0%)</td>
+                                        <td className="p-3 text-muted-foreground">
+                                            Option implied volatility aligns closely with recent realized stock movements. Premium is reasonably priced without excessive volatility surcharge.
+                                        </td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-emerald-400">Low IV / Discount</td>
+                                        <td className="p-3 font-mono font-bold">IV &lt; HV − 3.0%</td>
+                                        <td className="p-3 text-muted-foreground">
+                                            Option market is pricing lower volatility than recent stock price fluctuations. Call premiums are relatively cheap, offering favorable entry risk/reward for long directional call buyers.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Option Greeks Explained */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5">3. Option Greeks Breakdown</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-blue-400 text-sm">Call Delta (Δ)</h5>
+                                    <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-mono">Directional Exposure</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The dollar change in option price for every $1.00 move in the underlying stock price.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Optimal Band:</strong> <code className="bg-muted px-1 py-0.5 rounded font-mono text-foreground font-semibold">0.30 to 0.70</code>. A Delta of 0.50 means the call option gains approximately $0.50 for every $1.00 increase in the stock.
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-purple-400 text-sm">Gamma (Γ)</h5>
+                                    <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-mono">Delta Acceleration</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The rate of change in Call Delta for every $1.00 move in the underlying stock price.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Significance:</strong> Measures how fast your Delta increases as the stock moves in your favor, accelerating profits on breakout swings.
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-red-400 text-sm">Call Theta (Θ)</h5>
+                                    <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-mono">Time Decay</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The daily reduction in call option premium resulting from the passage of one day.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Significance:</strong> A Theta of -$1.60/day means the option loses $1.60 per contract daily if the stock stays static. Lower Theta % protects holding capital.
+                                </p>
+                            </div>
+
+                            <div className="bg-card/70 p-4 rounded-lg border border-border/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h5 className="font-semibold text-emerald-400 text-sm">Vega (V)</h5>
+                                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-mono">IV Sensitivity</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <strong className="text-foreground">Definition:</strong> The change in option price for a 1 percentage point (+1.0%) change in Implied Volatility.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    <strong className="text-foreground">Significance:</strong> A Vega of $2.02 means the call price increases by $2.02 if IV rises from 45% to 46%, and drops $2.02 if IV collapses (IV crush).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            id: "options-alpha-rank",
+            icon: <Sparkles className="w-5 h-5 text-amber-400" />,
+            title: "Options Alpha Rank (15-Point Quantitative Composite)",
+            badge: "2-Stage Options Screener",
+            description: "A 15-point composite ranking score evaluating bullish stock setups (Stage 1, max 7 points) combined with Call Option Greeks, decay rates, volatility pricing, and liquidity efficiency (Stage 2, max 8 points) targeting 30–45 DTE contracts.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Header Banner */}
+                    <div className="bg-gradient-to-r from-amber-950/40 via-background to-emerald-950/30 p-4 rounded-lg border border-amber-500/40 text-xs space-y-2">
+                        <p className="font-semibold text-amber-400 text-sm flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-400" /> Options Alpha Rank Scoring System Overview
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            The <strong className="text-foreground">Options Alpha Rank</strong> is displayed in the Top Tickers comparison table as a color-coded score out of 15 (e.g., <code className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono font-bold">13/15 (87%)</code>). It bridges equity technical analysis with option contract efficiency, ensuring that high-ranked stocks are paired with call contracts that maximize directional upside while minimizing time decay and slippage.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-amber-500/20 font-mono text-[11px]">
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded text-center">
+                                <span className="font-bold text-emerald-400">High Rank (≥80%)</span>
+                                <span className="block text-[10px] text-muted-foreground">12 to 15 Points (Green Badge)</span>
+                            </div>
+                            <div className="bg-amber-500/10 border border-amber-500/30 p-2 rounded text-center">
+                                <span className="font-bold text-amber-400">Medium Rank (60-79%)</span>
+                                <span className="block text-[10px] text-muted-foreground">9 to 11 Points (Amber Badge)</span>
+                            </div>
+                            <div className="bg-rose-500/10 border border-rose-500/30 p-2 rounded text-center">
+                                <span className="font-bold text-rose-400">Low Rank (&lt;60%)</span>
+                                <span className="block text-[10px] text-muted-foreground">0 to 8 Points (Red Badge)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stage 1: Bullish Ticker Selection */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>Stage 1: Bullish Ticker Selection (Max 7 Points)</span>
+                            <span className="text-xs font-mono font-normal text-emerald-400">Equity Technical Filters</span>
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Stage 1 screens the underlying stock to ensure a high-conviction bullish price setup before examining option chains. Each satisfied condition awards <strong>1 point</strong>:
+                        </p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Factor Rule</th>
+                                        <th className="p-3 w-1/3">Quantitative Test Condition</th>
+                                        <th className="p-3 w-5/12">Strategic Purpose for Call Option Buyers</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">1. Trend MA Alignment</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">Price &gt; 20d EMA &amp; 50d SMA</td>
+                                        <td className="p-3 text-muted-foreground">Confirms the underlying stock is trading in an established short- and medium-term uptrend.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">2. Positive Momentum Slopes</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">Slope(20d) &gt; 0 &amp; Slope(50d) &gt; 0</td>
+                                        <td className="p-3 text-muted-foreground">Verifies positive OLS log-price regression velocity over both 20-day and 50-day windows.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">3. Trend Quality &amp; Smoothness</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">Residual Std Error ≤ 2.0%</td>
+                                        <td className="p-3 text-muted-foreground">Ensures low structural deviation along the trendline, filtering out volatile/choppy stocks.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">4. Relative Strength vs SPY</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">Slope(Stock) &gt; Slope(SPY)</td>
+                                        <td className="p-3 text-muted-foreground">Requires the stock&apos;s trend velocity to outpace the S&amp;P 500 benchmark, targeting market leaders.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">5. Trading Volume Surge</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">Volume(5d Avg) / Volume(20d Avg) ≥ 1.0</td>
+                                        <td className="p-3 text-muted-foreground">Verifies institutional buying interest and expanding liquidity on upward moves.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">6. Resistance Headroom</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">Headroom ≥ 1.5 × ATR(14) or Breakout</td>
+                                        <td className="p-3 text-muted-foreground">Ensures sufficient price room to 20-day resistance before reaching major profit-taking zones.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">7. Event Risk Clearance</td>
+                                        <td className="p-3 font-mono text-xs text-emerald-400 font-bold">No Earnings within 30-Day Window</td>
+                                        <td className="p-3 text-muted-foreground">Protects against severe IV crush and binary earnings gap risk during the trade holding period.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Stage 2: Call Option Greeks & Efficiency Selection */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>Stage 2: Option Greeks &amp; Contract Efficiency (Max 8 Points)</span>
+                            <span className="text-xs font-mono font-normal text-blue-400">Options Chain &amp; Greeks Analytics</span>
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Stage 2 evaluates live call contracts near 30–45 DTE (target 35 DTE ATM/ITM) for optimal Greeks sensitivity, low time decay, and high execution quality. Each satisfied rule awards <strong>1 point</strong>:
+                        </p>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-3 w-1/4">Option Rule</th>
+                                        <th className="p-3 w-1/3">Quantitative Test Condition</th>
+                                        <th className="p-3 w-5/12">Strategic Significance &amp; Formula</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">1. Expiration Target Window</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold">30 ≤ DTE ≤ 45 Days (Target 35 DTE)</td>
+                                        <td className="p-3 text-muted-foreground">Sufficient time horizon to capture trend moves while avoiding the steep non-linear theta decay curve under 30 DTE.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">2. Delta Target Band</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold">0.60 ≤ Call Delta ≤ 0.75</td>
+                                        <td className="p-3 text-muted-foreground">Slightly ITM call selection balancing high equity directional capture (0.60–0.75) against lower extrinsic decay.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">3. Daily Theta Decay %</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold font-mono">Daily Theta % = (|Θ| / Premium) ≤ 1.5%</td>
+                                        <td className="p-3 text-muted-foreground">Limits daily time decay to less than 1.5% of option premium, protecting capital during consolidation days.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">4. Δ / |Θ| Efficiency Ratio</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold font-mono">Delta / |Theta| ≥ 5.0</td>
+                                        <td className="p-3 text-muted-foreground">Requires at least $5.00 of directional dollar delta capture per $1.00 of daily theta loss. High ratio = superior efficiency.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">5. Required Daily Stock Rise</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold font-mono">Req Rise = (|Θ| / Delta) ≤ $0.25/day</td>
+                                        <td className="p-3 text-muted-foreground">Measures daily stock price appreciation required to break even against daily theta decay. Lower = easier to profit.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">6. Implied Volatility Level</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold">Implied Volatility (IV) ≤ 45.0%</td>
+                                        <td className="p-3 text-muted-foreground">Ensures option premiums are reasonably priced and prevents overpaying for inflated volatility.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">7. Tight Bid-Ask Spread</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold">Spread % = (Ask - Bid)/Mid ≤ 5.0%</td>
+                                        <td className="p-3 text-muted-foreground">Protects execution quality and minimizes entry/exit slippage for option buyers.</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-3 font-semibold text-foreground">8. Option Liquidity Depth</td>
+                                        <td className="p-3 font-mono text-xs text-blue-400 font-bold">Open Interest (OI) ≥ 500 Contracts</td>
+                                        <td className="p-3 text-muted-foreground">Verifies deep institutional contract liquidity to ensure easy order execution at fair midpoint prices.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Summary Computation Formula */}
+                    <div className="bg-card border border-border p-4 rounded-lg space-y-2 text-xs">
+                        <h5 className="font-semibold text-foreground text-sm">Composite Score Calculation Formula</h5>
+                        <div className="bg-muted p-3 rounded font-mono text-center text-amber-400 font-bold text-xs sm:text-sm">
+                            Options Alpha Score = Stage 1 Score (0–7) + Stage 2 Score (0–8)
+                        </div>
+                        <div className="bg-muted p-2 rounded font-mono text-center text-foreground font-semibold text-xs">
+                            Score Percentage (%) = ( Total Score / 15 ) × 100%
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed pt-1">
+                            By combining <strong>Stage 1 (Stock Setup)</strong> and <strong>Stage 2 (Option Greeks Efficiency)</strong>, the <strong>Options Alpha Rank</strong> highlights prime candidates where both equity momentum and option pricing dynamics align for maximum potential alpha.
+                        </p>
+                    </div>
+                </div>
+            )
+        },
+        {
             id: "can-slim",
+
             icon: <TrendingUp className="w-5 h-5 text-blue-500" />,
             title: "1. CAN SLIM (The Momentum Growth Model)",
             badge: "High-Pass Filter",
@@ -1418,6 +1747,7 @@ export function StrategyGlossary() {
             (item.id === 'backtest-30d-strategy2' && "30-Day Strategy 2 Backtesting Model Historical Simulation Universe Selection Trades ROI Aggressive Bull Market".toLowerCase().includes(query)) ||
             (item.id === 'backtest-30d-strategy3' && "30-Day Strategy 3 Backtesting Model Historical Simulation Universe Selection Trades ROI Timeline Shift 2:50 PM".toLowerCase().includes(query)) ||
             (item.id === 'options-backtest' && "Options Strategy Backtesting Black-Scholes Call Premium Strike Expiry Intraday Relative Hold Baseline P&L Leverage Theta Volatility".toLowerCase().includes(query)) ||
+            (item.id === 'options-alpha-rank' && "Options Alpha Rank Stage 1 Stage 2 Bullish Tickers Call Option Greeks Efficiency Delta Theta Ratio Daily Decay DTE 30 45 Bid Ask Liquidity".toLowerCase().includes(query)) ||
             (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls".toLowerCase().includes(query))
         );
     });
@@ -1448,7 +1778,7 @@ export function StrategyGlossary() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredItems.map((item) => (
-                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
+                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' || item.id === 'options-alpha-rank' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
                             <CardHeader className="pb-3 border-b border-border/10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">

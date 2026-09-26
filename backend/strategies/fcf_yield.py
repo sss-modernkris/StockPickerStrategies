@@ -29,8 +29,8 @@ def evaluate_fcf_yield(data: Dict[str, Any]) -> StrategyResult:
         
     # Momentum
     if history is not None and len(history) >= 252:
-        start_price = history["Close"].iloc[-252]
-        end_price = history["Close"].iloc[-1]
+        start_price = float(history["Close"].iloc[-252])
+        end_price = float(history["Close"].iloc[-1])
         ret = (end_price - start_price) / start_price
         if ret > 0:
             score += 1

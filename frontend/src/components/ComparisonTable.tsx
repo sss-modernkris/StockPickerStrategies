@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, AreaChart, Area, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, YAxis, ComposedChart, ReferenceArea } from 'recharts';
-import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2, TrendingUp } from 'lucide-react';
+import { ArrowUpDown, ArrowDown, ArrowUp, Download, CheckCircle2, TrendingUp, X, Grid, List, Sparkles } from 'lucide-react';
 
 interface ComparisonTableProps {
     analysisData: Record<string, TickerAnalysis>;
@@ -246,7 +246,7 @@ export function runWillyBacktest(
     };
 }
 
-type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'strategy_value' | 'strategy_return' | string;
+type SortKey = 'ticker' | 'ml_alpha' | 'strat_avg' | 'ranking' | 'rec' | 'options_alpha_rank' | 'close_price' | 'close_slope' | 'willy_vwap_ratio' | 'macd_hist' | 'macd_slope' | 'macd_rel' | 'rsi' | 'rsi_slope' | 'call_delta' | 'gamma' | 'call_theta' | 'vega' | 'delta_theta_ratio' | 'theta_delta_ratio' | 'vol_spread' | 'open_interest' | 'strategy_value' | 'strategy_return' | string;
 type SortDirection = 'asc' | 'desc';
 
 export function ComparisonTable({ analysisData }: ComparisonTableProps) {
@@ -255,6 +255,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
     const [selectedRowTicker, setSelectedRowTicker] = useState<string | null>(null);
+    const [metricsViewMode, setMetricsViewMode] = useState<'array' | 'categorized'>('array');
     const [backtestPeriod, setBacktestPeriod] = useState<string | number>('4m');
     const [initialCapital, setInitialCapital] = useState<number>(10000);
     const [capitalInput, setCapitalInput] = useState<string>("10,000");
@@ -419,6 +420,27 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             rangeMode === 'date' ? customStartDate : undefined
         );
 
+        const optionAnalytics = data.option_analytics;
+        const greeks = optionAnalytics?.greeks;
+        const callDelta = greeks?.call_delta ?? null;
+        const gamma = greeks?.gamma ?? null;
+        const callTheta = greeks?.call_theta ?? null;
+        const vega = greeks?.vega ?? null;
+        const volSpread = optionAnalytics?.volatility_spread ?? null;
+        const volSpreadPct = optionAnalytics?.volatility_spread_pct ?? null;
+        const ivMid = optionAnalytics?.implied_volatility ?? null;
+        const hv20d = optionAnalytics?.historical_volatility_20d ?? null;
+        const liquidityRating = optionAnalytics?.liquidity_rating ?? null;
+        const openInterest = optionAnalytics?.open_interest ?? null;
+        const greeksBullishScore = optionAnalytics?.greeks_bullish_score ?? 0;
+        const greeksBullishPct = optionAnalytics?.greeks_bullish_pct ?? 0;
+        const stage1Score = optionAnalytics?.stage1_score ?? 0;
+        const stage2Score = optionAnalytics?.stage2_score ?? 0;
+        const deltaThetaRatio = optionAnalytics?.delta_theta_ratio ?? null;
+        const thetaDeltaRatio = optionAnalytics?.theta_delta_ratio ?? ((callTheta !== null && callDelta !== null && callDelta > 0) ? (callTheta / callDelta) : (deltaThetaRatio && deltaThetaRatio > 0 ? (1 / deltaThetaRatio) : null));
+        const dailyThetaPct = optionAnalytics?.daily_theta_pct ?? null;
+        const reqDailyStockRise = optionAnalytics?.req_daily_stock_rise ?? null;
+
         return {
             symbol: data.symbol,
             ml_alpha: alphaProb,
@@ -435,6 +457,24 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
             macd_rel: macdRel,
             rsi: rsi,
             rsi_slope: rsiSlope,
+            call_delta: callDelta,
+            gamma: gamma,
+            call_theta: callTheta,
+            vega: vega,
+            vol_spread: volSpread,
+            vol_spread_pct: volSpreadPct,
+            iv_mid: ivMid,
+            hv_20d: hv20d,
+            liquidity_rating: liquidityRating,
+            open_interest: openInterest,
+            greeks_bullish_score: greeksBullishScore,
+            greeks_bullish_pct: greeksBullishPct,
+            stage1_score: stage1Score,
+            stage2_score: stage2Score,
+            delta_theta_ratio: deltaThetaRatio,
+            theta_delta_ratio: thetaDeltaRatio,
+            daily_theta_pct: dailyThetaPct,
+            req_daily_stock_rise: reqDailyStockRise,
             strats: stratMap,
             strategy_value: backtest.finalValue,
             strategy_return: backtest.totalReturn,
@@ -499,6 +539,33 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
         } else if (sortKey === 'strategy_return') {
             valA = a.strategy_return;
             valB = b.strategy_return;
+        } else if (sortKey === 'options_alpha_rank') {
+            valA = a.greeks_bullish_score ?? -99999;
+            valB = b.greeks_bullish_score ?? -99999;
+        } else if (sortKey === 'delta_theta_ratio') {
+            valA = a.delta_theta_ratio ?? -99999;
+            valB = b.delta_theta_ratio ?? -99999;
+        } else if (sortKey === 'theta_delta_ratio') {
+            valA = a.theta_delta_ratio ?? 99999;
+            valB = b.theta_delta_ratio ?? 99999;
+        } else if (sortKey === 'call_delta') {
+            valA = a.call_delta ?? -99999;
+            valB = b.call_delta ?? -99999;
+        } else if (sortKey === 'gamma') {
+            valA = a.gamma ?? -99999;
+            valB = b.gamma ?? -99999;
+        } else if (sortKey === 'call_theta') {
+            valA = a.call_theta ?? -99999;
+            valB = b.call_theta ?? -99999;
+        } else if (sortKey === 'vega') {
+            valA = a.vega ?? -99999;
+            valB = b.vega ?? -99999;
+        } else if (sortKey === 'vol_spread') {
+            valA = a.vol_spread ?? -99999;
+            valB = b.vol_spread ?? -99999;
+        } else if (sortKey === 'open_interest') {
+            valA = a.open_interest ?? -99999;
+            valB = b.open_interest ?? -99999;
         } else {
             valA = a.strats[sortKey] || 0;
             valB = b.strats[sortKey] || 0;
@@ -526,8 +593,10 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
     const handleExportCsv = async () => {
         setIsExporting(true);
         const headers = [
-            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
-            "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope", ...STRATEGY_NAMES
+            "Ticker", "ML Alpha", "Strat Avg", "Ranking", "Rec", "Options Alpha Rank Score (0-15)", "Options Alpha Rank (%)", "Stage 1 Stock Score (0-7)", "Stage 2 Options Score (0-8)", "Willy Market", "Strategy Value ($)", "Strategy Return (%)", "Buy & Hold Return (%)", "Close Price", "Close Slope",
+            "Price/Willy VWAP", "MACD Hist", "MACD Slope", "MACD Rel", "RSI", "RSI Slope",
+            "Call Delta (30-45D)", "Gamma", "Call Theta ($/d)", "Vega ($/%)", "Delta/Theta Ratio", "Theta/Delta Ratio", "Daily Theta (%)", "Req Daily Rise ($/d)", "IV (30-45D)", "HV (20D)", "Vol Spread (%)", "Option Liquidity Rating", "Open Interest",
+            ...STRATEGY_NAMES
         ];
 
         const rows = sortedData.map(row => {
@@ -537,6 +606,10 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.strat_avg.toFixed(1),
                 row.ranking,
                 row.rec,
+                row.greeks_bullish_score,
+                `${row.greeks_bullish_pct}%`,
+                row.stage1_score,
+                row.stage2_score,
                 row.willy_market,
                 row.strategy_value.toFixed(2),
                 row.strategy_return.toFixed(2),
@@ -549,6 +622,19 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 row.macd_rel !== null ? row.macd_rel.toFixed(2) : "N/A",
                 row.rsi !== null ? row.rsi.toFixed(2) : "N/A",
                 row.rsi_slope !== null ? row.rsi_slope.toFixed(2) : "N/A",
+                row.call_delta !== null ? row.call_delta.toFixed(4) : "N/A",
+                row.gamma !== null ? row.gamma.toFixed(4) : "N/A",
+                row.call_theta !== null ? row.call_theta.toFixed(4) : "N/A",
+                row.vega !== null ? row.vega.toFixed(4) : "N/A",
+                row.delta_theta_ratio !== null ? row.delta_theta_ratio.toFixed(2) : "N/A",
+                row.theta_delta_ratio !== null ? row.theta_delta_ratio.toFixed(4) : "N/A",
+                row.daily_theta_pct !== null ? row.daily_theta_pct.toFixed(2) + "%" : "N/A",
+                row.req_daily_stock_rise !== null ? row.req_daily_stock_rise.toFixed(3) : "N/A",
+                row.iv_mid !== null ? (row.iv_mid * 100).toFixed(2) + "%" : "N/A",
+                row.hv_20d !== null ? (row.hv_20d * 100).toFixed(2) + "%" : "N/A",
+                row.vol_spread !== null ? (row.vol_spread >= 0 ? `+${(row.vol_spread * 100).toFixed(2)}%` : `${(row.vol_spread * 100).toFixed(2)}%`) : "N/A",
+                row.liquidity_rating || "N/A",
+                row.open_interest !== null ? row.open_interest : "N/A",
                 ...STRATEGY_NAMES.map(name => row.strats[name]?.toFixed(1) || "0.0")
             ];
             return r.map(v => `"${v}"`).join(",");
@@ -703,7 +789,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 className="overflow-x-auto bg-amber-500/15 border border-b-0 border-amber-500/30 p-1 flex items-center shrink-0 z-30 rounded-t-lg"
                 style={{ overflowY: 'hidden' }}
             >
-                <div className="h-2.5 min-w-[2800px] bg-amber-500/30 rounded-full" />
+                <div className="h-2.5 min-w-[3600px] bg-amber-500/30 rounded-full" />
             </div>
 
             <div
@@ -711,7 +797,7 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 onScroll={handleTableScroll}
                 className={`w-full bg-card text-card-foreground border rounded-b-lg shadow-sm overflow-auto relative transition-all duration-300 ${selectedRowTicker ? 'h-[480px] shrink-0' : 'flex-1'}`}
             >
-                <table className="w-full caption-bottom text-sm border-separate border-spacing-0 min-w-[2800px]">
+                <table className="w-full caption-bottom text-sm border-separate border-spacing-0 min-w-[3600px]">
                 <TableHeader className="sticky top-0 z-30 bg-card">
                     <TableRow>
                         <TableHead
@@ -743,6 +829,14 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                             onClick={() => handleSort('rec')}
                         >
                             Rec {renderSortIcon("rec")}
+                        </TableHead>
+                        {/* OPTIONS ALPHA RANK COLUMN (STAGE 1 STOCK + STAGE 2 CALL GREEKS SCORE) */}
+                        <TableHead
+                            className="font-bold text-emerald-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[145px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('options_alpha_rank')}
+                            title="Options Alpha Rank: Composite 15-point score combining Stage 1 Bullish Stock Filters (7 pts) and Stage 2 Call Option Greeks & Efficiency (8 pts) for 30-45 DTE contracts"
+                        >
+                            Options Alpha Rank {renderSortIcon("options_alpha_rank")}
                         </TableHead>
                         <TableHead
                             className="font-bold text-orange-500 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
@@ -810,6 +904,63 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                         >
                             RSI Slope {renderSortIcon("rsi_slope")}
                         </TableHead>
+                        {/* 6 NEW CALL OPTION COLUMNS (ATM Strike ~30 DTE) */}
+                        <TableHead
+                            className="font-bold text-purple-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[95px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('call_delta')}
+                            title="Call Delta (Δ): Option price change per $1 stock move (~30 DTE ATM Call)"
+                        >
+                            Call Delta {renderSortIcon("call_delta")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-purple-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[85px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('gamma')}
+                            title="Gamma (Γ): Delta rate of change per $1 stock move (~30 DTE ATM Call)"
+                        >
+                            Gamma {renderSortIcon("gamma")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-red-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[95px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('call_theta')}
+                            title="Call Theta (Θ): Daily time decay per day holding position (~30 DTE ATM Call)"
+                        >
+                            Call Theta {renderSortIcon("call_theta")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-emerald-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[85px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('vega')}
+                            title="Vega (V): Option price change per +1% change in Implied Volatility (~30-45 DTE Call)"
+                        >
+                            Vega {renderSortIcon("vega")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-teal-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('delta_theta_ratio')}
+                            title="Delta/Theta Efficiency Ratio (Δ / |Θ|): Directional delta leverage per unit of daily time decay (higher ratio is preferred)"
+                        >
+                            Δ / |Θ| Ratio {renderSortIcon("delta_theta_ratio")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-teal-300 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[110px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('theta_delta_ratio')}
+                            title="Theta/Delta Ratio (|Θ| / Δ): Daily time decay dollar cost per unit of Delta directional gain (lower ratio indicates lower decay cost per unit of delta)"
+                        >
+                            |Θ| / Δ Ratio {renderSortIcon("theta_delta_ratio")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-amber-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[115px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('vol_spread')}
+                            title="Volatility Spread: Implied Volatility minus 20-Day Historical Volatility (IV - 20d HV)"
+                        >
+                            Vol Spread {renderSortIcon("vol_spread")}
+                        </TableHead>
+                        <TableHead
+                            className="font-bold text-blue-400 cursor-pointer hover:bg-muted/50 whitespace-normal min-w-[135px] text-center sticky top-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"
+                            onClick={() => handleSort('open_interest')}
+                            title="Option Liquidity: Execution spread rating & Open Interest (OI)"
+                        >
+                            Option Liquidity {renderSortIcon("open_interest")}
+                        </TableHead>
                         {STRATEGY_NAMES.map(name => (
                             <TableHead
                                 key={name}
@@ -854,6 +1005,23 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                     </TableCell>
                                     <TableCell className={`text-center font-bold ${row.rec === 'Hold' ? 'text-green-500' : row.rec === 'Sell' ? 'text-red-500' : 'text-muted-foreground'}`}>
                                         {row.rec}
+                                    </TableCell>
+                                    {/* OPTIONS ALPHA RANK DATA CELL */}
+                                    <TableCell className="text-center font-mono text-xs min-w-[145px]">
+                                        <div 
+                                            className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold shadow-xs cursor-help"
+                                            title={`Options Alpha Rank: ${row.greeks_bullish_score}/15 (${row.greeks_bullish_pct}%)\n\n• Stage 1 (Stock Bullishness): ${row.stage1_score}/7\n• Stage 2 (Call Option Greeks & Efficiency): ${row.stage2_score}/8\n• Delta/Theta Ratio: ${row.delta_theta_ratio ?? 'N/A'}x\n• Daily Theta: ${row.daily_theta_pct ?? 'N/A'}%/d\n• Required Daily Stock Rise: $${row.req_daily_stock_rise ?? 'N/A'}/d`}
+                                        >
+                                            <span className={`px-2 py-0.5 rounded-full font-extrabold ${
+                                                row.greeks_bullish_score >= 11
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                    : row.greeks_bullish_score >= 8
+                                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                    : 'bg-destructive/20 text-destructive border border-destructive/30'
+                                            }`}>
+                                                {row.greeks_bullish_score}/15 ({row.greeks_bullish_pct}%)
+                                            </span>
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${row.willy_market === 'Bull' ? 'bg-green-500/15 text-green-500 border border-green-500/30' : row.willy_market === 'Bear' ? 'bg-red-500/15 text-red-500 border border-red-500/30' : 'bg-muted text-muted-foreground'}`}>
@@ -929,6 +1097,67 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                                             </span>
                                         ) : <span className="text-muted-foreground">N/A</span>}
                                     </TableCell>
+                                    {/* 6 NEW CALL OPTION DATA CELLS */}
+                                    <TableCell className="text-center font-mono text-sm max-w-[95px]">
+                                        {row.call_delta != null ? (
+                                            <span className={row.call_delta >= 0.3 && row.call_delta <= 0.7 ? "text-emerald-400 font-bold" : "text-purple-300 font-semibold"}>
+                                                {row.call_delta.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[85px]">
+                                        {row.gamma != null ? (
+                                            <span className="text-purple-400 font-semibold">
+                                                {row.gamma.toFixed(4)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[95px]">
+                                        {row.call_theta != null ? (
+                                            <span className="text-red-400 font-semibold">
+                                                -${Math.abs(row.call_theta).toFixed(2)}/d
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[85px]">
+                                        {row.vega != null ? (
+                                            <span className="text-emerald-400 font-semibold">
+                                                ${row.vega.toFixed(2)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[110px]">
+                                        {row.delta_theta_ratio != null && row.delta_theta_ratio > 0 ? (
+                                            <span className={row.delta_theta_ratio >= 5.0 ? "text-emerald-400 font-bold" : "text-amber-300 font-semibold"} title={`Daily Theta %: ${row.daily_theta_pct ?? 'N/A'}%/d\nReq Daily Stock Rise: $${row.req_daily_stock_rise ?? 'N/A'}/d`}>
+                                                {row.delta_theta_ratio.toFixed(2)}x
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[110px]">
+                                        {row.theta_delta_ratio != null && row.theta_delta_ratio > 0 ? (
+                                            <span className={row.theta_delta_ratio <= 0.20 ? "text-emerald-400 font-bold" : "text-amber-300 font-semibold"} title={`Daily Theta: -$${Math.abs(row.call_theta ?? 0).toFixed(2)}/d\nCall Delta: ${row.call_delta ?? 'N/A'}`}>
+                                                {row.theta_delta_ratio.toFixed(4)}
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm max-w-[115px]">
+                                        {row.vol_spread != null ? (
+                                            <span className={`font-bold ${row.vol_spread > 0.05 ? 'text-amber-400' : row.vol_spread >= -0.03 ? 'text-indigo-300' : 'text-emerald-400'}`}>
+                                                {row.vol_spread >= 0 ? '+' : ''}{(row.vol_spread * 100).toFixed(1)}%
+                                            </span>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-xs max-w-[135px]">
+                                        {row.liquidity_rating != null ? (
+                                            <div className="flex items-center justify-center gap-1.5" title={`Open Interest: ${row.open_interest ?? 'N/A'}`}>
+                                                <span className={`w-2 h-2 rounded-full shrink-0 ${row.liquidity_rating.includes('High') ? 'bg-emerald-400 animate-pulse' : row.liquidity_rating.includes('Moderate') ? 'bg-amber-400' : 'bg-red-400'}`} />
+                                                <span className="text-muted-foreground text-[11px] font-medium truncate">
+                                                    {row.liquidity_rating.includes('High') ? 'High' : row.liquidity_rating.includes('Moderate') ? 'Mod' : 'Low'}
+                                                    {row.open_interest ? ` (${row.open_interest > 1000 ? (row.open_interest/1000).toFixed(1) + 'k' : row.open_interest})` : ''}
+                                                </span>
+                                            </div>
+                                        ) : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
 
                                     {STRATEGY_NAMES.map(name => {
                                         const match = row.strats[name] || 0;
@@ -967,6 +1196,167 @@ export function ComparisonTable({ analysisData }: ComparisonTableProps) {
                 </TableBody>
             </table>
         </div>
+
+        {/* SELECTED TICKER FULL METRICS ARRAY BOX */}
+        {selectedRowTicker && selectedData && (() => {
+            const allColumnsArray = [
+                { index: 1, key: "Ticker Symbol", value: selectedData.symbol, category: "Core Signals", badgeColor: "text-foreground font-bold" },
+                { index: 2, key: "ML Alpha Proba", value: `${selectedData.ml_alpha.toFixed(1)}%`, category: "Core Signals", badgeColor: selectedData.ml_alpha >= 75 ? "text-emerald-400 font-bold" : selectedData.ml_alpha >= 40 ? "text-amber-400" : "text-rose-400" },
+                { index: 3, key: "Strat Avg Score", value: `${selectedData.strat_avg.toFixed(1)}%`, category: "Core Signals", badgeColor: selectedData.strat_avg >= 75 ? "text-emerald-400 font-bold" : selectedData.strat_avg >= 40 ? "text-amber-400" : "text-rose-400" },
+                { index: 4, key: "Ranking Score", value: `${selectedData.ranking}/8`, category: "Core Signals", badgeColor: "text-amber-400 font-bold" },
+                { index: 5, key: "Action Recommendation", value: selectedData.rec, category: "Core Signals", badgeColor: selectedData.rec === 'Hold' ? "text-emerald-400 font-bold" : selectedData.rec === 'Sell' ? "text-rose-400 font-bold" : "text-muted-foreground" },
+                { index: 6, key: "Options Alpha Rank", value: `${selectedData.greeks_bullish_score}/15 (${selectedData.greeks_bullish_pct}%)`, category: "Core Signals", badgeColor: selectedData.greeks_bullish_score >= 12 ? "text-emerald-400 font-bold" : selectedData.greeks_bullish_score >= 9 ? "text-amber-400 font-bold" : "text-rose-400 font-bold" },
+                
+                { index: 7, key: "Willy Market State", value: selectedData.willy_market === 'Bull' ? '🟢 Bull' : selectedData.willy_market === 'Bear' ? '🔴 Bear' : 'N/A', category: "Performance & State", badgeColor: selectedData.willy_market === 'Bull' ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 8, key: "Strategy Value ($)", value: `$${selectedData.strategy_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, category: "Performance & State", badgeColor: "text-amber-400 font-bold" },
+                { index: 9, key: "Strategy Return (%)", value: `${selectedData.strategy_return >= 0 ? '+' : ''}${selectedData.strategy_return.toFixed(1)}%`, category: "Performance & State", badgeColor: selectedData.strategy_return >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 10, key: "Buy & Hold Return (%)", value: `${selectedData.bh_return >= 0 ? '+' : ''}${selectedData.bh_return.toFixed(1)}%`, category: "Performance & State", badgeColor: selectedData.bh_return >= 0 ? "text-emerald-400" : "text-rose-400" },
+                
+                { index: 11, key: "Close Price ($)", value: selectedData.close_price != null ? `$${selectedData.close_price.toFixed(2)}` : "N/A", category: "Price & Technicals", badgeColor: "text-foreground font-semibold" },
+                { index: 12, key: "Close Slope", value: selectedData.close_slope, category: "Price & Technicals", badgeColor: selectedData.close_slope === '+' ? "text-emerald-400 font-bold" : selectedData.close_slope === '-' ? "text-rose-400 font-bold" : "text-foreground" },
+                { index: 13, key: "Price / Willy VWAP", value: selectedData.willy_vwap_ratio != null ? selectedData.willy_vwap_ratio.toFixed(3) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.willy_vwap_ratio ?? 0) >= 1.0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 14, key: "MACD Hist", value: selectedData.macd_hist != null ? (selectedData.macd_hist > 0 ? `+${selectedData.macd_hist.toFixed(2)}` : selectedData.macd_hist.toFixed(2)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.macd_hist ?? 0) > 0 ? "text-emerald-400" : "text-rose-400" },
+                { index: 15, key: "MACD Slope", value: selectedData.macd_slope != null ? (selectedData.macd_slope > 0 ? `+${selectedData.macd_slope.toFixed(3)}` : selectedData.macd_slope.toFixed(3)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.macd_slope ?? 0) > 0 ? "text-emerald-400" : "text-rose-400" },
+                { index: 16, key: "MACD Rel Ratio", value: selectedData.macd_rel != null ? (selectedData.macd_rel > 0 ? `+${selectedData.macd_rel.toFixed(3)}` : selectedData.macd_rel.toFixed(3)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.macd_rel ?? 0) > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold" },
+                { index: 17, key: "RSI (14)", value: selectedData.rsi != null ? selectedData.rsi.toFixed(1) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.rsi ?? 0) > 70 ? "text-rose-400 font-bold" : (selectedData.rsi ?? 0) < 30 ? "text-emerald-400 font-bold" : "text-foreground" },
+                { index: 18, key: "RSI Slope", value: selectedData.rsi_slope != null ? (selectedData.rsi_slope > 0 ? `+${selectedData.rsi_slope.toFixed(2)}` : selectedData.rsi_slope.toFixed(2)) : "N/A", category: "Price & Technicals", badgeColor: (selectedData.rsi_slope ?? 0) > 0 ? "text-emerald-400" : "text-rose-400" },
+                
+                { index: 19, key: "Call Delta (Δ)", value: selectedData.call_delta != null ? selectedData.call_delta.toFixed(2) : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-purple-400 font-bold" },
+                { index: 20, key: "Gamma (Γ)", value: selectedData.gamma != null ? selectedData.gamma.toFixed(4) : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-purple-300 font-semibold" },
+                { index: 21, key: "Call Theta (Θ)", value: selectedData.call_theta != null ? `-$${Math.abs(selectedData.call_theta).toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-rose-400 font-semibold" },
+                { index: 22, key: "Vega (V)", value: selectedData.vega != null ? `$${selectedData.vega.toFixed(2)}` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-emerald-400 font-semibold" },
+                { index: 23, key: "Δ / |Θ| Ratio", value: selectedData.delta_theta_ratio != null ? `${selectedData.delta_theta_ratio.toFixed(2)}x` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.delta_theta_ratio ?? 0) >= 5.0 ? "text-emerald-400 font-bold" : "text-amber-300" },
+                { index: 24, key: "|Θ| / Δ Ratio", value: selectedData.theta_delta_ratio != null ? selectedData.theta_delta_ratio.toFixed(4) : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.theta_delta_ratio ?? 1) <= 0.20 ? "text-emerald-400 font-bold" : "text-amber-300" },
+                { index: 25, key: "Daily Theta Decay %", value: selectedData.daily_theta_pct != null ? `${selectedData.daily_theta_pct.toFixed(2)}%/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-400" },
+                { index: 26, key: "Req Daily Stock Rise", value: selectedData.req_daily_stock_rise != null ? `$${selectedData.req_daily_stock_rise.toFixed(2)}/d` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-amber-300" },
+                { index: 27, key: "Vol Spread (IV - HV)", value: selectedData.vol_spread != null ? `${selectedData.vol_spread >= 0 ? '+' : ''}${(selectedData.vol_spread * 100).toFixed(1)}%` : "N/A", category: "Option Greeks & Volatility", badgeColor: (selectedData.vol_spread ?? 0) > 0.05 ? "text-amber-400" : "text-emerald-400" },
+                { index: 28, key: "Option Liquidity & OI", value: selectedData.liquidity_rating ? `${selectedData.liquidity_rating} (${selectedData.open_interest ?? 'N/A'} OI)` : "N/A", category: "Option Greeks & Volatility", badgeColor: "text-blue-400" },
+
+                ...STRATEGY_NAMES.map((name, i) => ({
+                    index: 29 + i,
+                    key: name,
+                    value: `${(selectedData.strats[name] || 0).toFixed(1)}%`,
+                    category: "10 Core Strategy Match Scores",
+                    badgeColor: getColorClass(selectedData.strats[name] || 0)
+                }))
+            ];
+
+            return (
+                <div className="mt-4 border border-amber-500/40 rounded-xl bg-card p-5 space-y-4 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                    {/* Header Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/50">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono font-black text-xl px-3 py-1 rounded-lg">
+                                {selectedData.symbol}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-bold text-lg text-foreground">
+                                        {selectedData.symbol} All Column Metrics Summary
+                                    </h3>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                        selectedData.rec === 'Hold' ? 'bg-emerald-500/20 text-emerald-400' : selectedData.rec === 'Sell' ? 'bg-rose-500/20 text-rose-400' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                        {selectedData.rec}
+                                    </span>
+                                    <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-mono font-bold">
+                                        Alpha Rank: {selectedData.greeks_bullish_score}/15 ({selectedData.greeks_bullish_pct}%)
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Displaying all {allColumnsArray.length} column metrics on one screen without horizontal scrolling.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Mode Toggle */}
+                            <div className="flex bg-muted p-1 rounded-lg border text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setMetricsViewMode('array')}
+                                    className={`px-3 py-1 font-semibold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        metricsViewMode === 'array' ? 'bg-background text-foreground shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    <List className="w-3.5 h-3.5 text-amber-400" />
+                                    Array List View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMetricsViewMode('categorized')}
+                                    className={`px-3 py-1 font-semibold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        metricsViewMode === 'categorized' ? 'bg-background text-foreground shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    <Grid className="w-3.5 h-3.5 text-blue-400" />
+                                    Categorized Grid
+                                </button>
+                            </div>
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedRowTicker(null)}
+                                className="h-8 w-8 p-0 rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                                title="Close Details Box"
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* View Mode 1: Array List View (Single-Screen Multi-Column List) */}
+                    {metricsViewMode === 'array' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-2">
+                            {allColumnsArray.map((col) => (
+                                <div 
+                                    key={col.index}
+                                    className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/40 hover:border-amber-500/40 transition-colors"
+                                >
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <span className="font-mono text-[10px] text-muted-foreground font-semibold bg-background px-1.5 py-0.5 rounded border shrink-0">
+                                            #{col.index.toString().padStart(2, '0')}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground font-medium truncate" title={col.key}>
+                                            {col.key}
+                                        </span>
+                                    </div>
+                                    <span className={`font-mono text-xs text-right pl-2 shrink-0 ${col.badgeColor}`}>
+                                        {col.value}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* View Mode 2: Categorized Grid View */}
+                    {metricsViewMode === 'categorized' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                            {Array.from(new Set(allColumnsArray.map(c => c.category))).map((cat) => {
+                                const items = allColumnsArray.filter(c => c.category === cat);
+                                return (
+                                    <div key={cat} className="bg-muted/30 border border-border/40 p-3.5 rounded-xl space-y-2.5">
+                                        <h4 className="font-bold text-xs uppercase tracking-wider text-amber-400 border-b border-border/40 pb-1.5 flex items-center justify-between">
+                                            <span>{cat}</span>
+                                            <span className="font-mono text-[10px] text-muted-foreground font-normal">{items.length} Metrics</span>
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {items.map(item => (
+                                                <div key={item.index} className="flex items-center justify-between text-xs py-0.5">
+                                                    <span className="text-muted-foreground font-medium">{item.key}</span>
+                                                    <span className={`font-mono ${item.badgeColor}`}>{item.value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        })()}
 
         {/* Willy VWAP Backtest Dashboard Panel */}
         {selectedRowTicker && selectedData && backtest && (() => {

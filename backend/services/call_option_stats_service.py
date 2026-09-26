@@ -148,7 +148,7 @@ def evaluate_ticker_call_indicators(
 
     # Options Chain Lookups (14-day / 2-week Call)
     atm_strike = get_atm_strike(stock_price)
-    t_obj = yf.Ticker(symbol)
+    t_obj = yf.Ticker(symbol.replace('.', '-'))
     c_price, p_price, iv, greeks = get_live_or_bs_option_price(t_obj, symbol, stock_price, atm_strike, 14, closes)
     hv = calc_historical_volatility(closes, window=30)
     

@@ -2,9 +2,41 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
+## 1. Release v20260922 - Options Alpha Rank & Top Tickers All-Column Metrics Box
+
+### 🎯 Options Alpha Rank 15-Point Composite Score Engine (`backend/services/options_service.py`)
+- **Stage 1 (Bullish Setup, 7 Points)**: Price > 20d & 50d MAs, positive 20-30d slope ($m > 0$), low trend standard error ($\text{StdErr} \le 2.0\%$), outperformance vs SPY slope, volume surge, ATR resistance headroom, and clear event risk horizon.
+- **Stage 2 (Option Greeks & Liquidity, 8 Points)**: Target 30–45 DTE window, optimal Delta ($0.60 - 0.75$), daily theta decay ($\le 1.5\%$), Delta/Theta efficiency ratio ($\ge 5.0$), low required daily stock rise ($\le \$0.25/\text{day}$), implied volatility ($\text{IV} \le 45\%$), bid-ask spread ($\le 5.0\%$), and open interest depth ($\ge 500$).
+
+### 📊 Top Tickers Single-Screen All-Column Metrics Box (`frontend/src/components/ComparisonTable.tsx`)
+- **Array / Key-Value List View**: Renders all 37 base metrics and individual strategy scores in a single-screen 4-column indexed grid (`#01` to `#37`) without horizontal scrolling.
+- **Categorized Grid View**: Displays metrics grouped into 5 structured categories with color-coded badges.
+- **Interactive UI Controls**: Ticker row toggle, mode switcher, and Close Box button.
+
+### 🏷️ Version Synchronization (`v20260922`)
+- Synchronized platform version tags across `README.md`, `frontend/src/app/page.tsx`, `frontend/src/components/TickerSidebar.tsx`, and `docs/changes.md`.
+
 ---
 
-## 1. Release v20260906 - 2-Day Slope-Ranked Options Backtesting Engine & UI Panel Integration
+## 2. Release v20260909 - Volatility Analytics & Call Option Implied Volatility (IV) Calculator
+
+### 📊 20-Day Historical Volatility & Black-Scholes IV Inversion Engine (`backend/services/options_service.py`)
+- **Black-Scholes IV Inversion**:
+  - Solves Implied Volatility ($\text{IV}$) backward from call option market premiums or Bid/Ask midpoints using Brent's root-finding method (`scipy.optimize.brentq`).
+  - Computes 20-day annualized realized Historical Volatility ($\text{HV}$), Bid/Ask IV sensitivity ranges, Volatility Spread ($\text{IV} - \text{HV}$), and full Black-Scholes Option Greeks ($\Delta$, $\Gamma$, $\Theta$, $V$, $\rho$).
+- **FastAPI Endpoints** ([backend/main.py](../backend/main.py)):
+  - Exposed `/api/volatility-calculator` POST and GET endpoints returning quantitative volatility analytics, breakeven stock prices, and required percentage return gain metrics.
+
+### 🖥️ Interactive IV/HV Calculator UI Tab (`frontend/src/components/VolatilityCalculatorPanel.tsx`)
+- **Dedicated Volatility Analytics View**:
+  - Integrated dedicated **IV/HV Calc** navigation tab (`%` icon) allowing real-time volatility calculations, ATM strike auto-filling, midpoint calculator, metric cards, option greeks, and comprehensive methodology glossary entry ([frontend/src/components/StrategyGlossary.tsx](../frontend/src/components/StrategyGlossary.tsx)).
+
+### 🏷️ Version Synchronization (`v20260909`)
+- Synchronized platform version tags across `README.md`, `frontend/src/app/page.tsx`, and `frontend/src/components/TickerSidebar.tsx`.
+
+---
+
+## 3. Release v20260906 - 2-Day Slope-Ranked Options Backtesting Engine & UI Panel Integration
 
 ### 📈 2-Day Slope-Ranked Options Backtesting Engine (`backend/services/backtester.py`)
 - **Fast 2-Day Holding Period Backtester** (`execute_slope_options_2day_backtest`):
@@ -25,7 +57,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 2. Release v20260905 - 24x7 Autonomous Daily Agentic Pipeline for Docker
+## 4. Release v20260905 - 24x7 Autonomous Daily Agentic Pipeline for Docker
 
 ### ⏰ Autonomous 24x7 In-Process Background Scheduler (`backend/agents/`)
 - **Continuous Clock Monitoring Engine** ([backend/agents/pipeline.py](../backend/agents/pipeline.py)):
@@ -52,7 +84,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 3. Release v20260904 - Call Option Stats Multi-Period Linear Fit & Trend Metrics
+## 5. Release v20260904 - Call Option Stats Multi-Period Linear Fit & Trend Metrics
 
 ### 📊 Call Option Stats Matrix Multi-Period Linear Fit (`frontend/src/components/CallOptionStatsModal.tsx`)
 - **Multi-Horizon Timeframe Selector**:
@@ -73,7 +105,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 4. Release v20260829 / v20260830 - Unified Branch Merge & Agentic MCP Pipeline
+## 6. Release v20260829 / v20260830 - Unified Branch Merge & Agentic MCP Pipeline
 
 ### 🔄 Branch Integration & Merge (`origin/main` into `Krishna-ST`)
 - **Unified Master Codebase**: Merged `origin/main` into `Krishna-ST` ([commit f8ba48b]), combining the AI Agentic Trading Sandbox, Robinhood Model Context Protocol (MCP) Server, Call Option Stats 14-Indicator Matrix, and Option Greeks calculation engine.
@@ -114,7 +146,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 5. Release v20260828 - Call Option Analytics & Compare Matrix Enhancements
+## 7. Release v20260828 - Call Option Analytics & Compare Matrix Enhancements
 
 ### 📈 Compare Charts Matrix Expansion
 - **Ordinary Least Squares (OLS) Linear Fit Slope ($m$)**: Quantifies directional momentum and rate of price change over selected lookback intervals.
@@ -131,7 +163,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 6. Release v20260820 - Call Option Stats Matrix Modal & UI Ergonomics
+## 8. Release v20260820 - Call Option Stats Matrix Modal & UI Ergonomics
 
 ### 📋 Call Option Stats Modal (14 Indicators)
 - **Comprehensive Deep-Dive View** ([CallOptionStatsModal.tsx](../frontend/src/components/CallOptionStatsModal.tsx)):
@@ -144,7 +176,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 7. Release v20260807 - Benchmark Comparison & Timeframe Selectors
+## 9. Release v20260807 - Benchmark Comparison & Timeframe Selectors
 
 - **Multi-Timeframe Backtesting**: Configurable backtest windows (1Wk, 1M, 3M, 6M, 1Y) on the Top Tickers page.
 - **Benchmark Alpha Overlay**: Integrated baseline comparison curves for S&P 500 and NASDAQ.
@@ -152,7 +184,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 8. Release v20260703 - Compare Matrix Ergonomics & Strategy 3 Integration
+## 10. Release v20260703 - Compare Matrix Ergonomics & Strategy 3 Integration
 
 - **Compare Charts Multi-Select**: Added "Select All" and "Deselect All" action buttons for bulk ticker comparison.
 - **Strategy 3 Backtester**: Added 30-Day rolling backtest evaluation for Strategy 3 and corresponding glossary reference cards.
