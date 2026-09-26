@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Grid, List, Sparkles, Layers, Download, Check, ArrowRight } from 'lucide-react';
 import { TickerAnalysis, VolatilityCalculationResponse } from '@/lib/types';
+import { API_BASE_URL } from '@/lib/api';
 
 interface RawTechOptionPanelProps {
     currentData: TickerAnalysis;
@@ -217,7 +218,7 @@ export function RawTechOptionPanel({
         return groups;
     }, [rawData, rawSearch]);
 
-    const handleExportSummary = () => {
+    const handleExportSummary = async () => {
         const exportObj = {
             ticker: selectedTicker,
             date: new Date().toISOString(),
@@ -231,6 +232,20 @@ export function RawTechOptionPanel({
         a.download = `${selectedTicker}_Raw_Tech_Option_Summary.json`;
         a.click();
         URL.revokeObjectURL(url);
+
+        try {
+            await fetch(`${API_BASE_URL}/api/save-raw-tech-option`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ticker: selectedTicker,
+                    data: exportObj
+                })
+            });
+        } catch (err) {
+            console.error("Failed to save to project directory:", err);
+        }
+
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };

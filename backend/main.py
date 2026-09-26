@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest, CallOptionStatsResponse, VolatilityCalculationRequest, VolatilityCalculationResponse
+from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest, CallOptionStatsResponse, VolatilityCalculationRequest, VolatilityCalculationResponse, SaveRawTechOptionRequest
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
 from services.ib_client import IBClient
@@ -1034,4 +1034,23 @@ def calculate_volatility_analytics_endpoint(
         return VolatilityCalculationResponse(**res)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Volatility calculation failed: {str(e)}")
+
+
+@app.post("/api/save-raw-tech-option")
+def save_raw_tech_option(req: SaveRawTechOptionRequest):
+    """
+    Saves the combined Raw/Tech/Option summary JSON file directly into the project root directory.
+    """
+    try:
+        symbol = req.ticker.upper().strip()
+        filename = f"{symbol}_Raw_Tech_Option_Summary.json"
+        filepath = os.path.join(BASE_DIR, filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(req.data, f, indent=2)
+        print(f"[SAVE] Raw/Tech/Option JSON saved successfully to {filepath}")
+        return {"status": "success", "filename": filename, "filepath": filepath}
+    except Exception as e:
+        print(f"[SAVE ERROR] Failed to save Raw/Tech/Option JSON: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 

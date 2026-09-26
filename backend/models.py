@@ -223,3 +223,9 @@ class VolatilityCalculationResponse(BaseModel):
     message: Optional[str] = None
 
 
+class SaveRawTechOptionRequest(BaseModel):
+    ticker: str
+    data: Dict[str, Any]
+
+
+
