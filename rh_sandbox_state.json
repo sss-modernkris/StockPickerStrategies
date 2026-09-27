@@ -1,0 +1,17 @@
+{
+  "account_id": "RH-SIM-SANDBOX-001",
+  "environment": "SANDBOX",
+  "cash": 25000.0,
+  "holdings": {},
+  "option_positions": {},
+  "orders": [],
+  "daily_spend_limit": 5000.0,
+  "position_cap_pct": 15.0,
+  "emergency_kill_switch": false,
+  "require_hitl": true,
+  "paused": false,
+  "budget_limit": 5000.0,
+  "today_spend_total": 0.0,
+  "last_spend_date": "2026-09-26",
+  "last_saved": "2026-09-26 19:19:33"
+}

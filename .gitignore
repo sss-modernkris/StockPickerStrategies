@@ -36,3 +36,4 @@ Backtest_Ledger*.csv
 CompTable_*.csv
 Top_Tickers_*.csv
 *_Raw_Tech_Option_Summary.json
+*.log
