@@ -11,3 +11,13 @@
 ![Slide 10](../fs_images/FS-_0009_Slide10.JPG.jpg)
 ![Slide 11](../fs_images/FS-_0010_Slide11.JPG.jpg)
 ![Slide 12](../fs_images/FS-_0011_Slide12.JPG.jpg)
+
+# Agentic AI
+## How AI is revolutionizing the financial market
+![AI Agent 1](../fs_images/AgenticAI/ai-trading-system-flow.avif)
+![AI Agent 2](../fs_images/AgenticAI/ai-trading-four-layers.avif)
+
+# References
+ - https://robinhood.com/us/en/support/articles/agentic-trading-overview/#OpenanAgenticaccount
+ - https://www.stockcram.com/blog/robinhood-agentic-trading-how-it-works
+ - https://www.stockcram.com/guides/how-ai-trading-works
