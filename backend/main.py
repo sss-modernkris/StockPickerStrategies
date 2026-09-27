@@ -148,6 +148,11 @@ class RHConnectRequest(BaseModel):
     simulate: bool = False
 
 class RHControlsRequest(BaseModel):
+    environment: Optional[str] = None
+    daily_spend_limit: Optional[float] = None
+    position_cap_pct: Optional[float] = None
+    emergency_kill_switch: Optional[bool] = None
+    require_hitl: Optional[bool] = None
     paused: Optional[bool] = None
     budget_limit: Optional[float] = None
 
@@ -188,21 +193,32 @@ def get_ib_data():
 def get_rh_config():
     from mcp.rh_mcp_server import get_sandbox
     sb = get_sandbox()
+    summary = sb.get_guardrails_summary()
     return {
         "is_connected": True,
         "mcp_url": "https://agent.robinhood.com/mcp/trading",
-        "is_simulated": True,
+        "environment": sb.environment,
+        "is_simulated": sb.is_simulated,
+        "daily_spend_limit": sb.daily_spend_limit,
+        "today_spend_total": summary["today_spend_total"],
+        "remaining_daily_budget": summary["remaining_daily_budget"],
+        "position_cap_pct": sb.position_cap_pct,
+        "emergency_kill_switch": sb.emergency_kill_switch,
+        "require_hitl": sb.require_hitl,
         "paused": sb.paused,
-        "budget_limit": sb.budget_limit
+        "budget_limit": sb.daily_spend_limit,
+        "account_id": sb.account_id,
+        "api_key_configured": summary["api_key_configured"],
+        "api_key_status": summary["api_key_status"]
     }
 
 @app.post("/api/rh/connect")
 def rh_connect(req: RHConnectRequest):
-    return {"status": "success", "message": "Connected to Robinhood MCP Sandbox"}
+    return {"status": "success", "message": "Connected to Robinhood Agentic MCP"}
 
 @app.post("/api/rh/disconnect")
 def rh_disconnect():
-    return {"status": "success", "message": "Disconnected from Robinhood MCP Sandbox"}
+    return {"status": "success", "message": "Disconnected from Robinhood Agentic MCP"}
 
 @app.get("/api/rh/data")
 def get_rh_data():
@@ -216,7 +232,7 @@ def place_rh_order(ticker: str, action: str, quantity: float, price: float):
     sb = get_sandbox()
     res = sb.place_stock_order(ticker, action, quantity, price)
     if res.get("success"):
-        return {"status": "success", "message": res.get("message")}
+        return {"status": "success", "message": res.get("message"), "order": res.get("order")}
     else:
         raise HTTPException(status_code=400, detail=res.get("error"))
 
@@ -224,11 +240,23 @@ def place_rh_order(ticker: str, action: str, quantity: float, price: float):
 def update_rh_controls(req: RHControlsRequest):
     from mcp.rh_mcp_server import get_sandbox
     sb = get_sandbox()
-    if req.paused is not None:
-        sb.paused = req.paused
-    if req.budget_limit is not None:
-        sb.budget_limit = req.budget_limit
-    return {"status": "success", "message": "Controls updated successfully"}
+    res = sb.update_guardrails(
+        environment=req.environment,
+        daily_spend_limit=req.daily_spend_limit,
+        position_cap_pct=req.position_cap_pct,
+        emergency_kill_switch=req.emergency_kill_switch,
+        require_hitl=req.require_hitl,
+        paused=req.paused,
+        budget_limit=req.budget_limit
+    )
+    return res
+
+@app.post("/api/rh/reset")
+def reset_rh_sandbox():
+    """Resets the Robinhood Sandbox to fresh $25,000 cash with empty holdings and orders."""
+    from mcp.rh_mcp_server import get_sandbox
+    sb = get_sandbox()
+    return sb.reset_sandbox()
 
 # -----------------------------------------------------------------------------
 # SPECIALIZED AI AGENTS & ROBINHOOD MCP SANDBOX PIPELINE
@@ -981,7 +1009,6 @@ def get_call_option_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Call Option Stats evaluation failed: {str(e)}")
 
-
 @app.post("/api/volatility-calculator", response_model=VolatilityCalculationResponse)
 @app.get("/api/volatility-calculator/{ticker}")
 def calculate_volatility_analytics_endpoint(
@@ -1052,5 +1079,4 @@ def save_raw_tech_option(req: SaveRawTechOptionRequest):
     except Exception as e:
         print(f"[SAVE ERROR] Failed to save Raw/Tech/Option JSON: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
