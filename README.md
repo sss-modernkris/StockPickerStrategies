@@ -1,4 +1,4 @@
-# Strategic Alpha Stock Picker Dashboard `v20260922`
+# Strategic Alpha Stock Picker Dashboard `v20260926`
 
 
 The **Strategic Alpha Dashboard** is a state-of-the-art, high-performance quantitative stock analysis platform. It combines institutional-grade financial strategies with modern machine learning to provide deep insights into stock performance, technical indicators, fundamental metrics, and portfolio backtesting.
@@ -69,8 +69,11 @@ Log and track simulated transactions to practice strategy execution.
 
 ![Paper Study Page](images/paper_study_new.png)
 
-### 9. Broker Integration (Interactive Brokers)
-A premium broker dashboard connected to TWS or IB Gateway to monitor your real-time cash, buying power, invested capital, active holdings, and orders in a unified glassmorphic view.
+### 9. Broker Integration & Agentic Trading (Robinhood & Interactive Brokers)
+A unified broker dashboard supporting both Interactive Brokers (via TWS/IB Gateway) and **Robinhood Agentic Trading** with Model Context Protocol (MCP) tool integration:
+*   **Dual Execution Modes**: Seamlessly switch between local simulated **Sandbox** (with local JSON state persistence) and **Live Trading API** (with dynamic cryptographic HMAC-SHA256 request signing).
+*   **Institutional Risk Firewall**: Configurable runtime guardrails including an **Emergency Kill Switch** (1-click freeze), **Daily Cumulative Spend Limit** ($ ceiling with budget meter and midnight rollover), and **Maximum Position Cap** (% equity cap per ticker).
+*   **Persistent Activity Ledger**: Track automated stock and call/put option orders across sessions with one-click sandbox reset capability.
 
 ![Brokers Page](images/brokers_new.png)
 

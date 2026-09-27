@@ -32,8 +32,13 @@ The application is engineered to meet the following functional and non-functiona
 *   **Real-Time Price Autofill**: Query `yfinance` to automatically populate current market prices on ticker input.
 *   **Simulated Ledger**: Write transaction records (Date, Ticker, Quantity, Price, Total Cost, Running Cash) to persistent workspace CSV files while tracking real-time unrealized P&L.
 
-### F. Broker Integration
-*   **Interactive Brokers Gateway**: Securely connect to a local IB Gateway or TWS session using `ib_insync` to monitor account equity, cash balances, open orders, and active positions in a unified interface.
+### F. Broker Integration & Autonomous Agentic Trading
+*   **Interactive Brokers Gateway**: Connect to local IB Gateway or TWS session via `ib_insync` to monitor live account equity, cash balances, open orders, and active positions.
+*   **Robinhood Agentic Trading Engine & Model Context Protocol (MCP)**:
+    *   **Dual Execution Routing**: Switchable execution targeting a persistent local simulation **Sandbox** or Robinhood's **Live Trading API** using dynamic HMAC-SHA256 request signing (`X-API-KEY`, `X-SIGNATURE`, `X-TIMESTAMP`).
+    *   **Autonomous Multi-Agent Workflow**: Supports the Backtester Agent (analyst running daily 2:00 PM EST screeners) and Broker Agent (executor dispatching stock/options orders via standardized MCP endpoints).
+    *   **Institutional Risk Firewall**: Enforces runtime guardrails including Emergency Kill Switch, Daily Cumulative Spend Limit ($ ceiling with budget meter and midnight UTC rollover), and Maximum Position Sizing Cap (% equity concentration limit).
+    *   **Persistent Sandbox State**: Replaces ephemeral memory models with local JSON file persistence (`rh_sandbox_state.json`), clean startup (zero phantom trades), and one-click full reset.
 
 ### G. Benchmark Index Comparative Analysis (Top Tickers)
 *   **Index Multi-Select Support**: Load and compare constituents of major benchmark indices (`DOW100.csv` / Dow 30, `Nasdaq100.csv` / Nasdaq 100, and `SP100.csv` / S&P 500) using a multi-select toggle layout.
@@ -62,12 +67,16 @@ graph TD
     Frontend <--> |HTTP / JSON| Backend[FastAPI App]
     Backend <--> |yfinance API| Yahoo[Yahoo Finance API]
     Backend <--> |ib_insync Socket| IBGate[IB Gateway / TWS]
+    Backend <--> |MCP Protocol & Cryptographic Signing| RHEngine[Robinhood Agentic Trading Engine]
+    RHEngine <--> |Local JSON Persistence| RHSandbox[(rh_sandbox_state.json)]
+    RHEngine <--> |Signed REST API| RHLive[Robinhood Live Trading API]
     Backend <--> |Local File I/O| CSV[(Workspace CSVs & JSONs)]
     
-    subgraph Strategy Engine
+    subgraph Strategy & Agent Pipeline
         Backend --> FT[Fundamental & Technical Strategies]
         Backend --> ML[XGBoost ML Classifier]
         Backend --> Willy[Dynamic VWAP Anchor Engine]
+        Backend --> Agents[Backtester & Broker Autonomous Agents]
     end
 ```
 

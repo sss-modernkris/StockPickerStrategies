@@ -2,7 +2,35 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20260922 - Options Alpha Rank & Top Tickers All-Column Metrics Box
+## 1. Release v20260926 - Robinhood Agentic Trading, Model Context Protocol (MCP) Router & Risk Guardrails
+
+### 🤖 Robinhood Agentic Trading Architecture ([backend/mcp/rh_mcp_server.py](file:///d:/AI/StockPickerStrategies/backend/mcp/rh_mcp_server.py))
+- **Dual Execution Engine (`SANDBOX` vs `LIVE`)**:
+  - Implemented dynamic execution routing supporting simulated paper trading in a local sandbox or real-time order dispatch to Robinhood's Trading API.
+  - Implemented cryptographic HMAC-SHA256 request signing with timestamp nonces (`X-API-KEY`, `X-SIGNATURE`, `X-TIMESTAMP`) in [backend/services/rh_live_client.py](file:///d:/AI/StockPickerStrategies/backend/services/rh_live_client.py).
+- **Persistent Sandbox State Engine**:
+  - Replaced in-memory mock holdings with local file persistence in `rh_sandbox_state.json`.
+  - Eliminated initial phantom `NVDA` trades from default initialization, ensuring clean ledger states upon initial startup.
+  - Added full sandbox state reset endpoint (`POST /api/rh/reset`) restoring initial cash ($100,000) and clearing trade ledgers on demand.
+
+### 🛡️ Multi-Layer Risk Firewall & Guardrails
+- **Emergency Kill Switch**: UI toggle and backend interceptor instantly rejecting all inbound trade orders.
+- **Daily Cumulative Spend Limit**: Hard configurable dollar ceiling (e.g. $10,000/day) tracked with automatic calendar date rollover.
+- **Maximum Position Sizing Cap**: Enforces an equity concentration limit (e.g. 20% max per ticker) across stock and option orders.
+- **Configuration & Persistence**: All guardrail thresholds are backed by default `.env` variables (`ROBINHOOD_DAILY_SPEND_LIMIT`, `ROBINHOOD_POSITION_CAP_PCT`, `ROBINHOOD_EMERGENCY_KILL_SWITCH`) and dynamically adjustable at runtime via `POST /api/rh/controls`.
+
+### 🖥️ Interactive Broker UI & Risk Control Panel ([frontend/src/components/BrokersPanel.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/BrokersPanel.tsx))
+- **Live / Sandbox Environment Switcher**: Visual toggle with safety confirmations.
+- **Interactive Risk Control Center**: Emergency Kill Switch button, real-time Daily Spend Limit input with visual budget utilization meter, and Max Position Cap slider.
+- **Robinhood Activity Ledger**: Displays execution mode badges (`[LIVE]` vs `[SANDBOX]`), trade timestamps, fill status, and one-click Sandbox Reset.
+
+### 📚 Strategic Glossary Expansion ([frontend/src/components/StrategyGlossary.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/StrategyGlossary.tsx))
+- Added full-width interactive documentation card for **Specialized AI Agents & Robinhood MCP Pipeline** detailing multi-agent analyst/broker orchestration, MCP tool signatures, risk firewall mechanics, and live cryptographic request authentication.
+- Added **Options Alpha Rank** 15-point dual-stage scoring model card.
+
+---
+
+## 2. Release v20260922 - Options Alpha Rank & Top Tickers All-Column Metrics Box
 
 ### 🎯 Options Alpha Rank 15-Point Composite Score Engine (`backend/services/options_service.py`)
 - **Stage 1 (Bullish Setup, 7 Points)**: Price > 20d & 50d MAs, positive 20-30d slope ($m > 0$), low trend standard error ($\text{StdErr} \le 2.0\%$), outperformance vs SPY slope, volume surge, ATR resistance headroom, and clear event risk horizon.

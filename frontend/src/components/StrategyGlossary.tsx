@@ -1218,15 +1218,169 @@ export function StrategyGlossary() {
             id: "ai-agents-pipeline",
             icon: <Bot className="w-5 h-5 text-emerald-400" />,
             title: "Specialized AI Agents & Robinhood MCP Pipeline",
-            badge: "Autonomous Sandbox Trading",
-            description: "A linear two-agent pipeline that automates daily market screening and simulated execution in the Robinhood MCP sandbox with strict 0% capital-risk guardrails.",
-            formula: "Buying Power = Current Cash + ∑(Liquidated Displaced Holdings Proceeds)",
-            bullets: [
-                { label: "1. Backtester Agent (Trigger: 2:00 PM EST)", text: "Automatically scans ~170 tickers across the Dow 30, Nasdaq 100, and S&P 500 every trading day at 2:00 PM EST. Applies Strategy 1 (1-Week lookback) quantitative filters (Bull Willy VWAP, 1-Wk Value > $10k, MACD Hist/Slope, RSI 30-70) and outputs a ranked recommendations payload with stock & ATM Call options signals." },
-                { label: "2. Broker Agent (Portfolio Comparative Analysis)", text: "Ingests the Backtester recommendations and queries the active Robinhood Sandbox account (RH-SIM-SANDBOX-001). Compares existing holdings vs. incoming top opportunities to determine which non-strategy positions to liquidate." },
-                { label: "3. Dynamic Buying Power & Trade Sizing", text: "Calculates total effective buying power as available cash plus proceeds from sell liquidations. Allocates capital across top-ranked stock positions and ATM Call options (sized to available budget)." },
-                { label: "4. MCP Sandbox Execution & Guardrails", text: "Dispatches sell orders first to release capital, then dispatches stock and option buy orders strictly via the Robinhood Model Context Protocol (MCP) server. Live-capital execution is blocked by design." }
-            ]
+            badge: "Autonomous Agentic Trading & Guardrails",
+            description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with an institutional Risk Firewall (Daily Spend Limits, Position Caps, Emergency Kill Switch, and Dual Sandbox/Live execution).",
+            formula: "Buying Power = Cash + ∑(Liquidated Proceeds) | Max Allocation = Total Equity × (Cap % / 100)",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Architecture Overview */}
+                    <div className="bg-gradient-to-br from-emerald-950/40 via-black/40 to-indigo-950/40 p-5 rounded-xl border border-emerald-500/20 text-xs space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="font-bold text-white text-sm flex items-center gap-2">
+                                <Cpu className="w-4 h-4 text-emerald-400" />
+                                End-to-End Agentic Trading Workflow (2:00 PM EST Daily Execution)
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
+                                Robinhood Agentic API Ready
+                            </span>
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed">
+                            The Strategic Alpha platform implements an autonomous multi-agent pipeline designed for both simulated research (<strong className="text-emerald-400">Sandbox Mode</strong>) and live brokerage execution (<strong className="text-amber-300">Live Trading Mode</strong>). The system operates on a linear data flow orchestrated by continuous 24x7 background schedulers aligned with US Eastern Market Time.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Multi-Agent Orchestration */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>1. Multi-Agent Orchestration Engine</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Linear Automated Pipeline</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Backtester Agent */}
+                            <div className="bg-card border border-emerald-500/30 p-4 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">
+                                        <Sparkles className="w-4 h-4" /> 1. Backtester Agent
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                                        Daily @ 2:00 PM EST
+                                    </span>
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Scans constituent tickers across the <strong className="text-foreground">Dow 30, Nasdaq 100, and S&P 500</strong> (~170 equities). Evaluates 5 quantitative screening layers:
+                                </p>
+                                <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                                    <li><strong className="text-foreground">Willy Dynamic VWAP:</strong> Price action confirmed in Bull market regime.</li>
+                                    <li><strong className="text-foreground">1-Week Strategy Value:</strong> Minimum $10,000 threshold with positive slope trajectory.</li>
+                                    <li><strong className="text-foreground">Momentum &amp; Velocity:</strong> Positive MACD Histogram and upward MACD Slope.</li>
+                                    <li><strong className="text-foreground">RSI Range Guard:</strong> RSI(14) between 30 and 70 to exclude overextended extremes.</li>
+                                    <li><strong className="text-foreground">ATM Option Sizing:</strong> Computes 30-day ATM Call strike, expiry, and contracts.</li>
+                                </ul>
+                            </div>
+
+                            {/* Broker Agent */}
+                            <div className="bg-card border border-indigo-500/30 p-4 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-indigo-400 flex items-center gap-1.5 text-sm">
+                                        <Briefcase className="w-4 h-4" /> 2. Broker Agent
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
+                                        Portfolio Rebalancer
+                                    </span>
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Queries active portfolio state and compares existing positions against incoming recommendations:
+                                </p>
+                                <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                                    <li><strong className="text-foreground">Comparative Liquidation:</strong> Positions falling out of top rankings are sold to free up capital.</li>
+                                    <li><strong className="text-foreground">Dynamic Buying Power:</strong> Available cash is calculated as initial cash + sell proceeds.</li>
+                                    <li><strong className="text-foreground">Order Sizing &amp; Staging:</strong> Allocates capital to top candidates within budget constraints.</li>
+                                    <li><strong className="text-foreground">Two-Phase Execution:</strong> Dispatches liquidations first, followed by stock &amp; Call option purchases.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Institutional Risk Firewall Guardrails */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>2. Institutional Risk Firewall &amp; Execution Safeguards</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Configurable via UI &amp; .env</span>
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="p-3.5 rounded-xl bg-card border border-red-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-red-400 flex items-center gap-1.5">
+                                    <AlertTriangle className="w-4 h-4" /> Emergency Kill Switch
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Instant 1-click execution freeze. Halts all manual order submissions and blocks automated daily agent pipeline dispatches immediately.
+                                </p>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-card border border-emerald-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                                    <DollarSign className="w-4 h-4" /> Daily Spend Limit
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Maximum daily capital cap ($5,000 default). Accumulates daily spend and rejects BUY orders that exceed the cap. Resets automatically at midnight.
+                                </p>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-card border border-indigo-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-indigo-400 flex items-center gap-1.5">
+                                    <Shield className="w-4 h-4" /> Max Position Cap
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Enforces a single-position allocation ceiling (15.0% default). Prevents portfolio over-concentration in any single stock or option.
+                                </p>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-card border border-purple-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-purple-400 flex items-center gap-1.5">
+                                    <RotateCcw className="w-4 h-4" /> State Persistence
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    All holdings, option contracts, and order history are persisted to <code className="text-foreground">rh_sandbox_state.json</code>, retaining complete audit logs across restarts.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Dual Execution Modes (Sandbox vs Live) */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>3. Dual Execution Architecture (Sandbox vs Live API)</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Model Context Protocol (MCP) Standard</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-xl space-y-3 text-xs sm:text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-1.5 text-xs">
+                                    <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                                        <span>🛡️ Mode A: Sandbox Simulation (0% Risk)</span>
+                                    </div>
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        Operates with virtual cash ($25,000 starting capital) in account <code className="text-foreground">RH-SIM-SANDBOX-001</code>. Simulates realistic order fills, bid/ask spreads, and options pricing without risking real capital. Supports 1-click sandbox reset.
+                                    </p>
+                                </div>
+
+                                <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1.5 text-xs">
+                                    <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                                        <span>⚡ Mode B: Live Robinhood Agentic Trading</span>
+                                    </div>
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        Routes trades to the official Robinhood Agentic Trading API with timestamped HMAC-SHA256 / ECDSA cryptographic request signatures (<code className="text-foreground">X-API-KEY</code>, <code className="text-foreground">X-SIGNATURE</code>, <code className="text-foreground">X-TIMESTAMP</code>).
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="bg-muted/50 p-3 rounded-lg border border-border/40 text-xs space-y-1">
+                                <p className="font-semibold text-foreground">Standardized MCP Tools Exposed:</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono text-[11px]">
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-emerald-400">
+                                        robinhood_get_portfolio
+                                    </div>
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-indigo-300">
+                                        robinhood_place_stock_order
+                                    </div>
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-purple-300">
+                                        robinhood_place_option_order
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             id: "compare-charts-linear-fit",
@@ -1720,6 +1874,189 @@ export function StrategyGlossary() {
                     </div>
                 </div>
             )
+        },
+        {
+            id: 'options-alpha-rank',
+            icon: <Sparkles className="w-5 h-5 text-amber-400" />,
+            title: "Options Alpha Rank (15-Point Dual-Stage Quantitative Model)",
+            badge: "Quantitative Options Scoring",
+            description: "A two-stage 15-point scoring methodology filtering candidate equity tickers for momentum, trend consistency, outperformance, and optimal Black-Scholes call option Greeks.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-lg space-y-3">
+                            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                                <h4 className="font-semibold text-emerald-400 text-sm">Stage 1: Bullish Stock Setup</h4>
+                                <Badge variant="outline" className="text-emerald-400 border-emerald-500/40">7 Points Max</Badge>
+                            </div>
+                            <ul className="space-y-2 text-xs text-muted-foreground">
+                                <li>• <strong>Moving Average Posture (+1 pt):</strong> Close &gt; 20d &amp; 50d SMAs</li>
+                                <li>• <strong>Linear Slope Velocity (+1 pt):</strong> Normalized Slope % &gt; 0</li>
+                                <li>• <strong>Trend Low Standard Error (+1 pt):</strong> StdErr &le; 2.0%</li>
+                                <li>• <strong>Relative Strength Alpha (+1 pt):</strong> Slope % outperforms SPY</li>
+                                <li>• <strong>Volume Accumulation (+1 pt):</strong> Volume &ge; 1.0x 50d Average</li>
+                                <li>• <strong>Resistance Headroom (+1 pt):</strong> Distance to 52w High &gt; 1.5 &times; ATR</li>
+                                <li>• <strong>Event Horizon Safety (+1 pt):</strong> Earnings &gt; 14 days out</li>
+                            </ul>
+                        </div>
+                        <div className="bg-sky-500/10 border border-sky-500/30 p-4 rounded-lg space-y-3">
+                            <div className="flex items-center justify-between border-b border-sky-500/20 pb-2">
+                                <h4 className="font-semibold text-sky-400 text-sm">Stage 2: Call Option Greeks &amp; Liquidity</h4>
+                                <Badge variant="outline" className="text-sky-400 border-sky-500/40">8 Points Max</Badge>
+                            </div>
+                            <ul className="space-y-2 text-xs text-muted-foreground">
+                                <li>• <strong>Optimal DTE Expiration Window (+1 pt):</strong> 30 &le; DTE &le; 45 days</li>
+                                <li>• <strong>Delta Sweet Spot (+1 pt):</strong> 0.60 &le; Delta &le; 0.75</li>
+                                <li>• <strong>Theta Decay Control (+1 pt):</strong> Daily Theta Decay &le; 1.5% of premium</li>
+                                <li>• <strong>Delta / Theta Efficiency (+1 pt):</strong> Ratio &ge; 5.0</li>
+                                <li>• <strong>Low Required Stock Rise (+1 pt):</strong> Daily stock rise &le; $0.25/day</li>
+                                <li>• <strong>Implied Volatility Cap (+1 pt):</strong> IV &le; 45% or IV &le; HV + 5%</li>
+                                <li>• <strong>Tight Bid-Ask Spread (+1 pt):</strong> Spread &le; 5.0% of mid-price</li>
+                                <li>• <strong>Liquidity &amp; Open Interest (+1 pt):</strong> Open Interest &ge; 500 contracts</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            id: 'ai-agents-pipeline',
+            icon: <Bot className="w-5 h-5 text-emerald-400" />,
+            title: "Specialized AI Agents & Robinhood MCP Pipeline",
+            badge: "Autonomous Agentic Trading",
+            description: "An institutional-grade, multi-agent automated trading workflow orchestrated via Model Context Protocol (MCP) and Robinhood Agentic APIs with dynamic cryptographic request signing, multi-layer risk guardrails, and simulated sandbox persistence.",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Architecture Overview Banner */}
+                    <div className="bg-gradient-to-r from-emerald-500/10 via-sky-500/10 to-indigo-500/10 border border-emerald-500/30 p-4 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="font-semibold text-emerald-400 text-sm flex items-center gap-2">
+                                <Bot className="w-4 h-4" /> Robinhood Agentic Trading Architecture
+                            </span>
+                            <Badge variant="outline" className="text-emerald-400 border-emerald-500/40 text-[11px]">
+                                Dual Execution: Sandbox &amp; Live API
+                            </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Built directly in alignment with Robinhood&apos;s Agentic Trading ecosystem, providing autonomous AI agents with structured MCP tool execution, automated daily quantitative rebalancing, simulated portfolio state persistence, and cryptographic HMAC-SHA256 request authentication.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Agent Roles & Workflow */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center gap-2">
+                            <BrainCircuit className="w-4 h-4 text-sky-400" /> 1. Autonomous Multi-Agent Roles &amp; Daily Workflow
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-card border border-border/60 p-3.5 rounded-lg space-y-2">
+                                <div className="flex items-center gap-2 text-sky-400 font-semibold text-xs">
+                                    <LineChart className="w-4 h-4" /> Backtester Agent (Analyst)
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Autonomously activates every trading day at <strong className="text-foreground">2:00 PM EST</strong> to run 30-day quantitative screeners across Dow 30, Nasdaq 100, and S&amp;P 500 universes. Ranks top candidates by Normalized Slope %, trend stability, and Options Alpha Rank.
+                                </p>
+                            </div>
+                            <div className="bg-card border border-border/60 p-3.5 rounded-lg space-y-2">
+                                <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
+                                    <ShieldAlert className="w-4 h-4" /> Broker Agent (Executor)
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Ingests candidate recommendations, queries active buying power and portfolio positions, performs Risk Firewall validation against hard limits, and dispatches stock/option orders through the Robinhood MCP Server.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: MCP Tool Interface */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-amber-400" /> 2. Robinhood Model Context Protocol (MCP) Tools
+                        </h4>
+                        <div className="overflow-x-auto rounded-lg border border-border/40">
+                            <table className="w-full text-left text-xs">
+                                <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border/40">
+                                    <tr>
+                                        <th className="p-2.5 w-1/3">MCP Tool</th>
+                                        <th className="p-2.5 w-1/3">Functionality</th>
+                                        <th className="p-2.5 w-1/3">Target Routing</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/20">
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-mono text-emerald-400">rh_get_account_balance</td>
+                                        <td className="p-2.5 text-muted-foreground">Fetches cash, buying power, invested capital, and total portfolio equity.</td>
+                                        <td className="p-2.5 text-xs text-foreground">Sandbox State / Live API</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-mono text-emerald-400">rh_get_positions</td>
+                                        <td className="p-2.5 text-muted-foreground">Returns active stock shares, cost basis, unrealized P&amp;L, and options contracts.</td>
+                                        <td className="p-2.5 text-xs text-foreground">Sandbox State / Live API</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-mono text-emerald-400">rh_place_stock_order</td>
+                                        <td className="p-2.5 text-muted-foreground">Executes BUY/SELL equity orders with risk firewall checks and ledger logging.</td>
+                                        <td className="p-2.5 text-xs text-foreground">Engine Router</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-mono text-emerald-400">rh_place_option_order</td>
+                                        <td className="p-2.5 text-muted-foreground">Dispatches call/put option orders with strike, expiration, and limit price validation.</td>
+                                        <td className="p-2.5 text-xs text-foreground">Engine Router</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-mono text-emerald-400">rh_get_risk_firewall_status</td>
+                                        <td className="p-2.5 text-muted-foreground">Reports Kill Switch state, cumulative daily spend, remaining spend, and position cap.</td>
+                                        <td className="p-2.5 text-xs text-foreground">Risk Guardrail Engine</td>
+                                    </tr>
+                                    <tr className="hover:bg-muted/20">
+                                        <td className="p-2.5 font-mono text-emerald-400">rh_reset_sandbox</td>
+                                        <td className="p-2.5 text-muted-foreground">Clears virtual activity ledger and resets sandbox cash to initial default ($100,000).</td>
+                                        <td className="p-2.5 text-xs text-foreground">Local Sandbox State</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Risk Firewall & Security Guardrails */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center gap-2">
+                            <ShieldAlert className="w-4 h-4 text-rose-400" /> 3. Institutional Risk Firewall &amp; Security Guardrails
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                            <div className="bg-rose-500/10 border border-rose-500/30 p-3 rounded-lg space-y-1.5">
+                                <span className="font-semibold text-rose-400 block">🚨 Emergency Kill Switch</span>
+                                <p className="text-muted-foreground">Instant global shutdown button in UI and backend that rejects all automated trade routing immediately.</p>
+                            </div>
+                            <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg space-y-1.5">
+                                <span className="font-semibold text-amber-400 block">💵 Daily Cumulative Spend Limit</span>
+                                <p className="text-muted-foreground">Hard ceiling (e.g. $10,000/day) preventing cumulative daily purchases from exceeding budget; resets at midnight UTC.</p>
+                            </div>
+                            <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded-lg space-y-1.5">
+                                <span className="font-semibold text-blue-400 block">📊 Max Position Sizing Cap</span>
+                                <p className="text-muted-foreground">Restricts individual stock or option holdings to a maximum percentage of total equity (e.g. 20%) to eliminate concentration risk.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 4: Live Account Security & Cryptographic Signing */}
+                    <div className="bg-card border border-border p-4 rounded-lg space-y-3 text-xs">
+                        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <Scale className="w-4 h-4 text-indigo-400" /> 4. Live API Authentication &amp; Request Signing
+                        </h4>
+                        <p className="text-muted-foreground leading-relaxed">
+                            When switching from <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-foreground font-semibold">SANDBOX</code> to <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-emerald-400 font-semibold">LIVE</code> mode, outbound HTTP requests are cryptographically signed using Robinhood&apos;s HMAC-SHA256 protocol with timestamp nonce validation:
+                        </p>
+                        <div className="bg-muted/70 p-3 rounded font-mono text-xs text-foreground space-y-1 overflow-x-auto">
+                            <div>X-API-KEY: &lt;YOUR_ROBINHOOD_API_KEY_ID&gt;</div>
+                            <div>X-TIMESTAMP: &lt;EPOCH_SECONDS&gt;</div>
+                            <div>X-SIGNATURE: HMAC_SHA256(secret, timestamp + method + path + body)</div>
+                        </div>
+                        <p className="text-muted-foreground text-[11px] italic">
+                            All API secrets remain safely encrypted in local <code className="bg-muted px-1 py-0.5 rounded font-mono text-foreground">.env</code> configuration and are never logged or exposed to the browser client.
+                        </p>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -1778,7 +2115,7 @@ export function StrategyGlossary() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredItems.map((item) => (
-                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' || item.id === 'options-alpha-rank' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
+                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' || item.id === 'options-alpha-rank' || item.id === 'ai-agents-pipeline' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
                             <CardHeader className="pb-3 border-b border-border/10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
