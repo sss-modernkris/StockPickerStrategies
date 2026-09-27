@@ -1,8 +1,8 @@
 # Strategic Alpha Stock Picker Dashboard — Build & Run Documentation
 
-**Workspace Directory:** `C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906`  
+**Workspace Directory:** `C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST - 20260927`  
 **Execution Environment:** Windows PowerShell / CMD (Local Development Mode)  
-**Date:** September 6, 2026  
+**Date:** September 27, 2026  
 
 ---
 
@@ -18,125 +18,120 @@ This document provides a complete technical record of setting up, building, and 
 
 1. **Navigate to Backend Directory:**
    ```powershell
-   cd C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906\backend
+   cd "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST - 20260927\backend"
    ```
 
-2. **Create Python Virtual Environment (`.venv`):**
+2. **Launch Backend Service:**
    ```powershell
-   python -m venv .venv
+   python -m uvicorn main:app --host 127.0.0.1 --port 8080
    ```
-
-3. **Install Backend Dependencies:**
-   ```powershell
-   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-   ```
-   *Installed key libraries: `fastapi`, `uvicorn`, `yfinance`, `xgboost`, `scikit-learn`, `pandas`, `pydantic`, `ib_insync`, `curl_cffi`.*
-
-4. **Launch Backend Service:**
-   ```powershell
-   .\.venv\Scripts\python.exe -m uvicorn main:app --host localhost --port 8080
-   ```
+   *Runs FastAPI on `http://127.0.0.1:8080`.*
 
 ---
 
-### 2. Frontend Setup (Next.js 16 Turbopack)
+### 2. Frontend Setup (Next.js 16 Webpack Mode)
 
 1. **Navigate to Frontend Directory:**
    ```powershell
-   cd C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906\frontend
+   cd "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST - 20260927\frontend"
    ```
 
-2. **Install Node Modules:**
-   ```powershell
-   npm install --legacy-peer-deps
+2. **Directory Junction for Node Modules:**
+   ```cmd
+   cmd /c mklink /J "node_modules" "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906\frontend\node_modules"
    ```
 
 3. **Launch Frontend Dev Server:**
-   ```cmd
-   cmd /c "npm run dev"
+   ```powershell
+   npx next dev -H 127.0.0.1 -p 3000 --webpack
    ```
-   *Runs Next.js 16.1.6 (Turbopack) on `http://localhost:3000`.*
+   *Runs Next.js 16.1.6 on `http://127.0.0.1:3000`.*
 
 ---
 
 ## 🚨 Issues Found & Resolutions
 
-### Issue 1: Port 8080 Address Conflict (`Errno 10048`)
+### Issue 1: Turbopack Symlink/Junction Root Boundary Panic (`Turbopack Error: Symlink node_modules is invalid`)
 
 - **Symptom:**
-  When attempting to start the FastAPI backend server on port 8080, uvicorn threw an error:
+  When `node_modules` was linked via Windows directory junction (`mklink /J`), Next.js 16 Turbopack default bundler threw a panic:
   ```text
-  ERROR: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8080): 
-  only one usage of each socket address (protocol/network address/port) is normally permitted
+  FATAL: An unexpected Turbopack error occurred.
+  Turbopack Error: Symlink node_modules is invalid, it points out of the filesystem root
   ```
 - **Root Cause:**
-  A previously running backend process was actively occupying port 8080.
+  Next.js 16 Turbopack bundler enforces strict filesystem root boundaries and rejects symlinks / directory junctions that point outside the project workspace root.
 - **Resolution:**
-  Identified and forcefully terminated the process bound to port 8080 using PowerShell:
+  Switched Next.js development mode from Turbopack to Webpack using the `--webpack` flag:
   ```powershell
-  Get-Process -Id (Get-NetTCPConnection -LocalPort 8080).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force
+  npx next dev -H 127.0.0.1 -p 3000 --webpack
   ```
-  After freeing port 8080, `uvicorn` started cleanly and initialized the 24x7 Autonomous Trading Pipeline Scheduler daemon.
+  Webpack resolves directory junctions cleanly and compiles the app in 3.7 seconds.
 
 ---
 
-### Issue 2: Missing 'next' Executable / Corrupted `node_modules`
+### Issue 2: Backend FastAPI Route `404 Not Found` on Dynamic Code Updates
 
 - **Symptom:**
-  Running `npm run dev` in `frontend/` returned the error:
+  Frontend API calls to newly added endpoints (such as POST `/api/save-raw-tech-option`) returned `404 Not Found`.
+- **Root Cause:**
+  FastAPI backend server was running in non-reload background mode (`uvicorn main:app --host 127.0.0.1 --port 8080` without `--reload`), so code additions made to `main.py` were not loaded into the active process memory.
+- **Resolution:**
+  Identified and terminated the stale uvicorn process, then launched a fresh background server:
+  ```powershell
+  python -m uvicorn main:app --host 127.0.0.1 --port 8080
+  ```
+  Endpoint `/api/save-raw-tech-option` responded with `200 OK` and saved JSON files directly into the project directory.
+
+---
+
+### Issue 3: `localhost` IPv6 vs IPv4 Bind Conflict (`WinError 10061 ConnectionRefusedError`)
+
+- **Symptom:**
+  HTTP requests to `http://localhost:3000` failed with `WinError 10061 ConnectionRefusedError: No connection could be made because the target machine actively refused it`.
+- **Root Cause:**
+  Windows DNS resolved `localhost` to IPv6 loopback (`::1`), while Next.js default listener bound exclusively to IPv4 (`127.0.0.1`).
+- **Resolution:**
+  Explicitly bound Next.js server to IPv4 host `127.0.0.1`:
+  ```powershell
+  npx next dev -H 127.0.0.1 -p 3000 --webpack
+  ```
+
+---
+
+### Issue 4: Port 8080 Address Conflict (`Errno 10048`)
+
+- **Symptom:**
+  Starting backend server on port 8080 threw socket bind error:
   ```text
-  'next' is not recognized as an internal or external command, operable program or batch file.
+  ERROR: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8080)
   ```
 - **Root Cause:**
-  Initial non-interactive `npm install` in Windows subshell created an incomplete `node_modules` tree where `node_modules/next` only contained nested metadata subdirectories without the binary CLI tools (`node_modules/.bin/next.cmd`).
+  A background python uvicorn process was occupying port 8080.
 - **Resolution:**
-  1. Cleaned the incomplete `node_modules` directory:
-     ```powershell
-     Remove-Item -Recurse -Force node_modules
-     ```
-  2. Mirrored the complete, pre-built package dependencies using multithreaded `robocopy` from the verified workspace template `StockPickerStrategies-Krishna-ST - 20260816\frontend\node_modules`:
-     ```cmd
-     robocopy "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST - 20260816\frontend\node_modules" "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906\frontend\node_modules" /E /MT:8 /NFL /NDL /NJH /NJS
-     ```
-  3. Verified `node_modules\next\dist\bin\next` binary path:
-     ```powershell
-     Test-Path node_modules\next\dist\bin\next  # Returned True
-     ```
-
----
-
-### Issue 3: Subshell Stdin Closure in Dev Server
-
-- **Symptom:**
-  Next.js dev server launched via temporary subprocess terminated with exit code 1 after initial compilation when stdout/stdin pipes closed.
-- **Root Cause:**
-  Turbopack interactive CLI requires standard process lifecycle scoping when run as a background task.
-- **Resolution:**
-  Launched Next.js via standard persistent CMD wrapper (`cmd /c "npm run dev"`), allowing Next.js 16.1.6 to serve requests cleanly on port 3000.
+  Terminated running process bound to port 8080 before starting the updated backend server.
 
 ---
 
 ## ✅ System Verification & Status
 
-| Service | Port | Endpoint / URL | Verification Result |
-| :--- | :---: | :--- | :--- |
-| **Backend (FastAPI)** | `8080` | `http://localhost:8080/health` | **`{"status":"ok"}`** |
-| **Frontend (Next.js)** | `3000` | `http://localhost:3000` | **Active & Compiled (HTTP 200 OK)** |
+| Service | Port | Host / Endpoint | Status | Verification Result |
+| :--- | :---: | :--- | :---: | :--- |
+| **Backend (FastAPI)** | `8080` | `http://127.0.0.1:8080/health` | 🟢 Active | **`{"status":"ok"}` (HTTP 200)** |
+| **Frontend (Next.js)** | `3000` | `http://127.0.0.1:3000` | 🟢 Active | **Compiled & Ready in 3.7s (HTTP 200)** |
 
 ---
 
-## 📌 Maintenance Commands
+## 📌 Local Mode Execution Commands
 
-- **Check Active Services:**
+- **Start Backend:**
   ```powershell
-  Test-NetConnection -ComputerName localhost -Port 8080
-  Test-NetConnection -ComputerName localhost -Port 3000
+  cd "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST - 20260927\backend"
+  python -m uvicorn main:app --host 127.0.0.1 --port 8080
   ```
-- **Restart Backend:**
+- **Start Frontend:**
   ```powershell
-  C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906\backend\.venv\Scripts\python.exe -m uvicorn main:app --host localhost --port 8080
+  cd "C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST - 20260927\frontend"
+  npx next dev -H 127.0.0.1 -p 3000 --webpack
   ```
-- **Restart Frontend:**
-  ```cmd
-  cd C:\Users\moder\AntiGravity\StockPickerStrategies-Krishna-ST-20260906\frontend && cmd /c "npm run dev"
-  ```
+
