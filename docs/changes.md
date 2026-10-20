@@ -2,7 +2,35 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20260922 - Options Alpha Rank & Top Tickers All-Column Metrics Box
+## 1. Release v20260926 - Robinhood Agentic Trading, Model Context Protocol (MCP) Router & Risk Guardrails
+
+### 🤖 Robinhood Agentic Trading Architecture ([backend/mcp/rh_mcp_server.py](file:///d:/AI/StockPickerStrategies/backend/mcp/rh_mcp_server.py))
+- **Dual Execution Engine (`SANDBOX` vs `LIVE`)**:
+  - Implemented dynamic execution routing supporting simulated paper trading in a local sandbox or real-time order dispatch to Robinhood's Trading API.
+  - Implemented cryptographic HMAC-SHA256 request signing with timestamp nonces (`X-API-KEY`, `X-SIGNATURE`, `X-TIMESTAMP`) in [backend/services/rh_live_client.py](file:///d:/AI/StockPickerStrategies/backend/services/rh_live_client.py).
+- **Persistent Sandbox State Engine**:
+  - Replaced in-memory mock holdings with local file persistence in `rh_sandbox_state.json`.
+  - Eliminated initial phantom `NVDA` trades from default initialization, ensuring clean ledger states upon initial startup.
+  - Added full sandbox state reset endpoint (`POST /api/rh/reset`) restoring initial cash ($100,000) and clearing trade ledgers on demand.
+
+### 🛡️ Multi-Layer Risk Firewall & Guardrails
+- **Emergency Kill Switch**: UI toggle and backend interceptor instantly rejecting all inbound trade orders.
+- **Daily Cumulative Spend Limit**: Hard configurable dollar ceiling (e.g. $10,000/day) tracked with automatic calendar date rollover.
+- **Maximum Position Sizing Cap**: Enforces an equity concentration limit (e.g. 20% max per ticker) across stock and option orders.
+- **Configuration & Persistence**: All guardrail thresholds are backed by default `.env` variables (`ROBINHOOD_DAILY_SPEND_LIMIT`, `ROBINHOOD_POSITION_CAP_PCT`, `ROBINHOOD_EMERGENCY_KILL_SWITCH`) and dynamically adjustable at runtime via `POST /api/rh/controls`.
+
+### 🖥️ Interactive Broker UI & Risk Control Panel ([frontend/src/components/BrokersPanel.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/BrokersPanel.tsx))
+- **Live / Sandbox Environment Switcher**: Visual toggle with safety confirmations.
+- **Interactive Risk Control Center**: Emergency Kill Switch button, real-time Daily Spend Limit input with visual budget utilization meter, and Max Position Cap slider.
+- **Robinhood Activity Ledger**: Displays execution mode badges (`[LIVE]` vs `[SANDBOX]`), trade timestamps, fill status, and one-click Sandbox Reset.
+
+### 📚 Strategic Glossary Expansion ([frontend/src/components/StrategyGlossary.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/StrategyGlossary.tsx))
+- Added full-width interactive documentation card for **Specialized AI Agents & Robinhood MCP Pipeline** detailing multi-agent analyst/broker orchestration, MCP tool signatures, risk firewall mechanics, and live cryptographic request authentication.
+- Added **Options Alpha Rank** 15-point dual-stage scoring model card.
+
+---
+
+## 2. Release v20260922 - Options Alpha Rank & Top Tickers All-Column Metrics Box
 
 ### 🎯 Options Alpha Rank 15-Point Composite Score Engine (`backend/services/options_service.py`)
 - **Stage 1 (Bullish Setup, 7 Points)**: Price > 20d & 50d MAs, positive 20-30d slope ($m > 0$), low trend standard error ($\text{StdErr} \le 2.0\%$), outperformance vs SPY slope, volume surge, ATR resistance headroom, and clear event risk horizon.
@@ -36,7 +64,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 2. Release v20260906 - 2-Day Slope-Ranked Options Backtesting Engine & UI Panel Integration
+## 3. Release v20260906 - 2-Day Slope-Ranked Options Backtesting Engine & UI Panel Integration
 
 ### 📈 2-Day Slope-Ranked Options Backtesting Engine (`backend/services/backtester.py`)
 - **Fast 2-Day Holding Period Backtester** (`execute_slope_options_2day_backtest`):
@@ -57,7 +85,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 2. Release v20260905 - 24x7 Autonomous Daily Agentic Pipeline for Docker
+## 4. Release v20260905 - 24x7 Autonomous Daily Agentic Pipeline for Docker
 
 ### ⏰ Autonomous 24x7 In-Process Background Scheduler (`backend/agents/`)
 - **Continuous Clock Monitoring Engine** ([backend/agents/pipeline.py](../backend/agents/pipeline.py)):
@@ -84,7 +112,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 3. Release v20260904 - Call Option Stats Multi-Period Linear Fit & Trend Metrics
+## 5. Release v20260904 - Call Option Stats Multi-Period Linear Fit & Trend Metrics
 
 ### 📊 Call Option Stats Matrix Multi-Period Linear Fit (`frontend/src/components/CallOptionStatsModal.tsx`)
 - **Multi-Horizon Timeframe Selector**:
@@ -105,7 +133,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 4. Release v20260829 / v20260830 - Unified Branch Merge & Agentic MCP Pipeline
+## 6. Release v20260829 / v20260830 - Unified Branch Merge & Agentic MCP Pipeline
 
 ### 🔄 Branch Integration & Merge (`origin/main` into `Krishna-ST`)
 - **Unified Master Codebase**: Merged `origin/main` into `Krishna-ST` ([commit f8ba48b]), combining the AI Agentic Trading Sandbox, Robinhood Model Context Protocol (MCP) Server, Call Option Stats 14-Indicator Matrix, and Option Greeks calculation engine.
@@ -146,7 +174,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 5. Release v20260828 - Call Option Analytics & Compare Matrix Enhancements
+## 7. Release v20260828 - Call Option Analytics & Compare Matrix Enhancements
 
 ### 📈 Compare Charts Matrix Expansion
 - **Ordinary Least Squares (OLS) Linear Fit Slope ($m$)**: Quantifies directional momentum and rate of price change over selected lookback intervals.
@@ -163,7 +191,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 6. Release v20260820 - Call Option Stats Matrix Modal & UI Ergonomics
+## 8. Release v20260820 - Call Option Stats Matrix Modal & UI Ergonomics
 
 ### 📋 Call Option Stats Modal (14 Indicators)
 - **Comprehensive Deep-Dive View** ([CallOptionStatsModal.tsx](../frontend/src/components/CallOptionStatsModal.tsx)):
@@ -176,7 +204,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 7. Release v20260807 - Benchmark Comparison & Timeframe Selectors
+## 9. Release v20260807 - Benchmark Comparison & Timeframe Selectors
 
 - **Multi-Timeframe Backtesting**: Configurable backtest windows (1Wk, 1M, 3M, 6M, 1Y) on the Top Tickers page.
 - **Benchmark Alpha Overlay**: Integrated baseline comparison curves for S&P 500 and NASDAQ.
@@ -184,7 +212,7 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 8. Release v20260703 - Compare Matrix Ergonomics & Strategy 3 Integration
+## 10. Release v20260703 - Compare Matrix Ergonomics & Strategy 3 Integration
 
 - **Compare Charts Multi-Select**: Added "Select All" and "Deselect All" action buttons for bulk ticker comparison.
 - **Strategy 3 Backtester**: Added 30-Day rolling backtest evaluation for Strategy 3 and corresponding glossary reference cards.

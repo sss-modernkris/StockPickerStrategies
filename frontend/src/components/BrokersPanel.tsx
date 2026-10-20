@@ -7,7 +7,7 @@ import {
   Lock, RefreshCcw, Unlock, Database, DollarSign, Briefcase, 
   TrendingUp, Cpu, Sliders, Play, Pause, PlayCircle, Shield, 
   ArrowUpRight, Landmark, Badge, CheckCircle2, AlertTriangle, ToggleLeft,
-  Bot, Sparkles, Clock, ArrowRight, FileSpreadsheet, Layers, Activity, Check, Loader2, Zap
+  Bot, Sparkles, Clock, ArrowRight, FileSpreadsheet, Layers, Activity, Check, Loader2, Zap, RotateCcw
 } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { logger } from '@/lib/logger';
@@ -17,9 +17,25 @@ import { IBOrder, IBData } from '@/lib/types';
 interface RHConfig {
   is_connected: boolean;
   mcp_url: string;
+  environment: 'SANDBOX' | 'LIVE';
   is_simulated: boolean;
+  daily_spend_limit: number;
+  today_spend_total: number;
+  remaining_daily_budget: number;
+  position_cap_pct: number;
+  emergency_kill_switch: boolean;
+  require_hitl: boolean;
   paused: boolean;
   budget_limit: number;
+  account_id: string;
+  api_key_configured: boolean;
+  api_key_status?: {
+    valid: boolean;
+    mode: string;
+    message: string;
+    account: string;
+    api_key_masked?: string;
+  };
 }
 
 interface RHData {
@@ -140,13 +156,21 @@ export function BrokersPanel() {
   const [rhSimulate, setRhSimulate] = useState(true);
   const [rhLoading, setRhLoading] = useState(false);
   
+  // Guardrail Controls State
+  const [rhEnvironment, setRhEnvironment] = useState<'SANDBOX' | 'LIVE'>('SANDBOX');
+  const [rhDailyLimitInput, setRhDailyLimitInput] = useState('5000');
+  const [rhPositionCapInput, setRhPositionCapInput] = useState('15');
+  const [rhKillSwitch, setRhKillSwitch] = useState(false);
+  const [rhRequireHitl, setRhRequireHitl] = useState(true);
+  const [guardrailsSaving, setGuardrailsSaving] = useState(false);
+
   // --- Automated AI Pipeline State ---
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState<boolean>(false);
   const [pipelineReport, setPipelineReport] = useState<PipelineReport | null>(null);
 
   // Controls & Manual Orders State
-  const [rhBudgetInput, setRhBudgetInput] = useState('50000');
+  const [rhBudgetInput, setRhBudgetInput] = useState('5000');
   const [tradeTicker, setTradeTicker] = useState('NVDA');
   const [tradeAction, setTradeAction] = useState<'BUY' | 'SELL'>('BUY');
   const [tradeQty, setTradeQty] = useState('10');
@@ -228,10 +252,14 @@ export function BrokersPanel() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/rh/config`);
       if (res.ok) {
-        const data = await res.json();
+        const data: RHConfig = await res.json();
         setRhConfig(data);
         setRhMcpUrl(data.mcp_url);
-        setRhBudgetInput(data.budget_limit.toString());
+        setRhEnvironment(data.environment || 'SANDBOX');
+        setRhDailyLimitInput((data.daily_spend_limit || 5000).toString());
+        setRhPositionCapInput((data.position_cap_pct || 15).toString());
+        setRhKillSwitch(Boolean(data.emergency_kill_switch || data.paused));
+        setRhRequireHitl(Boolean(data.require_hitl));
         if (data.is_connected) {
           fetchRhData();
         }
@@ -239,6 +267,58 @@ export function BrokersPanel() {
     } catch (err) {
       logger.error("Failed to check Robinhood config", err);
     }
+  };
+
+  const handleSaveGuardrails = async (overrides?: { environment?: 'SANDBOX' | 'LIVE'; emergency_kill_switch?: boolean }) => {
+    try {
+      setGuardrailsSaving(true);
+      setError(null);
+      setSuccessMsg(null);
+
+      const targetEnv = overrides?.environment ?? rhEnvironment;
+      const targetKill = overrides?.emergency_kill_switch ?? rhKillSwitch;
+      const dailyLim = parseFloat(rhDailyLimitInput) || 5000;
+      const posCap = parseFloat(rhPositionCapInput) || 15;
+
+      const payload = {
+        environment: targetEnv,
+        daily_spend_limit: dailyLim,
+        position_cap_pct: posCap,
+        emergency_kill_switch: targetKill,
+        require_hitl: rhRequireHitl,
+        paused: targetKill
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/rh/controls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSuccessMsg(
+          targetKill 
+            ? "EMERGENCY KILL SWITCH ACTIVATED: Trading execution is halted!" 
+            : `Guardrails updated: Environment=${targetEnv}, Daily Limit=$${dailyLim.toLocaleString()}, Position Cap=${posCap}%`
+        );
+        checkRhConfig();
+        fetchRhData();
+      } else {
+        const errData = await res.json();
+        setError(errData.detail || "Failed to update guardrails.");
+      }
+    } catch (err) {
+      setError("Error saving guardrail settings.");
+    } finally {
+      setGuardrailsSaving(false);
+    }
+  };
+
+  const handleToggleKillSwitch = () => {
+    const nextState = !rhKillSwitch;
+    setRhKillSwitch(nextState);
+    handleSaveGuardrails({ emergency_kill_switch: nextState });
   };
 
   const handleRhConnect = async () => {
@@ -299,23 +379,27 @@ export function BrokersPanel() {
     }
   };
 
-  const handleRhControlUpdate = async (pausedStatus: boolean | null, budgetVal: number | null) => {
+  const handleRhResetSandbox = async () => {
+    if (!window.confirm("Are you sure you want to reset the Robinhood Sandbox? This will clear all holdings, option contracts, and orders, resetting cash to $25,000.")) {
+      return;
+    }
     try {
-      const payload: { paused?: boolean; budget_limit?: number } = {};
-      if (pausedStatus !== null) payload.paused = pausedStatus;
-      if (budgetVal !== null) payload.budget_limit = budgetVal;
-
-      const res = await fetch(`${API_BASE_URL}/api/rh/controls`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
+      setRhLoading(true);
+      setError(null);
+      setSuccessMsg(null);
+      const res = await fetch(`${API_BASE_URL}/api/rh/reset`, { method: 'POST' });
       if (res.ok) {
-        checkRhConfig();
+        const data = await res.json();
+        setSuccessMsg(data.message || "Robinhood Sandbox reset successfully to $25,000 cash.");
+        setPipelineReport(null);
+        fetchRhData();
+      } else {
+        setError("Failed to reset sandbox.");
       }
     } catch (err) {
-      logger.error("Failed to update Robinhood controls", err);
+      setError("Error resetting sandbox.");
+    } finally {
+      setRhLoading(false);
     }
   };
 
@@ -691,6 +775,161 @@ export function BrokersPanel() {
             </CardContent>
           </Card>
 
+          {/* ========================================================================= */}
+          {/* ROBINHOOD AGENTIC TRADING RISK FIREWALL & GUARDRAILS CONTROL CENTER */}
+          {/* ========================================================================= */}
+          <Card className="bg-gradient-to-br from-black/60 via-card/40 to-black/60 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden">
+            <CardHeader className="pb-3 border-b border-white/5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-white text-base font-bold flex items-center gap-2">
+                      Agentic Risk Firewall &amp; Execution Guardrails
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono border font-semibold ${
+                        rhEnvironment === 'LIVE' 
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      }`}>
+                        {rhEnvironment === 'LIVE' ? '⚡ LIVE TRADING MODE' : '🛡️ SANDBOX SIMULATION (0% RISK)'}
+                      </span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Enforce institutional safety limits, daily spend caps, position allocation ceilings, and emergency controls.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                {/* Emergency Kill Switch Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleToggleKillSwitch()}
+                  disabled={guardrailsSaving}
+                  className={`h-9 font-bold text-xs flex items-center gap-2 transition-all ${
+                    rhKillSwitch
+                      ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-lg shadow-red-600/30 animate-pulse'
+                      : 'bg-red-950/40 hover:bg-red-900/60 text-red-400 border-red-500/30 hover:text-white'
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  {rhKillSwitch ? '🚨 KILL SWITCH ENGAGED (TRADING HALTED)' : 'EMERGENCY KILL SWITCH'}
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4 space-y-4">
+              {/* Guardrail Controls Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Environment Switcher */}
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Operating Environment
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setRhEnvironment('SANDBOX');
+                        handleSaveGuardrails({ environment: 'SANDBOX' });
+                      }}
+                      className={`h-8 text-xs font-semibold ${
+                        rhEnvironment === 'SANDBOX'
+                          ? 'bg-emerald-500 text-black hover:bg-emerald-400 font-bold shadow-md shadow-emerald-500/20'
+                          : 'bg-black/40 text-muted-foreground hover:text-white border border-white/5'
+                      }`}
+                    >
+                      🛡️ Sandbox
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (window.confirm("Switch to LIVE Robinhood Trading? Real order dispatches will route to Robinhood Brokerage API.")) {
+                          setRhEnvironment('LIVE');
+                          handleSaveGuardrails({ environment: 'LIVE' });
+                        }
+                      }}
+                      className={`h-8 text-xs font-semibold ${
+                        rhEnvironment === 'LIVE'
+                          ? 'bg-amber-500 text-black hover:bg-amber-400 font-bold shadow-md shadow-amber-500/20'
+                          : 'bg-black/40 text-muted-foreground hover:text-white border border-white/5'
+                      }`}
+                    >
+                      ⚡ Live API
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 2. Daily Spend Limit */}
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Daily Spend Cap ($)</label>
+                    <span className="text-[10px] font-mono text-emerald-400">
+                      Rem: {formatMoney(rhConfig?.remaining_daily_budget ?? 5000)}
+                    </span>
+                  </div>
+                  <Input
+                    type="number"
+                    step="100"
+                    value={rhDailyLimitInput}
+                    onChange={(e) => setRhDailyLimitInput(e.target.value)}
+                    className="bg-black/60 border-white/10 rounded-md text-white h-8 text-xs font-mono"
+                    placeholder="5000"
+                  />
+                  <div className="w-full bg-white/5 rounded-full h-1.5 mt-1 overflow-hidden">
+                    <div 
+                      className="bg-emerald-500 h-full transition-all" 
+                      style={{ width: `${Math.min(100, ((rhConfig?.today_spend_total || 0) / (parseFloat(rhDailyLimitInput) || 5000)) * 100)}%` }} 
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Position Equity Cap */}
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Max Position Cap (%)</label>
+                    <span className="text-[10px] font-mono text-indigo-400">Max Single Asset</span>
+                  </div>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="100"
+                    value={rhPositionCapInput}
+                    onChange={(e) => setRhPositionCapInput(e.target.value)}
+                    className="bg-black/60 border-white/10 rounded-md text-white h-8 text-xs font-mono"
+                    placeholder="15"
+                  />
+                  <div className="text-[10px] text-muted-foreground">
+                    Max {rhPositionCapInput}% equity per stock/option
+                  </div>
+                </div>
+
+                {/* 4. Actions & Telemetry */}
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground text-[10px] uppercase font-bold">API Status:</span>
+                    <span className="text-emerald-400 font-mono text-[10px] font-semibold truncate max-w-[120px]">
+                      {rhConfig?.api_key_status?.mode || 'Active'}
+                    </span>
+                  </div>
+                  <Button
+                    onClick={() => handleSaveGuardrails()}
+                    disabled={guardrailsSaving}
+                    className="w-full h-8 text-xs font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white mt-2 shadow-md shadow-indigo-600/20"
+                  >
+                    {guardrailsSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Guardrails'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Account PNL Summary Metric Cards */}
           {rhData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-3 duration-300">
@@ -701,7 +940,9 @@ export function BrokersPanel() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-white font-mono">{formatMoney(rhData.cash_available)}</div>
-                  <p className="text-[10px] text-muted-foreground">Sandbox Buying Power (RH-SIM-SANDBOX-001)</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {rhEnvironment === 'LIVE' ? 'Robinhood Live Buying Power' : 'Sandbox Buying Power (RH-SIM-SANDBOX-001)'}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -735,7 +976,7 @@ export function BrokersPanel() {
           ) : (
             <div className="text-center py-12 border rounded-xl bg-card/25 border-dashed border-white/10 text-muted-foreground backdrop-blur-md">
               <Cpu className="w-10 h-10 mx-auto mb-3 text-emerald-400 animate-pulse" />
-              <div className="font-semibold text-sm text-white/90">Robinhood MCP Sandbox Active</div>
+              <div className="font-semibold text-sm text-white/90">Robinhood MCP Active ({rhEnvironment} Mode)</div>
               <p className="text-xs text-muted-foreground/80 mt-1 max-w-sm mx-auto">
                 Ready for autonomous daily execution. Click &quot;Run Daily Pipeline Now&quot; above to rebalance.
               </p>
@@ -751,7 +992,9 @@ export function BrokersPanel() {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-white text-base">Active Sandbox Stock Holdings</CardTitle>
+                      <CardTitle className="text-white text-base">
+                        Active {rhEnvironment === 'LIVE' ? 'Live' : 'Sandbox'} Stock Holdings
+                      </CardTitle>
                       <CardDescription>Equities controlled by the AI Broker Agent rebalancing policy</CardDescription>
                     </div>
                     <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
@@ -842,8 +1085,19 @@ export function BrokersPanel() {
               {/* Manual Execution Playground Tool */}
               <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-2xl">
                 <CardHeader>
-                  <CardTitle className="text-white text-base">Execution Playground</CardTitle>
-                  <CardDescription>Push ad-hoc test orders directly to the Robinhood Sandbox</CardDescription>
+                  <CardTitle className="text-white text-base flex items-center justify-between">
+                    <span>Execution Playground</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      rhEnvironment === 'LIVE' 
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    }`}>
+                      {rhEnvironment}
+                    </span>
+                  </CardTitle>
+                  <CardDescription>
+                    Push ad-hoc test orders directly to the Robinhood {rhEnvironment === 'LIVE' ? 'Live Router' : 'Sandbox'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleRhTradeSubmit} className="space-y-4">
@@ -930,9 +1184,16 @@ export function BrokersPanel() {
 
                     <Button
                       type="submit"
-                      className="w-full bg-emerald-500 text-black hover:bg-emerald-400 rounded-md font-bold text-xs h-9 uppercase tracking-wider shadow-md"
+                      disabled={rhKillSwitch}
+                      className={`w-full rounded-md font-bold text-xs h-9 uppercase tracking-wider shadow-md ${
+                        rhKillSwitch 
+                          ? 'bg-red-800/50 text-red-300 cursor-not-allowed'
+                          : rhEnvironment === 'LIVE'
+                            ? 'bg-amber-500 text-black hover:bg-amber-400'
+                            : 'bg-emerald-500 text-black hover:bg-emerald-400'
+                      }`}
                     >
-                      Execute Sandbox Order
+                      {rhKillSwitch ? 'Blocked by Kill Switch' : `Execute ${rhEnvironment === 'LIVE' ? 'Live' : 'Sandbox'} Order`}
                     </Button>
                   </form>
                 </CardContent>
@@ -954,11 +1215,22 @@ export function BrokersPanel() {
                         {rhData.orders.length} Executed Orders
                       </span>
                     </CardTitle>
-                    <CardDescription>Live audit log of simulated stock and option orders executed via Robinhood MCP</CardDescription>
+                    <CardDescription>Live audit log of stock and option orders executed via Robinhood MCP</CardDescription>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={fetchRhData} className="text-xs text-muted-foreground flex items-center gap-1.5 hover:text-white">
-                    <RefreshCcw className="w-3.5 h-3.5" /> Refresh Ledger
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleRhResetSandbox} 
+                      className="text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-300 flex items-center gap-1.5 h-8"
+                      title="Reset cash to $25,000 and clear all holdings & orders"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset Sandbox
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={fetchRhData} className="text-xs text-muted-foreground flex items-center gap-1.5 hover:text-white h-8">
+                      <RefreshCcw className="w-3.5 h-3.5" /> Refresh
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
@@ -972,6 +1244,7 @@ export function BrokersPanel() {
                       <TableHeader className="bg-black/35">
                         <TableRow className="border-white/5">
                           <TableHead className="text-xs text-white">Date &amp; Time</TableHead>
+                          <TableHead className="text-xs text-white">Mode</TableHead>
                           <TableHead className="text-xs text-white">Symbol / Contract</TableHead>
                           <TableHead className="text-xs text-white">Action</TableHead>
                           <TableHead className="text-xs text-right text-white">Amount (Filled/Total)</TableHead>
@@ -984,6 +1257,15 @@ export function BrokersPanel() {
                         {rhData.orders.map((ord, idx) => (
                           <TableRow key={ord.order_id || idx} className="border-white/5 hover:bg-white/5">
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap font-mono">{ord.last_update || (ord as any).timestamp}</TableCell>
+                            <TableCell>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${
+                                (ord as any).environment === 'LIVE'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              }`}>
+                                {(ord as any).environment || 'SANDBOX'}
+                              </span>
+                            </TableCell>
                             <TableCell className="font-bold text-white">
                               {(ord as any).asset_type === 'option' ? (
                                 <span className="text-indigo-300 font-mono text-xs">
