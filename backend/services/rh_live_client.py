@@ -134,73 +134,13 @@ class RobinhoodLiveClient:
         self, symbol: str, action: str, quantity: float, price: float, order_type: str = "LIMIT"
     ) -> Dict[str, Any]:
         """
-        Dispatches a live stock trade to the Robinhood Trading API with signature authentication.
+        DEPRECATED: Order placement via legacy rh_live_client is disabled.
+        Live trading orders route through the official Robinhood MCP Streamable HTTP gateway in backend/trading/.
         """
-        symbol = symbol.strip().upper()
-        action = action.strip().upper()
-        path = "/api/v1/orders/"
-        body_dict = {
-            "account_number": self.account_number,
-            "symbol": symbol,
-            "side": action.lower(),
-            "quantity": quantity,
-            "type": order_type.lower(),
-            "price": price,
-            "time_in_force": "gtc",
-            "extended_hours": False,
-            "client_order_id": f"RH-LIVE-{int(time.time() * 1000)}"
-        }
-        body_json = json.dumps(body_dict)
-        headers = self._get_auth_headers("POST", path, body_json)
-
-        is_demo = "demo" in self.api_key_id.lower() or "sandbox" in self.api_key_id.lower()
-        if is_demo:
-            # High-fidelity live simulator response
-            order_id = body_dict["client_order_id"]
-            cost = round(quantity * price, 2)
-            return {
-                "success": True,
-                "order_id": order_id,
-                "status": "FILLED",
-                "symbol": symbol,
-                "action": action,
-                "quantity": quantity,
-                "price": price,
-                "total_cost": cost,
-                "execution_venue": "ROBINHOOD_LIVE_ROUTER (Demo Sandbox Key)",
-                "message": f"[LIVE SIMULATOR] {action} order executed for {quantity} shs {symbol} @ ${price:.2f} (Total: ${cost:,.2f})",
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-
-        try:
-            import requests
-            url = f"{self.base_url}{path}"
-            resp = requests.post(url, data=body_json, headers=headers, timeout=8.0)
-            if resp.status_code in [200, 201]:
-                data = resp.json()
-                return {
-                    "success": True,
-                    "order_id": data.get("id") or body_dict["client_order_id"],
-                    "status": data.get("state", "FILLED").upper(),
-                    "symbol": symbol,
-                    "action": action,
-                    "quantity": quantity,
-                    "price": price,
-                    "total_cost": round(quantity * price, 2),
-                    "execution_venue": "ROBINHOOD_LIVE_ROUTER",
-                    "message": f"Live {action} order submitted for {quantity} shs {symbol} @ ${price:.2f}",
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Robinhood Live API Error ({resp.status_code}): {resp.text}"
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to transmit live order to Robinhood: {str(e)}"
-            }
+        raise NotImplementedError(
+            "RobinhoodLiveClient.place_live_stock_order is deprecated. "
+            "Live trading must route through the official Robinhood MCP client in backend.trading."
+        )
 
     def place_live_option_order(
         self,
@@ -213,78 +153,11 @@ class RobinhoodLiveClient:
         premium: float
     ) -> Dict[str, Any]:
         """
-        Dispatches a live option contract order to Robinhood Options API.
+        DEPRECATED: Option order placement via legacy rh_live_client is disabled.
+        Live trading orders route through the official Robinhood MCP Streamable HTTP gateway in backend/trading/.
         """
-        symbol = symbol.strip().upper()
-        option_type = option_type.strip().upper()
-        action = action.strip().upper()
-        path = "/api/v1/options/orders/"
+        raise NotImplementedError(
+            "RobinhoodLiveClient.place_live_option_order is deprecated. "
+            "Live trading must route through the official Robinhood MCP client in backend.trading."
+        )
 
-        body_dict = {
-            "account_number": self.account_number,
-            "chain_symbol": symbol,
-            "strike_price": strike,
-            "expiration_date": expiry_date,
-            "option_type": option_type.lower(),
-            "side": action.lower(),
-            "quantity": contracts,
-            "price": premium,
-            "time_in_force": "gtc",
-            "client_order_id": f"RH-OPT-LIVE-{int(time.time() * 1000)}"
-        }
-        body_json = json.dumps(body_dict)
-        headers = self._get_auth_headers("POST", path, body_json)
-
-        is_demo = "demo" in self.api_key_id.lower() or "sandbox" in self.api_key_id.lower()
-        if is_demo:
-            order_id = body_dict["client_order_id"]
-            cost = round(contracts * premium * 100.0, 2)
-            return {
-                "success": True,
-                "order_id": order_id,
-                "status": "FILLED",
-                "symbol": symbol,
-                "option_type": option_type,
-                "strike": strike,
-                "expiry_date": expiry_date,
-                "action": action,
-                "contracts": contracts,
-                "premium": premium,
-                "total_cost": cost,
-                "execution_venue": "ROBINHOOD_LIVE_OPTIONS_ROUTER (Demo Sandbox Key)",
-                "message": f"[LIVE SIMULATOR] {action} {contracts}x {symbol} ${strike} {option_type} exp {expiry_date} @ ${premium:.2f} (Total: ${cost:,.2f})",
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-
-        try:
-            import requests
-            url = f"{self.base_url}{path}"
-            resp = requests.post(url, data=body_json, headers=headers, timeout=8.0)
-            if resp.status_code in [200, 201]:
-                data = resp.json()
-                return {
-                    "success": True,
-                    "order_id": data.get("id") or body_dict["client_order_id"],
-                    "status": data.get("state", "FILLED").upper(),
-                    "symbol": symbol,
-                    "option_type": option_type,
-                    "strike": strike,
-                    "expiry_date": expiry_date,
-                    "action": action,
-                    "contracts": contracts,
-                    "premium": premium,
-                    "total_cost": round(contracts * premium * 100.0, 2),
-                    "execution_venue": "ROBINHOOD_LIVE_OPTIONS_ROUTER",
-                    "message": f"Live Option Order submitted: {action} {contracts}x {symbol} ${strike} {option_type}",
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Robinhood Live Option API Error ({resp.status_code}): {resp.text}"
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to transmit live option order: {str(e)}"
-            }

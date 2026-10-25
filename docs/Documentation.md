@@ -33,12 +33,16 @@ The application is engineered to meet the following functional and non-functiona
 *   **Simulated Ledger**: Write transaction records (Date, Ticker, Quantity, Price, Total Cost, Running Cash) to persistent workspace CSV files while tracking real-time unrealized P&L.
 
 ### F. Broker Integration & Autonomous Agentic Trading
-*   **Interactive Brokers Gateway**: Connect to local IB Gateway or TWS session via `ib_insync` to monitor live account equity, cash balances, open orders, and active positions.
+*   **Interactive Brokers Gateway**: Deprecated and decoupled in favor of the dedicated Robinhood Agentic Model Context Protocol (MCP) trading architecture.
 *   **Robinhood Agentic Trading Engine & Model Context Protocol (MCP)**:
-    *   **Dual Execution Routing**: Switchable execution targeting a persistent local simulation **Sandbox** or Robinhood's **Live Trading API** using dynamic HMAC-SHA256 request signing (`X-API-KEY`, `X-SIGNATURE`, `X-TIMESTAMP`).
-    *   **Autonomous Multi-Agent Workflow**: Supports the Backtester Agent (analyst running daily 2:00 PM EST screeners) and Broker Agent (executor dispatching stock/options orders via standardized MCP endpoints).
-    *   **Institutional Risk Firewall**: Enforces runtime guardrails including Emergency Kill Switch, Daily Cumulative Spend Limit ($ ceiling with budget meter and midnight UTC rollover), and Maximum Position Sizing Cap (% equity concentration limit).
-    *   **Persistent Sandbox State**: Replaces ephemeral memory models with local JSON file persistence (`rh_sandbox_state.json`), clean startup (zero phantom trades), and one-click full reset.
+    *   **Four Multi-Environment Operating Modes**: Dynamic runtime switching between:
+        1. **`SANDBOX`**: 100% in-process local Python simulation engine (`rh_mcp_server.py`) with $25,000 mock cash, simulated stock and option positions, and zero live financial risk.
+        2. **`LIVE_SHADOW`**: Real account reads (`get_portfolio`, `get_equity_positions`, `get_equity_orders`, `get_equity_quotes`) via Robinhood MCP with simulated shadow order execution logged to `_data/live_trading/ledger.jsonl`.
+        3. **`LIVE_APPROVAL`**: Human-In-The-Loop (HITL) institutional governance. Automated AI rebalancing generates a proposed plan queued in a 15-minute countdown buffer for manual review (`Approve & Execute via Live Gateway` vs. `Reject Plan`).
+        4. **`LIVE_AUTONOMOUS`**: Fully automated, hands-free live execution of pipeline signals directly through the Robinhood Trading MCP server (`place_equity_order`), protected by a safety confirmation passphrase (`I UNDERSTAND THIS TRADES REAL MONEY`).
+    *   **Autonomous Multi-Agent Workflow**: Dual-agent pipeline featuring the **Backtester Agent** (analyst scanning ~170 constituent tickers from Dow 30, Nasdaq 100, and S&P 500 daily at 2:00 PM EST) and **Broker Agent** (portfolio comparator and execution manager).
+    *   **9-Point Institutional Risk Firewall**: Mandatory pre-trade safety checks in `LiveExecutionGateway` (Kill switch, NYSE session status with off-hours queue allowance, equities-only policy, single-position cap, daily spend ceiling, PDT protection, fresh quote spread validation, LIMIT DAY order constraints, and deterministic client order ID idempotency).
+    *   **Live Order & Queued Orders Telemetry**: Real-time tracking of active stock holdings and off-hours queued orders awaiting market open, synced directly with Robinhood MCP.
 
 ### G. Benchmark Index Comparative Analysis (Top Tickers)
 *   **Index Multi-Select Support**: Load and compare constituents of major benchmark indices (`DOW100.csv` / Dow 30, `Nasdaq100.csv` / Nasdaq 100, and `SP100.csv` / S&P 500) using a multi-select toggle layout.
@@ -63,21 +67,31 @@ The design of the application prioritizes visual excellence and ergonomic effici
 
 ```mermaid
 graph TD
-    User([User Browser]) <--> |Next.js 16 / React 19 / Recharts| Frontend[Next.js Dev Server]
-    Frontend <--> |HTTP / JSON| Backend[FastAPI App]
+    User([User Browser]) <--> |Next.js 16 / React 19 / Recharts| Frontend[Next.js App :3000]
+    Frontend <--> |HTTP / JSON REST API| Backend[FastAPI App :8080]
     Backend <--> |yfinance API| Yahoo[Yahoo Finance API]
-    Backend <--> |ib_insync Socket| IBGate[IB Gateway / TWS]
-    Backend <--> |MCP Protocol & Cryptographic Signing| RHEngine[Robinhood Agentic Trading Engine]
-    RHEngine <--> |Local JSON Persistence| RHSandbox[(rh_sandbox_state.json)]
-    RHEngine <--> |Signed REST API| RHLive[Robinhood Live Trading API]
     Backend <--> |Local File I/O| CSV[(Workspace CSVs & JSONs)]
     
     subgraph Strategy & Agent Pipeline
         Backend --> FT[Fundamental & Technical Strategies]
         Backend --> ML[XGBoost ML Classifier]
         Backend --> Willy[Dynamic VWAP Anchor Engine]
-        Backend --> Agents[Backtester & Broker Autonomous Agents]
+        Backend --> BTAgent["Backtester Agent<br/>(Stage 1 Screener)"]
+        BTAgent -->|Ranked Signals Payload| BRAgent["Broker Agent<br/>(Stage 2 Portfolio Rebalancer)"]
     end
+
+    BRAgent --> Factory{TradingFactory}
+
+    subgraph Operating Modes & Routing
+        Factory -->|SANDBOX| Sandbox["Local Sandbox Engine (rh_mcp_server.py)<br/>• $25,000 In-Memory Cash<br/>• Local State (rh_sandbox_state.json)"]
+        Factory -->|LIVE_SHADOW| Shadow["ShadowClient<br/>• Real MCP Reads<br/>• Intercepted Shadow Fills in ledger.jsonl"]
+        Factory -->|LIVE_APPROVAL| HITL["HITL Approval Queue (15-min TTL)<br/>Awaiting User One-Click Confirmation"]
+        HITL -->|Operator Approved| Firewall
+        Factory -->|LIVE_AUTONOMOUS| Firewall["LiveExecutionGateway<br/>9-Point Institutional Risk Firewall"]
+    end
+
+    Firewall -->|JSON-RPC Tools| RHMCP["Robinhood Remote MCP Server<br/>(https://agent.robinhood.com/mcp/trading)"]
+    Shadow -->|Reads Only| RHMCP
 ```
 
 ### A. Dynamic Self-Anchoring VWAP (WillyAlgo)
@@ -211,56 +225,126 @@ Open [http://localhost:3000](http://localhost:3000) in your web browser.
     *   **S&P 500 Benchmark**: Quantifies excess leveraged alpha over the broad market.
     *   **Options Trade Ledger**: Inspect per-contract strikes, entry/exit premiums, leverage multiples, and export full logs to `Backtest_Ledger_Options.csv`.
 
-#### 12. Specialized AI Agents & Robinhood MCP Sandbox Pipeline
+#### 12. Specialized AI Agents, Operating Modes & Robinhood MCP Pipeline
 *   **Action**: Select the *Brokers* tab and choose **Robinhood Agentic AI**.
-*   **Dual Agent Architecture**:
-    *   **1. Backtester Agent**:
-        *   **Automated 24x7 In-Process Schedule**: Daemon background scheduler thread monitoring `America/New_York` market time continuously in Docker, automatically triggering every trading day at **2:00 PM Market Time (EST/EDT)**.
-        *   **Universe Scan**: Scans all ~170 constituent tickers from the **Dow 30**, **Nasdaq 100**, and **S&P 500**.
-        *   **Quantitative Screener**: Runs Strategy 1 (1-Week lookback) with 5 strict filters (Willy Bull state, 1-Wk Strategy Value > $10k, MACD Hist $\in (-0.5, 0.5)$, MACD Slope $> 0$, RSI $14 \in (30, 70)$).
-        *   **Signals Generated**: Produces target stock share allocations and ATM Call options parameters (strike, weekly expiration, synthetic Black-Scholes premium).
-    *   **2. Broker Agent**:
-        *   **Portfolio Comparative Analysis**: Queries the active Robinhood Sandbox account (`RH-SIM-SANDBOX-001`) and compares current holdings against incoming recommendations.
-        *   **Dynamic Liquidation & Buying Power**: Automatically generates SELL orders for non-strategy positions to free up cash. Computes effective buying power as:
-            $$\text{Effective Buying Power} = \text{Available Cash} + \sum \text{Sell Liquidation Proceeds}$$
-        *   **Order Execution**: Sizes and dispatches simulated BUY limit orders for top stocks and ATM Call option contracts directly via the Robinhood Model Context Protocol (MCP) toolset.
-*   **Guardrails**: All operations are restricted to the sandbox simulation environment, ensuring 0% live-capital risk.
-*   **Interactive Controls**: Click **Run Daily Pipeline Now** to trigger on-demand linear analysis, view real-time stage execution breakdowns, and inspect the Robinhood MCP sandbox order ledger.
+
+##### A. Dual Agent Architecture
+The agentic trading system decouples **market analysis** from **capital execution** into two specialized agents:
+1.  **Backtester Agent (Stage 1 Screener & Quant Analyst)**:
+    *   **24x7 Daemon Scheduler**: Background thread monitoring `America/New_York` market time, automatically triggering every trading day at **2:00 PM EST/EDT**.
+    *   **Universe Scan**: Evaluates all ~170 constituent tickers across the **Dow 30**, **Nasdaq 100**, and **S&P 500**.
+    *   **5-Layer Strategy 1 Screen**:
+        1.  *Willy Bull Market State*: Price strictly above the self-anchored dynamic VWAP.
+        2.  *1-Week Strategy Value*: Backtest strategy value exceeds $10,000 threshold.
+        3.  *MACD Histogram Stability*: Histogram bounded within $[-0.5, 0.5]$.
+        4.  *MACD Slope Health*: Positive slope ($\Delta \text{MACD} > 0$).
+        5.  *RSI Momentum Envelope*: 14-period RSI bounded within $(30, 70)$.
+    *   **Signals Generated**: Selects top 5 ranked assets and outputs target share quantities, limit prices, and ATM Call option parameters.
+2.  **Broker Agent (Stage 2 Portfolio Rebalancer & Execution Manager)**:
+    *   **Portfolio Analysis**: Compares current account holdings against incoming Stage 1 recommendations.
+    *   **Dynamic Liquidation & Sizing**: Automatically liquidates displaced/non-strategy holdings to free up cash. Computes effective buying power as:
+        $$\text{Effective Buying Power} = \text{Available Cash} + \sum \text{Sell Liquidation Proceeds}$$
+    *   **Execution Routing**: Delegates execution to the appropriate client implementation resolved by `TradingFactory` based on the active **Operating Mode**.
+
+---
+
+##### B. The Four Operating Modes Explained
+
+The platform provides 4 runtime operating modes, allowing operators to seamlessly transition from zero-risk offline simulation to fully autonomous live execution:
+
+| Operating Mode | Environment Used | Connects to Robinhood MCP? | Real Money at Risk? | Order Execution Behavior |
+| :--- | :--- | :--- | :--- | :--- |
+| **🛡️ SANDBOX** | **Local Sandbox Simulator** | ❌ **NO** (100% Offline / Local) | **$0.00** (0% Risk) | Executes against internal in-memory Python engine (`rh_mcp_server.py`) with **$25,000 simulated cash**. Supports simulated stocks and options. |
+| **👁️ LIVE_SHADOW** | **Hybrid** (Real Reads, Mock Writes) | ✅ **YES (Reads Only)** | **$0.00** (0% Risk) | Reads your real Robinhood balance, positions, and live quotes via MCP. Order placements are intercepted and recorded to `ledger.jsonl` without sending real orders. |
+| **⏳ LIVE_APPROVAL** | **Robinhood Live MCP + HITL** | ✅ **YES (Reads & Approved Orders)** | ⚠️ **REAL MONEY** (Operator Gated) | Automated AI rebalance plans are queued in a **Pending Approval** card (15-min TTL). Orders are sent to Robinhood only when you click **Approve** (or execute from Playground). |
+| **⚡ LIVE_AUTONOMOUS** | **Robinhood Live MCP Autonomous** | ✅ **YES (Full Live Execution)** | 🚨 **REAL MONEY** (Hands-Free) | Pipeline dispatches real stock orders directly to Robinhood MCP without waiting for manual clicks, guarded by the 9 safety firewall checks. |
+
+*   **Mode Switching**: Switch modes anytime via the UI Operating Mode buttons or `POST /api/trading/mode`.
+*   **Autonomous Safeguard**: Engaging `LIVE_AUTONOMOUS` mode requires entering the mandatory confirmation phrase: `"I UNDERSTAND THIS TRADES REAL MONEY"`.
+*   **Sandbox Isolation**: The local Sandbox simulator is completely isolated from live brokerage requests. It maintains independent state in `rh_sandbox_state.json` with a dedicated **Reset Sandbox** button to restore initial $25,000 cash.
+
+---
+
+##### C. 9-Point Institutional Risk Firewall (`LiveExecutionGateway`)
+
+In all live modes (`LIVE_APPROVAL`, `LIVE_AUTONOMOUS`, `LIVE_SHADOW`), orders must pass through the institutional firewall implemented in [`backend/trading/live_gateway.py`](file:///d:/AI/StockPickerStrategies/backend/trading/live_gateway.py):
+
+1.  **Check 1: Emergency Kill Switch & Circuit Breaker**: Trading halts instantly if the kill switch is engaged or if 3 consecutive API execution failures trip the circuit breaker.
+2.  **Check 2: Market Session & Broker Rest Window**: Validates regular NYSE trading hours (9:30 AM - 4:00 PM ET) and enforces a broker rest blackout (11:30 AM - 1:55 PM ET). Orders placed outside regular hours are safely transmitted to Robinhood and queued for market open.
+3.  **Check 3: Equities-Only Live Policy**: Live execution is restricted to equities; synthetic options and crypto are safely skipped.
+4.  **Check 4: Single-Position Cap & Duplicate Guard**: Enforces the maximum portfolio concentration limit (default: 15% equity cap) while permitting single-share odd-lot testing.
+5.  **Check 5: Buying Power & Daily Spend Cap**: Verifies that order costs do not exceed available cash, the remaining daily budget (default: $5,000/day), or the maximum daily drawdown limit (< 2%).
+6.  **Check 6: Held Quantity & Pattern Day Trader (PDT) Guard**: Validates that sell orders do not exceed sellable shares and prevents day-trading buys executed on the same calendar day.
+7.  **Check 7: Fresh Quote Validation**: Verifies that live bid-ask spreads do not exceed 0.50% and price deviations from the signal price remain within $\pm 1.0\%$.
+8.  **Check 8: Order Constraints**: Enforces `LIMIT`, `DAY`, and regular-session order types with dynamic price rounding buffers.
+9.  **Check 9: Deterministic Idempotency & Audit Trail**: Generates unique client order IDs (`UUIDv4`) to eliminate duplicate order execution and appends full telemetry to `_data/live_trading/ledger.jsonl`.
+
+---
+
+##### D. End-to-End Execution Flow
 
 ```mermaid
 flowchart TD
-    subgraph Trigger ["1. Trigger & Ingestion Layer"]
-        T1["24x7 Autonomous Daemon Scheduler<br/>2:00 PM EST/EDT Trading Days (Mon-Fri)"] --> PIPE["Trading Pipeline Orchestrator<br/>(pipeline.py)"]
-        T2["On-Demand UI Click<br/>(Run Daily Pipeline Now)"] --> PIPE
-        CSV["Universe Constituent Feeds<br/>(DOW100.csv, Nasdaq100.csv, SP100.csv)"] -->|~170 Tickers| BT["Backtester Agent<br/>(backtester_agent.py)"]
+    subgraph Trigger ["1. Pipeline Ingestion & Trigger"]
+        T1["24x7 Daemon Scheduler<br/>(2:00 PM EST Trading Days)"] --> Orchestrator["Pipeline Orchestrator<br/>(pipeline.py)"]
+        T2["Manual UI Trigger<br/>('Run Daily Pipeline Now')"] --> Orchestrator
+        Constituents["Index Feeds (~170 Tickers)<br/>(DOW100, Nasdaq100, SP100)"] --> Stage1["Backtester Agent<br/>(backtester_agent.py)"]
     end
 
-    subgraph Stage1 ["2. Backtester Agent Screening & Pricing"]
-        PIPE -->|1. Start Analysis| BT
-        BT --> S1["5-Layer Strategy 1 Screen<br/>• Bull Willy VWAP (Close > VWAP)<br/>• 1-Wk Strategy Value > $10,000<br/>• MACD Hist in [-0.5, 0.5]<br/>• MACD Slope > 0<br/>• RSI 14 in [30, 70]"]
-        S1 --> S2["Rank Candidates by 1-Wk Momentum<br/>(Select Top 5 Candidates)"]
-        S2 --> S3["Generate Execution Signals<br/>• Stock: Target Price & Shares Allocation<br/>• Options: ATM Strike, Expiry Date,<br/>  Black-Scholes Synthetic Premium & Contracts"]
+    subgraph Stage1Analysis ["2. Stage 1: Backtester Agent Screening"]
+        Orchestrator --> Stage1
+        Stage1 --> Screen["5-Layer Quant Screener<br/>• Bull Willy VWAP<br/>• 1-Wk Strategy Value > $10k<br/>• MACD Hist & Slope > 0<br/>• RSI 14 in [30, 70]"]
+        Screen --> Rank["Rank Top 5 Momentum Candidates<br/>Calculate Sizing & Target Limits"]
+        Rank --> Handoff["Structured Signal Handoff (JSON)"]
     end
 
-    subgraph Payload ["3. Structured Signal Hand-Off"]
-        S3 -->|JSON Recommendations Payload| BR["Broker Agent<br/>(broker_agent.py)"]
+    subgraph Stage2Execution ["3. Stage 2: Broker Agent Rebalancing"]
+        Handoff --> Stage2["Broker Agent<br/>(broker_agent.py)"]
+        Stage2 --> Factory{"TradingFactory<br/>(factory.py)"}
     end
 
-    subgraph Stage2 ["4. Broker Agent Comparative Analysis & Rebalancing"]
-        BR --> Q1["Call MCP: robinhood_get_portfolio<br/>Account: RH-SIM-SANDBOX-001"]
-        Q1 --> Q2["Portfolio Comparative Analysis<br/>• Match current holdings against Top 5<br/>• Identify displaced non-strategy holdings"]
-        Q2 --> Q3["Compute Dynamic Buying Power<br/>Buying Power = Cash Available + ∑(Sell Proceeds)"]
-        Q3 --> P1["Phase 1: Liquidations<br/>Dispatch SELL Orders to MCP<br/>(Free up cash capital)"]
-        P1 --> P2["Phase 2: Allocations<br/>Dispatch Stock BUY Orders &<br/>ATM Call Option BUY Orders to MCP"]
+    subgraph Routing ["4. Operating Mode Client Routing"]
+        Factory -->|SANDBOX| SandboxClient["SandboxClient<br/>(Local Simulation)"]
+        Factory -->|LIVE_SHADOW| ShadowClient["ShadowClient<br/>(Real Reads + Shadow Writes)"]
+        Factory -->|LIVE_APPROVAL| HITLQueue["Pending Approval Queue<br/>(15-Minute Countdown TTL)"]
+        Factory -->|LIVE_AUTONOMOUS| LiveGateway["LiveExecutionGateway<br/>(Real Live Execution)"]
+        
+        HITLQueue -->|User Clicks Approve| LiveGateway
+        HITLQueue -->|User Clicks Reject| Cancelled["Plan Cancelled"]
     end
 
-    subgraph MCP ["5. Robinhood MCP Sandbox Toolset"]
-        P1 -->|MCP Tool: robinhood_place_stock_order| RH_SRV["Robinhood MCP Server<br/>(rh_mcp_server.py)"]
-        P2 -->|MCP Tools: stock & option order| RH_SRV
-        RH_SRV --> LEDGER[("Simulated Sandbox Ledger<br/>• Stock Fills & Option Positions<br/>• 0% Live-Capital Risk Guardrail")]
-        LEDGER -->|Post-Execution Snapshot| RPT["Execution Audit Report &<br/>UI Dashboard Update"]
+    subgraph ExecutionDestinations ["5. Execution Handlers & Telemetry"]
+        SandboxClient --> LocalSim["rh_mcp_server.py<br/>• $25,000 Mock Cash<br/>• rh_sandbox_state.json"]
+        ShadowClient -->|Read Only| RHMCP["Robinhood Remote MCP<br/>(agent.robinhood.com)"]
+        ShadowClient -->|Log Write| AuditLedger["ledger.jsonl (SHADOW_INTENT)"]
+        LiveGateway --> Firewall["9-Point Risk Firewall Checks"]
+        Firewall -->|Passed| RHMCP
+        Firewall -->|Audit Event| AuditLedger
+        RHMCP --> Brokerage["Robinhood Brokerage Account<br/>• Real Equity Orders<br/>• Off-Hours Queueing"]
+    end
+
+    subgraph UI ["6. Live UI & Operator Dashboard"]
+        LocalSim --> UIHoldings["Active Stock Holdings<br/>• Held Positions Table<br/>• Queued Orders Sub-Table<br/>• Activity & Audit Trail"]
+        Brokerage --> UIHoldings
+        AuditLedger --> UILedger["Robinhood Live Gateway Audit Ledger"]
     end
 ```
+
+---
+
+##### E. Operator UI & Telemetry Components
+
+1.  **Active Stock Holdings Card**:
+    *   **Dynamic Data Switching**: Automatically displays simulated positions in `SANDBOX` mode, or live equity holdings fetched from Robinhood MCP in `LIVE` modes.
+    *   **Orders Queued for Market Open**: Detects and displays orders placed during weekends or after-hours (`VZ`, `NVDA`, `F`), showing ticker, quantity, limit price, execution status (`QUEUED`), timestamp, and Robinhood Order IDs.
+    *   **Header Badges**: Highlights active position counts (e.g., `0 Held · 3 Queued`) with status indicators.
+2.  **Execution Playground**:
+    *   **Ad-Hoc Order Execution**: Push manual BUY/SELL orders directly to the local Sandbox simulator or to your Robinhood MCP trading account.
+    *   **Mode-Independent Button**: Unified **`EXECUTE ORDER`** action button with instant visual feedback and kill-switch locks.
+    *   **Pre-Check / Dry Run**: Pre-trade order verification tool calling Robinhood's `review_equity_order` to inspect real bid/ask quotes and market disclosures before submitting real orders.
+3.  **Robinhood Live Gateway Audit Ledger**:
+    *   Displays real-time append-only records from `_data/live_trading/ledger.jsonl`.
+    *   Logs every pre-flight firewall decision, execution fill, reject reason, shadow intent, and human approval event.
 
 #### 13. Call Option Stats Matrix & Trend Metrics
 *   **Action**: Click the **Call Option Stats Matrix** button on the Top Tickers view or open the modal.

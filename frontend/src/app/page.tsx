@@ -151,7 +151,7 @@ export default function Dashboard() {
 
         {!selectedTicker ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20260926</span></h2>
+            <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome to Strategic Alpha <span className="text-sm font-mono text-muted-foreground ml-2">v20261026</span></h2>
             <p>Add and select a ticker from the sidebar to view quant analysis.</p>
           </div>
         ) : loading ? (
@@ -189,7 +189,7 @@ export default function Dashboard() {
                   {viewMode === 'raw-data' && 'Unfiltered metrics and detailed company statistics'}
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                   {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
-                  {viewMode === 'brokers' && 'Manage Interactive Brokers connection and view real-time portfolio data'}
+                  {viewMode === 'brokers' && 'Manage Robinhood Agentic AI live execution and portfolio rebalancing'}
                   {viewMode === 'analysis' && 'Willy VWAP dynamics, 2.0 ATR volatility boundaries, and high-precision visual summaries.'}
                   {viewMode === 'bx' && 'Dual-momentum oscillator calculations, short-term spreads, long-term background histograms, and automated crossover logs.'}
                   {viewMode === 'volatility' && 'Invert Black-Scholes backward from Call option premium to extract Implied Volatility, compute 20d Historical Volatility, and Option Greeks.'}

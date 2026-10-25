@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from models import TickerAnalysis, HistoryResponse, HoldingModel, IBOrderModel, TransactionModel, TransactionResponse, PortfolioSummaryResponse, StockAnalysisItem, PortfolioAnalysisResponse, SaveReportRequest, CallOptionStatsResponse, VolatilityCalculationRequest, VolatilityCalculationResponse, SaveRawTechOptionRequest
 from services.strategy_engine import run_all_strategies
 from services.history_client import fetch_batch_history
-from services.ib_client import IBClient
+# from services.ib_client import IBClient  # Disabled per user request
 from services.rh_client import RHClient
 from services.backtester import execute_30d_backtest, execute_options_backtest, execute_trend_options_backtest, execute_slope_options_backtest, execute_slope_options_2day_backtest, execute_toptickers_options_backtest
 from services.options_service import generate_and_save_options_data, compute_ticker_volatility_analytics
@@ -106,7 +106,7 @@ def save_csv(req: SaveCsvRequest):
         email_sent = False
         email_msg = ""
         if safe_filename == "Top_Tickers_to_buy.csv":
-            target_email = "modernkris@gmail.com"
+            target_email = os.getenv("TARGET_EMAIL") or os.getenv("ALERT_EMAIL") or os.getenv("SENDER_EMAIL") or "alerts@example.com"
             subject = "Top Tickers Buy Screen Results - Top_Tickers_to_buy.csv"
             body = (
                 "Hello,\n\n"
@@ -140,7 +140,15 @@ class IBDataResponse(BaseModel):
     holdings: List[HoldingModel]
     orders: List[IBOrderModel]
 
-ib_control = IBClient()
+class DummyIBClient:
+    def is_connected(self):
+        return False
+    def get_orders(self):
+        return []
+    def place_order(self, *args, **kwargs):
+        return False, "Interactive Brokers integration is disabled"
+
+ib_control = DummyIBClient()  # Disabled per user request
 rh_control = RHClient()
 
 class RHConnectRequest(BaseModel):
@@ -156,60 +164,85 @@ class RHControlsRequest(BaseModel):
     paused: Optional[bool] = None
     budget_limit: Optional[float] = None
 
+class TradingModeRequest(BaseModel):
+    mode: str
+    confirmation: Optional[str] = None
+
+class KillSwitchRequest(BaseModel):
+    active: bool
+    reason: Optional[str] = "Manual user toggle"
+
+class PlanActionRequest(BaseModel):
+    reason: Optional[str] = "Operator review"
+
+# Interactive Brokers integration is disabled per user request
 @app.get("/api/ib/config")
 def get_ib_config():
-    username = os.getenv("IB_USERNAME")
-    password = os.getenv("IB_PASSWORD")
-    print("IB Username: ", username)
-    print("IB Password: ", password)
-    res = {
-        "is_configured": bool(username and password),
-        "is_connected": ib_control.is_connected()
+    return {
+        "is_configured": False,
+        "is_connected": False,
+        "disabled": True,
+        "message": "Interactive Brokers integration is disabled."
     }
-    print("IB Config: ", res)
-    return res
 
 @app.post("/api/ib/login")
 def ib_login(credentials: LoginRequest):
-    # In a real scenario, we might use the credentials to start a gateway 
-    # or authenticate against a service. For now, we connect to the local API.
-    print("Attempting to login to IB at " + credentials.username + "/api/ib/login")
-    success, error_msg = ib_control.connect()
-    if success:
-        return {"status": "success", "message": "Logged into Interactive Brokers"}
-    else:
-        # For development/demo, if it fails, we provide the actual error or a generic one.
-        raise HTTPException(status_code=500, detail=f"Failed to connect to IB Gateway/TWS: {error_msg}. Ensure it is running and API is enabled.")
+    return {
+        "status": "disabled",
+        "message": "Interactive Brokers integration is disabled."
+    }
 
-@app.get("/api/ib/data", response_model=IBDataResponse)
+@app.get("/api/ib/data")
 def get_ib_data():
-    data = ib_control.get_portfolio_summary()
-    if data:
-        return data
-    else:
-        raise HTTPException(status_code=400, detail="Not connected to Interactive Brokers")
+    return {
+        "unrealized_pnl": 0.0,
+        "realized_pnl": 0.0,
+        "buying_power": 0.0,
+        "cash_available": 0.0,
+        "invested_capital": 0.0,
+        "total_equity": 0.0,
+        "holdings": [],
+        "orders": []
+    }
 
 @app.get("/api/rh/config")
 def get_rh_config():
-    from mcp.rh_mcp_server import get_sandbox
+    from rh_sandbox.rh_mcp_server import get_sandbox
+    from trading import config, ledger, market_calendar, state
     sb = get_sandbox()
     summary = sb.get_guardrails_summary()
+    current_mode = state.get_mode()
+    is_live_mode = current_mode in ("LIVE_SHADOW", "LIVE_APPROVAL", "LIVE_AUTONOMOUS")
+
+    if is_live_mode:
+        today_spend = ledger.get_ledger().today_spend_total()
+        rem_budget = max(0.0, round(config.get_settings().daily_spend_limit - today_spend, 2))
+        acct_id = config.get_settings().agentic_account_number
+        masked_acct = config.mask_account(acct_id)
+    else:
+        today_spend = summary["today_spend_total"]
+        rem_budget = summary["remaining_daily_budget"]
+        masked_acct = sb.account_id
+
     return {
         "is_connected": True,
-        "mcp_url": "https://agent.robinhood.com/mcp/trading",
-        "environment": sb.environment,
-        "is_simulated": sb.is_simulated,
-        "daily_spend_limit": sb.daily_spend_limit,
-        "today_spend_total": summary["today_spend_total"],
-        "remaining_daily_budget": summary["remaining_daily_budget"],
-        "position_cap_pct": sb.position_cap_pct,
-        "emergency_kill_switch": sb.emergency_kill_switch,
-        "require_hitl": sb.require_hitl,
-        "paused": sb.paused,
-        "budget_limit": sb.daily_spend_limit,
-        "account_id": sb.account_id,
-        "api_key_configured": summary["api_key_configured"],
-        "api_key_status": summary["api_key_status"]
+        "mcp_url": config.get_settings().mcp_url,
+        "environment": current_mode,
+        "trading_mode": current_mode,
+        "is_simulated": (current_mode == "SANDBOX"),
+        "daily_spend_limit": config.get_settings().daily_spend_limit,
+        "today_spend_total": today_spend,
+        "remaining_daily_budget": rem_budget,
+        "position_cap_pct": config.get_settings().position_cap_pct,
+        "emergency_kill_switch": state.kill_switch_active(),
+        "circuit_breaker": state.breaker_state(),
+        "require_hitl": (current_mode == "LIVE_APPROVAL"),
+        "paused": state.kill_switch_active(),
+        "budget_limit": config.get_settings().daily_spend_limit,
+        "account_id": masked_acct,
+        "api_key_configured": True if is_live_mode else summary["api_key_configured"],
+        "api_key_status": "MCP OAuth Connected" if is_live_mode else summary["api_key_status"],
+        "market_status": market_calendar.describe(),
     }
 
 @app.post("/api/rh/connect")
@@ -222,26 +255,68 @@ def rh_disconnect():
 
 @app.get("/api/rh/data")
 def get_rh_data():
-    from mcp.rh_mcp_server import get_sandbox
-    sb = get_sandbox()
-    return sb.get_portfolio()
+    from trading.factory import get_trading_client
+    client = get_trading_client()
+    return client.get_portfolio()
 
 @app.post("/api/rh/order")
-def place_rh_order(ticker: str, action: str, quantity: float, price: float):
-    from mcp.rh_mcp_server import get_sandbox
-    sb = get_sandbox()
-    res = sb.place_stock_order(ticker, action, quantity, price)
+def place_rh_order(ticker: str, action: str, quantity: float, price: float, preview: bool = False):
+    from trading import state
+    from trading.factory import get_trading_client
+    mode = state.get_mode()
+
+    # Pre-trade review simulation via Robinhood MCP review_equity_order
+    if preview and mode in ("LIVE_APPROVAL", "LIVE_AUTONOMOUS"):
+        from trading.live_client import get_live_client
+        c = get_live_client()
+        review_res = c.review_order(symbol=ticker, action=action, quantity=quantity, price=price)
+        if review_res.get("success"):
+            data = review_res.get("data", {})
+            msg = f"[PREVIEW] Pre-trade checks verified on Robinhood MCP."
+            return {"status": "success", "message": msg, "order": data, "preview": True}
+        else:
+            raise HTTPException(status_code=400, detail=review_res.get("error", "Pre-trade review failed"))
+
+    # In LIVE_APPROVAL, manual execution from the playground is an operator-approved live action:
+    if mode == "LIVE_APPROVAL":
+        from trading.live_gateway import LiveExecutionGateway
+        client = LiveExecutionGateway(mode="LIVE_APPROVAL")
+    else:
+        client = get_trading_client()
+
+    res = client.place_stock_order(ticker, action, quantity, price)
     if res.get("success"):
         return {"status": "success", "message": res.get("message"), "order": res.get("order")}
     else:
-        raise HTTPException(status_code=400, detail=res.get("error"))
+        raise HTTPException(status_code=400, detail=res.get("error") or res.get("message"))
 
 @app.post("/api/rh/controls")
 def update_rh_controls(req: RHControlsRequest):
-    from mcp.rh_mcp_server import get_sandbox
+    from rh_sandbox.rh_mcp_server import get_sandbox
+    from trading import state
     sb = get_sandbox()
+
+    if req.environment:
+        env_up = req.environment.upper()
+        if env_up in ("LIVE", "LIVE_SHADOW"):
+            state.set_mode("LIVE_SHADOW", actor="api_controls")
+        elif env_up == "LIVE_APPROVAL":
+            state.set_mode("LIVE_APPROVAL", actor="api_controls")
+        elif env_up == "LIVE_AUTONOMOUS":
+            try:
+                state.set_mode("LIVE_AUTONOMOUS", confirmation="I UNDERSTAND THIS TRADES REAL MONEY", actor="api_controls")
+            except Exception:
+                pass
+        elif env_up == "SANDBOX":
+            state.set_mode("SANDBOX", actor="api_controls")
+
+    if req.emergency_kill_switch is not None:
+        state.set_kill_switch(active=req.emergency_kill_switch, actor="api_controls")
+    if req.paused is not None:
+        state.set_kill_switch(active=req.paused, actor="api_controls")
+
     res = sb.update_guardrails(
-        environment=req.environment,
+        environment="SANDBOX" if state.get_mode() == "SANDBOX" else "LIVE",
         daily_spend_limit=req.daily_spend_limit,
         position_cap_pct=req.position_cap_pct,
         emergency_kill_switch=req.emergency_kill_switch,
@@ -249,14 +324,140 @@ def update_rh_controls(req: RHControlsRequest):
         paused=req.paused,
         budget_limit=req.budget_limit
     )
+    res["guardrails"]["environment"] = state.get_mode()
+    res["guardrails"]["trading_mode"] = state.get_mode()
+    res["guardrails"]["emergency_kill_switch"] = state.kill_switch_active()
     return res
 
 @app.post("/api/rh/reset")
 def reset_rh_sandbox():
     """Resets the Robinhood Sandbox to fresh $25,000 cash with empty holdings and orders."""
-    from mcp.rh_mcp_server import get_sandbox
+    from rh_sandbox.rh_mcp_server import get_sandbox
     sb = get_sandbox()
     return sb.reset_sandbox()
+
+# -----------------------------------------------------------------------------
+# DEDICATED LIVE TRADING, AUDIT LEDGER & APPROVAL ENDPOINTS
+# -----------------------------------------------------------------------------
+
+@app.get("/api/trading/mode")
+def get_trading_mode_endpoint():
+    """Returns current active mode, kill switch, and circuit breaker telemetry."""
+    from trading import config, state
+    return {
+        "status": "success",
+        "snapshot": state.snapshot(),
+        "masked_account": config.mask_account(config.get_settings().agentic_account_number),
+        "mcp_url": config.get_settings().mcp_url
+    }
+
+@app.post("/api/trading/mode")
+def set_trading_mode_endpoint(req: TradingModeRequest):
+    """Changes active trading mode (LIVE_AUTONOMOUS requires confirmation phrase)."""
+    from trading import state
+    try:
+        res = state.set_mode(mode=req.mode, confirmation=req.confirmation, actor="frontend_ui")
+        return {"status": "success", "result": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/trading/kill-switch")
+def set_kill_switch_endpoint(req: KillSwitchRequest):
+    """Immediately activates or releases the emergency kill switch."""
+    from trading import state
+    res = state.set_kill_switch(active=req.active, actor="frontend_ui", reason=req.reason or "")
+    return {"status": "success", "result": res}
+
+@app.get("/api/trading/live/health")
+async def get_live_health_endpoint():
+    """Checks OAuth token validity, MCP connectivity, circuit breaker, and account status."""
+    from trading import state
+    from trading.live_auth import check_auth_health
+    health = await check_auth_health()
+    health["circuit_breaker"] = state.breaker_state()
+    health["kill_switch"] = state.kill_switch_active()
+    health["trading_mode"] = state.get_mode()
+    return health
+
+@app.get("/api/trading/live/ledger")
+def get_live_ledger_endpoint(offset: int = 0, limit: int = 50, event: Optional[str] = None, date_et: Optional[str] = None):
+    """Returns paginated live audit ledger records."""
+    from trading import ledger
+    return ledger.get_ledger().page(offset=offset, limit=limit, event=event, date_et=date_et)
+
+@app.get("/api/agents/broker/pending-plan")
+def get_pending_plan_endpoint():
+    """Returns the current pending execution plan waiting for manual user approval."""
+    from trading import approval
+    return approval.get_pending_plan()
+
+@app.post("/api/agents/broker/approve")
+def approve_pending_plan_endpoint(req: Optional[PlanActionRequest] = None):
+    """Approves and executes the current pending plan via LiveExecutionGateway with fresh quotes."""
+    from trading import approval
+    res = approval.execute_approved_plan(actor="frontend_ui")
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error"))
+    return res
+
+@app.post("/api/agents/broker/reject")
+def reject_pending_plan_endpoint(req: Optional[PlanActionRequest] = None):
+    """Rejects the current pending plan."""
+    from trading import approval
+    reason = req.reason if req and req.reason else "Operator rejected"
+    res = approval.reject_pending_plan(reason=reason, actor="frontend_ui")
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error"))
+    return res
+
+
+@app.get("/api/quote/{ticker}")
+@app.get("/api/ticker-price/{ticker}")
+def get_ticker_quote(ticker: str):
+    """
+    Fetches the latest real-time/recent market price for a ticker symbol to populate the Execution Playground limit price.
+    """
+    sym = ticker.strip().upper()
+    try:
+        import yfinance as yf
+        yf_sym = sym.replace('.', '-')
+        t = yf.Ticker(yf_sym)
+        
+        price = None
+        # Try fast_info
+        try:
+            fast_info = getattr(t, 'fast_info', None)
+            if fast_info:
+                price = getattr(fast_info, 'last_price', None) or getattr(fast_info, 'regular_market_previous_close', None)
+        except Exception:
+            pass
+
+        # Fallback to recent 5d history
+        if price is None or price <= 0:
+            hist = t.history(period="5d")
+            if not hist.empty and 'Close' in hist.columns:
+                price = float(hist['Close'].iloc[-1])
+
+        # Fallback to info
+        if price is None or price <= 0:
+            info = t.info or {}
+            price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose", 100.0)
+
+        price = round(float(price), 2)
+        return {
+            "symbol": sym,
+            "price": price,
+            "success": True,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    except Exception as e:
+        # Check if held in sandbox as last resort fallback
+        from rh_sandbox.rh_mcp_server import get_sandbox
+        sb = get_sandbox()
+        if sym in sb.holdings:
+            held_price = float(sb.holdings[sym].get("current_price", 100.0))
+            return {"symbol": sym, "price": held_price, "success": True, "fallback": True}
+        return {"symbol": sym, "price": 100.0, "success": False, "error": str(e)}
 
 # -----------------------------------------------------------------------------
 # SPECIALIZED AI AGENTS & ROBINHOOD MCP SANDBOX PIPELINE

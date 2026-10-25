@@ -144,8 +144,8 @@ class BacktesterAgent:
                 "stock_signal": {
                     "action": "BUY",
                     "target_price": round(close, 2),
-                    "suggested_budget": 2000.0,
-                    "suggested_shares": int(2000.0 / close) if close > 0 else 0
+                    "suggested_budget": round((max(1, int(2000.0 / close)) if close > 0 else 0) * close, 2),
+                    "suggested_shares": max(1, int(2000.0 / close)) if close > 0 else 0
                 },
                 "option_signal": {
                     "action": "BUY",

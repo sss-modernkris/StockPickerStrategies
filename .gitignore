@@ -8,10 +8,16 @@ dist/
 __pycache__/
 *.py[cod]
 *$py.class
-venv/
+# Environment & Secrets
 .env
-.venv
-env/
+.env.*
+!.env.example
+*.env
+.strategicalpha/
+.mcp-auth/
+*robinhood_oauth*.json
+*tokens*.json
+*client_info*.json
 *.sqlite3
 
 # OS generated files

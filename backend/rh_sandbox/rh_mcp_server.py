@@ -37,9 +37,9 @@ class RobinhoodAgenticTradingEngine:
 
     def __init__(self):
         load_env_variables()
-        self.account_id = os.getenv("ROBINHOOD_ACCOUNT_NUMBER", SANDBOX_ACCOUNT_ID)
-        self.environment = os.getenv("ROBINHOOD_ENVIRONMENT", "SANDBOX").upper()  # 'SANDBOX' or 'LIVE'
-        self.is_simulated = (self.environment == "SANDBOX")
+        self.account_id = SANDBOX_ACCOUNT_ID
+        self.environment = "SANDBOX"
+        self.is_simulated = True
         
         # Risk Firewall Guardrail Defaults (configurable via UI and .env)
         self.daily_spend_limit = float(os.getenv("ROBINHOOD_DAILY_SPEND_LIMIT", "5000.0"))
@@ -110,10 +110,9 @@ class RobinhoodAgenticTradingEngine:
                 self.option_positions = state.get("option_positions", {})
                 self.orders = state.get("orders", [])
                 
-                # Load guardrails (respecting user saves while supporting env fallbacks)
-                if "environment" in state:
-                    self.environment = state["environment"]
-                    self.is_simulated = (self.environment == "SANDBOX")
+                # Sandbox engine is strictly dedicated to local simulation
+                self.environment = "SANDBOX"
+                self.is_simulated = True
                 if "daily_spend_limit" in state:
                     self.daily_spend_limit = float(state["daily_spend_limit"])
                 if "position_cap_pct" in state:
@@ -160,9 +159,9 @@ class RobinhoodAgenticTradingEngine:
         budget_limit: Optional[float] = None
     ) -> Dict[str, Any]:
         """Updates trading guardrails and environment dynamically from UI."""
-        if environment is not None:
-            self.environment = environment.upper()
-            self.is_simulated = (self.environment == "SANDBOX")
+        # Note: Sandbox engine is strictly local simulation; live orders route through LiveExecutionGateway
+        self.environment = "SANDBOX"
+        self.is_simulated = True
         if daily_spend_limit is not None:
             self.daily_spend_limit = float(daily_spend_limit)
             self.budget_limit = self.daily_spend_limit
@@ -329,6 +328,7 @@ class RobinhoodAgenticTradingEngine:
             "unrealized_pnl": round(total_unrealized_pnl, 2),
             "realized_pnl": 0.0,
             "holdings": holdings_list,
+            "queued_orders": [o for o in self.orders if (o.get("status") or "").upper() in ("QUEUED", "PENDING", "SUBMITTED")],
             "option_positions": options_list,
             "orders": self.orders[:50],
             "guardrails": self.get_guardrails_summary(),
@@ -358,35 +358,12 @@ class RobinhoodAgenticTradingEngine:
             logger.warning(f"Order rejected by Guardrail: {error_msg}")
             return {"success": False, "error": error_msg}
 
-        # 2. Handle Live Trading Dispatch
+        # 2. Hard-disable LIVE execution in Sandbox engine
         if self.environment == "LIVE":
-            live_res = self.live_client.place_live_stock_order(
-                symbol=symbol, action=action, quantity=quantity, price=price, order_type=order_type
-            )
-            if not live_res.get("success"):
-                return live_res
-
-            # Track spend on successful live BUY
-            if action == "BUY":
-                self.today_spend_total = round(self.today_spend_total + cost, 2)
-
-            order_record = {
-                "order_id": live_res.get("order_id", f"RH-LIVE-{len(self.orders)+1}"),
-                "account": self.account_id,
-                "environment": "LIVE",
-                "symbol": symbol,
-                "asset_type": "stock",
-                "action": action,
-                "quantity": quantity,
-                "filled_quantity": quantity,
-                "price": price,
-                "avg_fill_price": price,
-                "status": live_res.get("status", "FILLED"),
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return {
+                "success": False,
+                "error": "The Sandbox MCP Server only supports SANDBOX simulation. For live trading, use the backend.trading gateway."
             }
-            self.orders.insert(0, order_record)
-            self.save_state()
-            return live_res
 
         # 3. Handle Sandbox Execution
         if action == "BUY":
@@ -483,43 +460,12 @@ class RobinhoodAgenticTradingEngine:
             logger.warning(f"Option order rejected by Guardrail: {error_msg}")
             return {"success": False, "error": error_msg}
 
-        # 2. Handle Live Trading Dispatch
+        # 2. Hard-disable LIVE execution in Sandbox engine
         if self.environment == "LIVE":
-            live_res = self.live_client.place_live_option_order(
-                symbol=symbol,
-                option_type=option_type,
-                strike=strike,
-                expiry_date=expiry_date,
-                action=action,
-                contracts=contracts,
-                premium=premium
-            )
-            if not live_res.get("success"):
-                return live_res
-
-            if action == "BUY":
-                self.today_spend_total = round(self.today_spend_total + cost_of_position, 2)
-
-            order_record = {
-                "order_id": live_res.get("order_id", f"RH-OPT-LIVE-{len(self.orders)+1}"),
-                "account": self.account_id,
-                "environment": "LIVE",
-                "symbol": symbol,
-                "asset_type": "option",
-                "option_type": option_type,
-                "strike": strike,
-                "expiry_date": expiry_date,
-                "action": action,
-                "quantity": contracts,
-                "filled_quantity": contracts,
-                "price": premium,
-                "avg_fill_price": premium,
-                "status": live_res.get("status", "FILLED"),
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return {
+                "success": False,
+                "error": "The Sandbox MCP Server only supports SANDBOX simulation. For live trading, use the backend.trading gateway."
             }
-            self.orders.insert(0, order_record)
-            self.save_state()
-            return live_res
 
         # 3. Handle Sandbox Execution
         if action == "BUY":

@@ -7,23 +7,30 @@ import {
   Lock, RefreshCcw, Unlock, Database, DollarSign, Briefcase, 
   TrendingUp, Cpu, Sliders, Play, Pause, PlayCircle, Shield, 
   ArrowUpRight, Landmark, Badge, CheckCircle2, AlertTriangle, ToggleLeft,
-  Bot, Sparkles, Clock, ArrowRight, FileSpreadsheet, Layers, Activity, Check, Loader2, Zap, RotateCcw
+  Bot, Sparkles, Clock, ArrowRight, FileSpreadsheet, Layers, Activity, Check, Loader2, Zap, RotateCcw,
+  Eye, AlertCircle, XCircle, X
 } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { logger } from '@/lib/logger';
-import { IBOrder, IBData } from '@/lib/types';
+import { IBOrder } from '@/lib/types';
 
 // Custom Robinhood interfaces
 interface RHConfig {
   is_connected: boolean;
   mcp_url: string;
-  environment: 'SANDBOX' | 'LIVE';
+  environment: string;
+  trading_mode?: string;
   is_simulated: boolean;
   daily_spend_limit: number;
   today_spend_total: number;
   remaining_daily_budget: number;
   position_cap_pct: number;
   emergency_kill_switch: boolean;
+  circuit_breaker?: {
+    open: boolean;
+    consecutive_failures: number;
+    reason?: string | null;
+  };
   require_hitl: boolean;
   paused: boolean;
   budget_limit: number;
@@ -35,6 +42,15 @@ interface RHConfig {
     message: string;
     account: string;
     api_key_masked?: string;
+  };
+  market_status?: {
+    now_et: string;
+    is_trading_day: boolean;
+    session_open: string | null;
+    session_close: string | null;
+    market_open: boolean;
+    broker_rest_window: boolean;
+    calendar_source: string;
   };
 }
 
@@ -67,7 +83,20 @@ interface RHData {
     unrealized_pnl: number;
     unrealized_pnl_pct: number;
   }>;
-  orders: IBOrder[];
+  queued_orders?: Array<{
+    order_id: string;
+    symbol: string;
+    ticker?: string;
+    action: string;
+    side?: string;
+    quantity: number;
+    total_quantity?: number;
+    price: number;
+    status: string;
+    timestamp: string;
+    created_at?: string;
+  }>;
+  orders?: any[];
 }
 
 export interface PipelineStatus {
@@ -124,8 +153,32 @@ export interface PipelineReport {
     execution_summary: string;
     actions: {
       sells: Array<{ symbol: string; action: string; quantity: number; price: number; proceeds: number; status: string; mcp_response: string }>;
-      buys_stock: Array<{ symbol: string; action: string; quantity: number; price: number; total_cost: number; rank: number; status: string; mcp_response: string }>;
-      buys_options: Array<{ symbol: string; option_type: string; strike: number; expiry_date: string; contracts: number; premium: number; total_cost: number; rank: number; status: string; mcp_response: string }>;
+      buys_stock: Array<{
+        symbol: string;
+        action: string;
+        quantity: number;
+        target_quantity?: number;
+        price: number;
+        total_cost: number;
+        rank: number;
+        status: string;
+        partial_fill?: boolean;
+        mcp_response: string;
+      }>;
+      buys_options: Array<{
+        symbol: string;
+        option_type: string;
+        strike: number;
+        expiry_date: string;
+        contracts: number;
+        target_contracts?: number;
+        premium: number;
+        total_cost: number;
+        rank: number;
+        status: string;
+        partial_fill?: boolean;
+        mcp_response: string;
+      }>;
     };
   };
 }
@@ -138,16 +191,7 @@ const formatMoney = (val: number | null | undefined) => {
 };
 
 export function BrokersPanel() {
-  const [activeTab, setActiveTab] = useState<'rh' | 'ib'>('rh'); // Default to Robinhood to show new setup
-
-  // --- Interactive Brokers State ---
-  const [ibConfig, setIbConfig] = useState<{ is_configured: boolean; is_connected: boolean } | null>(null);
-  const [ibData, setIbData] = useState<IBData | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [ibUsername, setIbUsername] = useState('');
-  const [ibPassword, setIbPassword] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [activeTab] = useState<'rh'>('rh'); // Robinhood Agentic AI active (IB disabled per user request)
 
   // --- Robinhood Agentic AI State ---
   const [rhConfig, setRhConfig] = useState<RHConfig | null>(null);
@@ -157,12 +201,23 @@ export function BrokersPanel() {
   const [rhLoading, setRhLoading] = useState(false);
   
   // Guardrail Controls State
-  const [rhEnvironment, setRhEnvironment] = useState<'SANDBOX' | 'LIVE'>('SANDBOX');
+  const [rhEnvironment, setRhEnvironment] = useState<string>('SANDBOX');
   const [rhDailyLimitInput, setRhDailyLimitInput] = useState('5000');
   const [rhPositionCapInput, setRhPositionCapInput] = useState('15');
   const [rhKillSwitch, setRhKillSwitch] = useState(false);
   const [rhRequireHitl, setRhRequireHitl] = useState(true);
   const [guardrailsSaving, setGuardrailsSaving] = useState(false);
+  const isLive = rhEnvironment !== 'SANDBOX';
+
+  // Live Trading, Approval & Ledger State
+  const [pendingPlan, setPendingPlan] = useState<any>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planActionMsg, setPlanActionMsg] = useState<string | null>(null);
+  const [planActionError, setPlanActionError] = useState<string | null>(null);
+  const [liveLedgerRecords, setLiveLedgerRecords] = useState<any[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [autonomousConfirmOpen, setAutonomousConfirmOpen] = useState(false);
+  const [autonomousInput, setAutonomousInput] = useState('');
 
   // --- Automated AI Pipeline State ---
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
@@ -175,77 +230,17 @@ export function BrokersPanel() {
   const [tradeAction, setTradeAction] = useState<'BUY' | 'SELL'>('BUY');
   const [tradeQty, setTradeQty] = useState('10');
   const [tradePrice, setTradePrice] = useState('125.00');
+  const [priceLoading, setPriceLoading] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [tradeSuccess, setTradeSuccess] = useState<string | null>(null);
+  const [tradePreviewing, setTradePreviewing] = useState<boolean>(false);
+  const [tradePreviewData, setTradePreviewData] = useState<any>(null);
 
   // Global messages
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // --- Fetching & Configuration logic ---
-
-  // IB Config Checks
-  const checkIbConfig = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/ib/config`);
-      if (res.ok) {
-        const data = await res.json();
-        setIbConfig(data);
-        if (data.is_connected) {
-          fetchIbData();
-        } else if (data.is_configured) {
-          handleIbLogin("", "");
-        }
-      }
-    } catch (err) {
-      logger.error("Failed to check IB config", err);
-    }
-  };
-
-  const handleIbLogin = async (username?: string, password?: string) => {
-    try {
-      setLoginLoading(true);
-      setModalError(null);
-      setError(null);
-      const res = await fetch(`${API_BASE_URL}/api/ib/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username || "", password: password || "" })
-      });
-
-      if (res.ok) {
-        setIbConfig((prev) =>
-          prev ? { ...prev, is_connected: true } : { is_configured: true, is_connected: true }
-        );
-        setShowLoginModal(false);
-        fetchIbData();
-        setSuccessMsg("Successfully connected to Interactive Brokers!");
-      } else {
-        const errData = await res.json();
-        const msg = errData.detail || "Failed to login to Interactive Brokers.";
-        setModalError(msg);
-        setError(msg);
-      }
-    } catch (err) {
-      const msg = "An error occurred during IB login.";
-      setModalError(msg);
-      setError(msg);
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const fetchIbData = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/ib/data`);
-      if (res.ok) {
-        const data = await res.json();
-        setIbData(data);
-      }
-    } catch (err) {
-      logger.error("Failed to fetch IB data", err);
-    }
-  };
 
   // Robinhood Config & Data Checks
   const checkRhConfig = async () => {
@@ -315,10 +310,123 @@ export function BrokersPanel() {
     }
   };
 
-  const handleToggleKillSwitch = () => {
+  const fetchPendingPlan = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/agents/broker/pending-plan`);
+      if (res.ok) {
+        const data = await res.json();
+        setPendingPlan(data.has_plan ? data : null);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleApprovePlan = async () => {
+    try {
+      setPlanLoading(true);
+      setError(null);
+      setPlanActionError(null);
+      setPlanActionMsg(null);
+      const res = await fetch(`${API_BASE_URL}/api/agents/broker/approve`, { method: 'POST' });
+      if (res.ok) {
+        setPlanActionMsg("Plan approved! Live orders submitted through LiveExecutionGateway.");
+        fetchPendingPlan();
+        fetchRhData();
+        fetchLiveLedger();
+      } else {
+        const err = await res.json();
+        setPlanActionError(err.detail || "Failed to approve plan.");
+      }
+    } catch (e) {
+      setPlanActionError("Network error approving plan.");
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  const handleRejectPlan = async () => {
+    try {
+      setPlanLoading(true);
+      setError(null);
+      setPlanActionError(null);
+      setPlanActionMsg(null);
+      const res = await fetch(`${API_BASE_URL}/api/agents/broker/reject`, { method: 'POST' });
+      if (res.ok) {
+        setPlanActionMsg("Plan rejected.");
+        fetchPendingPlan();
+        fetchLiveLedger();
+      } else {
+        const err = await res.json();
+        setPlanActionError(err.detail || "Failed to reject plan.");
+      }
+    } catch (e) {
+      setPlanActionError("Network error rejecting plan.");
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  const fetchLiveLedger = async () => {
+    try {
+      setLedgerLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/trading/live/ledger?limit=30`);
+      if (res.ok) {
+        const data = await res.json();
+        setLiveLedgerRecords(data.records || []);
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
+  const handleSwitchMode = async (mode: string, confirmation?: string) => {
+    try {
+      setGuardrailsSaving(true);
+      setError(null);
+      const res = await fetch(`${API_BASE_URL}/api/trading/mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, confirmation })
+      });
+      if (res.ok) {
+        setRhEnvironment(mode);
+        setSuccessMsg(`Operating mode switched to ${mode}.`);
+        setAutonomousConfirmOpen(false);
+        setAutonomousInput('');
+        checkRhConfig();
+        fetchRhData();
+        fetchLiveLedger();
+        fetchPendingPlan();
+      } else {
+        const err = await res.json();
+        setError(err.detail || "Failed to change mode.");
+      }
+    } catch (e) {
+      setError("Error changing trading mode.");
+    } finally {
+      setGuardrailsSaving(false);
+    }
+  };
+
+  const handleToggleKillSwitch = async () => {
     const nextState = !rhKillSwitch;
     setRhKillSwitch(nextState);
-    handleSaveGuardrails({ emergency_kill_switch: nextState });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/trading/kill-switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: nextState, reason: "Manual UI toggle" })
+      });
+      if (res.ok) {
+        setSuccessMsg(nextState ? "EMERGENCY KILL SWITCH ENGAGED! All trading halted." : "Kill switch released.");
+        checkRhConfig();
+      }
+    } catch (e) {
+      handleSaveGuardrails({ emergency_kill_switch: nextState });
+    }
   };
 
   const handleRhConnect = async () => {
@@ -428,14 +536,82 @@ export function BrokersPanel() {
       if (res.ok) {
         const result = await res.json();
         setTradeSuccess(result.message);
+        setTradePreviewData(null);
         fetchRhData();
+        fetchLiveLedger();
       } else {
         const errData = await res.json();
         setTradeError(errData.detail || "Trade failed.");
+        fetchLiveLedger();
       }
     } catch (err) {
       setTradeError("An error occurred executing the trade.");
+      fetchLiveLedger();
     }
+  };
+
+  const handleRhTradePreview = async () => {
+    setTradeError(null);
+    setTradeSuccess(null);
+    setTradePreviewData(null);
+
+    const qty = parseFloat(tradeQty);
+    const price = parseFloat(tradePrice);
+    if (isNaN(qty) || qty <= 0) {
+      setTradeError("Please enter a valid positive quantity.");
+      return;
+    }
+    if (isNaN(price) || price <= 0) {
+      setTradeError("Please enter a valid positive price.");
+      return;
+    }
+
+    try {
+      setTradePreviewing(true);
+      const res = await fetch(
+        `${API_BASE_URL}/api/rh/order?ticker=${tradeTicker}&action=${tradeAction}&quantity=${qty}&price=${price}&preview=true`,
+        { method: 'POST' }
+      );
+
+      if (res.ok) {
+        const result = await res.json();
+        setTradeSuccess(result.message);
+        setTradePreviewData(result.order);
+        fetchLiveLedger();
+      } else {
+        const errData = await res.json();
+        setTradeError(errData.detail || "Preview checks failed.");
+        fetchLiveLedger();
+      }
+    } catch (err) {
+      setTradeError("An error occurred running the pre-trade review.");
+      fetchLiveLedger();
+    } finally {
+      setTradePreviewing(false);
+    }
+  };
+
+  const fetchTickerPrice = async (symbol: string) => {
+    if (!symbol) return;
+    try {
+      setPriceLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/quote/${encodeURIComponent(symbol.trim().toUpperCase())}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.price != null && !isNaN(Number(data.price))) {
+          setTradePrice(Number(data.price).toFixed(2));
+        }
+      }
+    } catch (err) {
+      logger.error("Failed to fetch quote for " + symbol, err);
+    } finally {
+      setPriceLoading(false);
+    }
+  };
+
+  const handleTickerChange = (newTicker: string) => {
+    setTradeTicker(newTicker);
+    fetchTickerPrice(newTicker);
   };
 
   const fetchPipelineStatus = async () => {
@@ -455,13 +631,30 @@ export function BrokersPanel() {
       setPipelineLoading(true);
       setError(null);
       setSuccessMsg(null);
+      setPlanActionError(null);
+      setPlanActionMsg(null);
       const res = await fetch(`${API_BASE_URL}/api/agents/pipeline/run`, { method: 'POST' });
       if (res.ok) {
         const report: PipelineReport = await res.json();
         setPipelineReport(report);
-        setSuccessMsg("Automated Daily Pipeline executed successfully in Robinhood MCP Sandbox!");
+
+        // Dynamic success message according to the active operating mode
+        const mode = report.trading_mode || rhEnvironment;
+        let modeMsg = "Automated Daily Pipeline executed successfully in Robinhood MCP Sandbox!";
+        if (mode === 'LIVE_APPROVAL') {
+          modeMsg = "Automated Daily Pipeline executed! Proposed rebalance plan is queued below for your review & approval.";
+          setPlanActionMsg("New rebalance plan generated by daily pipeline. Review proposed trades and approve or reject below.");
+        } else if (mode === 'LIVE_AUTONOMOUS') {
+          modeMsg = "Automated Daily Pipeline executed successfully in Live Autonomous mode via Robinhood MCP!";
+        } else if (mode === 'LIVE_SHADOW') {
+          modeMsg = "Automated Daily Pipeline executed in Live Shadow mode! Shadow orders recorded to live ledger.";
+        }
+        setSuccessMsg(modeMsg);
+
         fetchRhData();
         fetchPipelineStatus();
+        fetchPendingPlan();
+        fetchLiveLedger();
       } else {
         const errData = await res.json();
         setError(errData.detail || "Pipeline execution failed.");
@@ -474,9 +667,17 @@ export function BrokersPanel() {
   };
 
   useEffect(() => {
-    checkIbConfig();
     checkRhConfig();
     fetchPipelineStatus();
+    fetchTickerPrice(tradeTicker);
+    fetchPendingPlan();
+    fetchLiveLedger();
+
+    const interval = setInterval(() => {
+      fetchPendingPlan();
+      fetchLiveLedger();
+    }, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -487,33 +688,10 @@ export function BrokersPanel() {
           <h2 className="text-xl font-bold tracking-tight text-white">Broker Connections</h2>
           <p className="text-xs text-muted-foreground">Link and manage your brokerage platforms & AI trading agents</p>
         </div>
-        <div className="flex items-center gap-2 bg-black/45 p-1 rounded-lg border border-white/5">
-          <Button
-            variant={activeTab === 'rh' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('rh')}
-            className={`flex items-center gap-2 rounded-md font-semibold text-xs transition-all ${
-              activeTab === 'rh' 
-                ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shadow-md hover:bg-emerald-500/20' 
-                : 'text-muted-foreground hover:text-white'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            Robinhood Agentic AI
-          </Button>
-          <Button
-            variant={activeTab === 'ib' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('ib')}
-            className={`flex items-center gap-2 rounded-md font-semibold text-xs transition-all ${
-              activeTab === 'ib' 
-                ? 'bg-blue-500/15 text-blue-500 border border-blue-500/30 shadow-md hover:bg-blue-500/20' 
-                : 'text-muted-foreground hover:text-white'
-            }`}
-          >
-            <Landmark className="w-3.5 h-3.5" />
-            Interactive Brokers
-          </Button>
+        <div className="flex items-center gap-2 bg-black/45 px-3 py-1.5 rounded-lg border border-emerald-500/30">
+          <Cpu className="w-4 h-4 text-emerald-400" />
+          <span className="font-semibold text-xs text-white">Robinhood Agentic AI</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 font-bold">Active</span>
         </div>
       </div>
 
@@ -546,9 +724,9 @@ export function BrokersPanel() {
                     </div>
                     <div>
                       <CardTitle className="text-white text-lg font-bold flex items-center gap-2">
-                        Specialized AI Agents & Robinhood MCP Sandbox Pipeline
+                        Specialized AI Agents &amp; Robinhood MCP Pipeline
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          v2.0 Sandbox
+                          {rhEnvironment}
                         </span>
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground">
@@ -750,22 +928,62 @@ export function BrokersPanel() {
 
                       {/* Buys (Stocks & Options) */}
                       <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-2">
-                        <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                        <div className="font-bold text-emerald-400 flex items-center justify-between">
                           <span>Purchased Stocks &amp; Options ({pipelineReport.stage_2_broker.actions.buys_stock.length + pipelineReport.stage_2_broker.actions.buys_options.length})</span>
+                          <span className="text-[10px] text-muted-foreground font-normal">Stage 1 Sizing &amp; Fills</span>
                         </div>
-                        <div className="space-y-1 font-mono text-[11px]">
-                          {pipelineReport.stage_2_broker.actions.buys_stock.map((b, i) => (
-                            <div key={`stk-${i}`} className="flex justify-between items-center text-muted-foreground">
-                              <span>BUY {b.quantity} shs {b.symbol}</span>
-                              <span className="text-white">{formatMoney(b.total_cost)} ({b.status})</span>
-                            </div>
-                          ))}
-                          {pipelineReport.stage_2_broker.actions.buys_options.map((o, i) => (
-                            <div key={`opt-${i}`} className="flex justify-between items-center text-indigo-300">
-                              <span>BUY {o.contracts}x {o.symbol} ${o.strike} CALL</span>
-                              <span className="text-white">{formatMoney(o.total_cost)} ({o.status})</span>
-                            </div>
-                          ))}
+                        <div className="space-y-1.5 font-mono text-[11px]">
+                          {pipelineReport.stage_2_broker.actions.buys_stock.map((b, i) => {
+                            const isPartial = b.status === 'PARTIAL' || (b.target_quantity != null && b.quantity < b.target_quantity && b.quantity > 0);
+                            const isSkipped = b.status === 'SKIPPED' || b.quantity === 0;
+                            return (
+                              <div key={`stk-${i}`} className="flex justify-between items-center text-muted-foreground bg-black/25 px-2 py-1.5 rounded border border-white/5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    isSkipped 
+                                      ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' 
+                                      : isPartial 
+                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  }`}>
+                                    {b.status}
+                                  </span>
+                                  <span className="text-white font-semibold">
+                                    BUY {b.quantity}{b.target_quantity && b.target_quantity !== b.quantity ? `/${b.target_quantity}` : ''} shs {b.symbol}
+                                  </span>
+                                  <span className="text-zinc-400 text-[10px]">@{formatMoney(b.price)}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-white font-semibold">{formatMoney(b.total_cost)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {pipelineReport.stage_2_broker.actions.buys_options.map((o, i) => {
+                            const isPartial = o.status === 'PARTIAL' || (o.target_contracts != null && o.contracts < o.target_contracts && o.contracts > 0);
+                            const isSkipped = o.status === 'SKIPPED' || o.contracts === 0;
+                            return (
+                              <div key={`opt-${i}`} className="flex justify-between items-center text-indigo-300 bg-black/25 px-2 py-1.5 rounded border border-white/5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    isSkipped 
+                                      ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' 
+                                      : isPartial 
+                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                                        : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                                  }`}>
+                                    {o.status}
+                                  </span>
+                                  <span className="text-indigo-200 font-semibold">
+                                    BUY {o.contracts}{o.target_contracts && o.target_contracts !== o.contracts ? `/${o.target_contracts}` : ''}x {o.symbol} ${o.strike} CALL
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-white font-semibold">{formatMoney(o.total_cost)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -789,11 +1007,21 @@ export function BrokersPanel() {
                     <CardTitle className="text-white text-base font-bold flex items-center gap-2">
                       Agentic Risk Firewall &amp; Execution Guardrails
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono border font-semibold ${
-                        rhEnvironment === 'LIVE' 
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        rhEnvironment === 'LIVE_AUTONOMOUS' 
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                          : rhEnvironment === 'LIVE_APPROVAL'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            : rhEnvironment === 'LIVE_SHADOW'
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                       }`}>
-                        {rhEnvironment === 'LIVE' ? '⚡ LIVE TRADING MODE' : '🛡️ SANDBOX SIMULATION (0% RISK)'}
+                        {rhEnvironment === 'LIVE_AUTONOMOUS' 
+                          ? '⚡ LIVE AUTONOMOUS (REAL MONEY)' 
+                          : rhEnvironment === 'LIVE_APPROVAL'
+                            ? '⏳ LIVE APPROVAL (HITL GATEWAY)'
+                            : rhEnvironment === 'LIVE_SHADOW'
+                              ? '👁️ LIVE SHADOW (REAL DATA, SIM ORDERS)'
+                              : '🛡️ SANDBOX SIMULATION (0% RISK)'}
                       </span>
                     </CardTitle>
                     <CardDescription className="text-xs text-muted-foreground">
@@ -824,43 +1052,70 @@ export function BrokersPanel() {
             <CardContent className="pt-4 space-y-4">
               {/* Guardrail Controls Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Environment Switcher */}
+                {/* 1. Operating Environment Switcher (4 Modes) */}
                 <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Operating Environment
+                    <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Operating Mode
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <div className="grid grid-cols-2 gap-1 pt-0.5">
                     <Button
                       type="button"
                       size="sm"
-                      onClick={() => {
-                        setRhEnvironment('SANDBOX');
-                        handleSaveGuardrails({ environment: 'SANDBOX' });
-                      }}
-                      className={`h-8 text-xs font-semibold ${
+                      onClick={() => handleSwitchMode('SANDBOX')}
+                      disabled={guardrailsSaving}
+                      className={`h-7 px-1.5 text-[11px] font-semibold ${
                         rhEnvironment === 'SANDBOX'
                           ? 'bg-emerald-500 text-black hover:bg-emerald-400 font-bold shadow-md shadow-emerald-500/20'
                           : 'bg-black/40 text-muted-foreground hover:text-white border border-white/5'
                       }`}
+                      title="Internal sandbox simulator (0% real money risk)"
                     >
                       🛡️ Sandbox
                     </Button>
                     <Button
                       type="button"
                       size="sm"
-                      onClick={() => {
-                        if (window.confirm("Switch to LIVE Robinhood Trading? Real order dispatches will route to Robinhood Brokerage API.")) {
-                          setRhEnvironment('LIVE');
-                          handleSaveGuardrails({ environment: 'LIVE' });
-                        }
-                      }}
-                      className={`h-8 text-xs font-semibold ${
-                        rhEnvironment === 'LIVE'
+                      onClick={() => handleSwitchMode('LIVE_SHADOW')}
+                      disabled={guardrailsSaving}
+                      className={`h-7 px-1.5 text-[11px] font-semibold ${
+                        rhEnvironment === 'LIVE_SHADOW'
+                          ? 'bg-cyan-500 text-black hover:bg-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+                          : 'bg-black/40 text-muted-foreground hover:text-white border border-white/5'
+                      }`}
+                      title="Live Robinhood MCP: Real quotes & portfolio, shadow simulated orders"
+                    >
+                      👁️ Shadow
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleSwitchMode('LIVE_APPROVAL')}
+                      disabled={guardrailsSaving}
+                      className={`h-7 px-1.5 text-[11px] font-semibold ${
+                        rhEnvironment === 'LIVE_APPROVAL'
                           ? 'bg-amber-500 text-black hover:bg-amber-400 font-bold shadow-md shadow-amber-500/20'
                           : 'bg-black/40 text-muted-foreground hover:text-white border border-white/5'
                       }`}
+                      title="Live Robinhood MCP: Plans queued for HITL human approval"
                     >
-                      ⚡ Live API
+                      ⏳ Approval
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setAutonomousInput('');
+                        setAutonomousConfirmOpen(true);
+                      }}
+                      disabled={guardrailsSaving}
+                      className={`h-7 px-1.5 text-[11px] font-semibold ${
+                        rhEnvironment === 'LIVE_AUTONOMOUS'
+                          ? 'bg-rose-600 text-white hover:bg-rose-500 font-bold shadow-md shadow-rose-600/30 animate-pulse'
+                          : 'bg-black/40 text-rose-400/80 hover:text-rose-300 border border-rose-500/20'
+                      }`}
+                      title="Autonomous live trading with real money via Robinhood Agentic MCP"
+                    >
+                      ⚡ Auto
                     </Button>
                   </div>
                 </div>
@@ -930,6 +1185,189 @@ export function BrokersPanel() {
             </CardContent>
           </Card>
 
+          {/* ========================================================================= */}
+          {/* BROKER AGENT PENDING APPROVAL NOTIFICATION & QUEUE CARD */}
+          {/* ========================================================================= */}
+
+          {/* Plan Status Banner (Approve / Reject / Expired feedback placed directly above plan) */}
+          {(planActionMsg || planActionError) && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              {planActionMsg && (
+                <div className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-sm p-3.5 rounded-xl font-medium flex items-center justify-between shadow-xl backdrop-blur-md">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+                    <span>{planActionMsg}</span>
+                  </div>
+                  <button
+                    onClick={() => setPlanActionMsg(null)}
+                    className="p-1 rounded-md text-emerald-300 hover:text-white hover:bg-emerald-500/20 transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+              {planActionError && (
+                <div className="bg-rose-500/20 border border-rose-500/50 text-rose-200 text-sm p-3.5 rounded-xl font-medium flex items-center justify-between shadow-xl backdrop-blur-md">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-400" />
+                    <span className="font-semibold">{planActionError}</span>
+                  </div>
+                  <button
+                    onClick={() => setPlanActionError(null)}
+                    className="p-1 rounded-md text-rose-300 hover:text-white hover:bg-rose-500/20 transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Live Approval empty state banner when no pending plan is queued */}
+          {rhEnvironment === 'LIVE_APPROVAL' && (!pendingPlan || !pendingPlan.has_plan) && (
+            <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center justify-between text-xs text-amber-200/80 backdrop-blur-md">
+              <div className="flex items-center gap-2.5">
+                <Shield className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>
+                  <strong>Live Approval Mode Active:</strong> No pending execution plans awaiting review. Click &quot;Run Daily Pipeline Now&quot; above to trigger analysis and queue a new rebalance proposal.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Pending Approval Queue Card */}
+          {pendingPlan && pendingPlan.has_plan && (
+            <Card className="bg-gradient-to-br from-amber-950/40 via-card/50 to-amber-950/20 border-amber-500/40 shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+              <CardHeader className="pb-3 border-b border-amber-500/20">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-2 rounded-lg border ${pendingPlan.is_expired ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' : 'bg-amber-500/20 border-amber-500/40 text-amber-300'}`}>
+                      <Clock className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-base font-bold flex items-center gap-2">
+                        Broker Agent Pending Approval Plan
+                        {pendingPlan.is_expired ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold">
+                            EXPIRED
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold">
+                            TTL: {Math.max(0, Math.floor(pendingPlan.seconds_remaining || 0))}s remaining
+                          </span>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs text-amber-200/70">
+                        Plan ID: <span className="font-mono text-white">{pendingPlan.plan?.plan_id}</span> | Created: {pendingPlan.plan?.created_at ? new Date(pendingPlan.plan.created_at).toLocaleTimeString() : '--'} | Target Mode: {pendingPlan.plan?.mode || 'LIVE_APPROVAL'}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRejectPlan}
+                      disabled={planLoading}
+                      className="bg-black/40 text-rose-400 border-rose-500/30 hover:bg-rose-500/20 hover:text-white text-xs font-bold h-9"
+                    >
+                      <XCircle className="w-4 h-4 mr-1.5" />
+                      Reject Plan
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleApprovePlan}
+                      disabled={planLoading || pendingPlan.is_expired}
+                      className={`font-bold text-xs h-9 shadow-lg ${
+                        pendingPlan.is_expired 
+                          ? 'bg-zinc-700 opacity-60 cursor-not-allowed text-zinc-300' 
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                      }`}
+                      title={pendingPlan.is_expired ? pendingPlan.plan?.expiration_reason || "Plan expired" : "Approve and execute plan"}
+                    >
+                      {planLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                      {pendingPlan.is_expired ? 'Plan Expired' : 'Approve & Execute via Live Gateway'}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                {pendingPlan.is_expired && (
+                  <div className="p-3.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium flex items-center gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                    <span>
+                      <strong>Notice:</strong> {pendingPlan.plan?.expiration_reason || "Plan expired: passed daily market close cutoff (15:55 ET)"}. Please reject this plan or click &quot;Run Daily Pipeline Now&quot; above to generate a fresh one.
+                    </span>
+                  </div>
+                )}
+                {/* Planned Liquidations */}
+                {((pendingPlan.plan?.liquidations && pendingPlan.plan.liquidations.length > 0) || (pendingPlan.plan?.planned_actions?.sells && pendingPlan.plan.planned_actions.sells.length > 0)) && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5" /> Planned Liquidations ({((pendingPlan.plan?.liquidations || pendingPlan.plan?.planned_actions?.sells) || []).length})
+                    </div>
+                    <div className="rounded-md border border-white/10 overflow-x-auto bg-black/40">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-white/10">
+                            <TableHead className="text-xs text-white">Symbol</TableHead>
+                            <TableHead className="text-xs text-right text-white">Quantity</TableHead>
+                            <TableHead className="text-xs text-right text-white">Current Price</TableHead>
+                            <TableHead className="text-xs text-right text-white">Est. Proceeds</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(pendingPlan.plan?.liquidations || pendingPlan.plan?.planned_actions?.sells || []).map((liq: any, idx: number) => (
+                            <TableRow key={idx} className="border-white/5">
+                              <TableCell className="font-bold text-rose-300">{liq.symbol}</TableCell>
+                              <TableCell className="text-right font-mono text-white">{liq.quantity}</TableCell>
+                              <TableCell className="text-right font-mono text-muted-foreground">{formatMoney(liq.current_price ?? liq.price)}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-emerald-400">{formatMoney(liq.estimated_proceeds ?? (liq.quantity * (liq.current_price ?? liq.price ?? 0)))}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Planned Buys */}
+                {((pendingPlan.plan?.buys && pendingPlan.plan.buys.length > 0) || (pendingPlan.plan?.planned_actions?.buys_stock && pendingPlan.plan.planned_actions.buys_stock.length > 0)) && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5" /> Planned Stock Buys ({((pendingPlan.plan?.buys || pendingPlan.plan?.planned_actions?.buys_stock) || []).length})
+                    </div>
+                    <div className="rounded-md border border-white/10 overflow-x-auto bg-black/40">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-white/10">
+                            <TableHead className="text-xs text-white">Rank</TableHead>
+                            <TableHead className="text-xs text-white">Symbol</TableHead>
+                            <TableHead className="text-xs text-right text-white">Quantity</TableHead>
+                            <TableHead className="text-xs text-right text-white">Target Price</TableHead>
+                            <TableHead className="text-xs text-right text-white">Est. Total Cost</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(pendingPlan.plan?.buys || pendingPlan.plan?.planned_actions?.buys_stock || []).map((b: any, idx: number) => (
+                            <TableRow key={idx} className="border-white/5">
+                              <TableCell className="font-mono text-muted-foreground text-xs">#{b.rank || (idx + 1)}</TableCell>
+                              <TableCell className="font-bold text-emerald-300">{b.symbol}</TableCell>
+                              <TableCell className="text-right font-mono text-white">{b.quantity}</TableCell>
+                              <TableCell className="text-right font-mono text-muted-foreground">{formatMoney(b.target_price ?? b.price)}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-white">{formatMoney(b.suggested_budget ?? b.total_cost ?? (b.quantity * (b.target_price ?? b.price ?? 0)))}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Account PNL Summary Metric Cards */}
           {rhData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-3 duration-300">
@@ -941,7 +1379,7 @@ export function BrokersPanel() {
                 <CardContent>
                   <div className="text-2xl font-bold text-white font-mono">{formatMoney(rhData.cash_available)}</div>
                   <p className="text-[10px] text-muted-foreground">
-                    {rhEnvironment === 'LIVE' ? 'Robinhood Live Buying Power' : 'Sandbox Buying Power (RH-SIM-SANDBOX-001)'}
+                    {rhEnvironment.startsWith('LIVE') ? 'Robinhood Live Buying Power' : 'Sandbox Buying Power (RH-SIM-SANDBOX-001)'}
                   </p>
                 </CardContent>
               </Card>
@@ -993,20 +1431,58 @@ export function BrokersPanel() {
                   <div className="flex justify-between items-center">
                     <div>
                       <CardTitle className="text-white text-base">
-                        Active {rhEnvironment === 'LIVE' ? 'Live' : 'Sandbox'} Stock Holdings
+                        Active Stock Holdings
                       </CardTitle>
-                      <CardDescription>Equities controlled by the AI Broker Agent rebalancing policy</CardDescription>
+                      <CardDescription>
+                        {isLive 
+                          ? 'Real equities held in your Robinhood MCP brokerage account' 
+                          : 'Simulated equities controlled by the AI Broker Agent sandbox policy'}
+                      </CardDescription>
                     </div>
-                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-                      {rhData.holdings.length} Stocks
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        isLive 
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' 
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      }`}>
+                        {isLive ? `Robinhood MCP (${rhEnvironment})` : 'Sandbox Simulation'}
+                      </span>
+                      <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-white/5 text-white border border-white/10 font-semibold">
+                        {(rhData.holdings || []).length} Held
+                      </span>
+                      {rhData.queued_orders && rhData.queued_orders.length > 0 && (
+                        <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1">
+                          <Clock className="w-3 h-3 animate-pulse" />
+                          {rhData.queued_orders.length} Queued
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {rhData.holdings.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground border rounded-lg bg-black/25 border-dashed border-white/5 text-xs">
-                      No active stock positions. Run the AI Pipeline to seed this portfolio.
+                  {/* Queued Orders Info Notice (when orders are queued outside regular hours) */}
+                  {rhData.queued_orders && rhData.queued_orders.length > 0 && (!rhData.holdings || rhData.holdings.length === 0) && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-lg flex items-start gap-2.5 text-xs text-amber-200 mb-4">
+                      <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                      <div className="space-y-1">
+                        <div className="font-semibold text-amber-300">
+                          {rhData.queued_orders.length} Stock Buy Order{rhData.queued_orders.length > 1 ? 's' : ''} Queued in Robinhood MCP:
+                        </div>
+                        <div className="text-[11px] text-amber-200/80 leading-relaxed">
+                          Your buy orders for <strong className="text-white">{rhData.queued_orders.map((q: any) => q.symbol || q.ticker).join(', ')}</strong> were successfully received by Robinhood. Because the regular NYSE session is currently closed, Robinhood has queued them for execution. When regular market hours open (Monday 9:30 AM ET), these orders will execute and appear as active holdings.
+                        </div>
+                      </div>
                     </div>
+                  )}
+
+                  {!rhData.holdings || rhData.holdings.length === 0 ? (
+                    (!rhData.queued_orders || rhData.queued_orders.length === 0) ? (
+                      <div className="text-center py-10 text-muted-foreground border rounded-lg bg-black/25 border-dashed border-white/5 text-xs">
+                        {isLive 
+                          ? 'No active stock positions held in your Robinhood MCP account. Orders placed will appear here once submitted or filled.' 
+                          : 'No active stock positions. Run the AI Pipeline or execute orders to seed this sandbox portfolio.'}
+                      </div>
+                    ) : null
                   ) : (
                     <div className="rounded-md border border-white/5 overflow-x-auto">
                       <Table>
@@ -1021,7 +1497,7 @@ export function BrokersPanel() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {rhData.holdings.map((h, idx) => (
+                          {(rhData.holdings || []).map((h, idx) => (
                             <TableRow key={idx} className="border-white/5 hover:bg-white/5">
                               <TableCell className="font-bold text-white">{h.symbol}</TableCell>
                               <TableCell className="text-right text-white/95">{h.total_quantity}</TableCell>
@@ -1035,6 +1511,69 @@ export function BrokersPanel() {
                           ))}
                         </TableBody>
                       </Table>
+                    </div>
+                  )}
+
+                  {/* Queued Orders Sub-Table */}
+                  {rhData.queued_orders && rhData.queued_orders.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-white/10 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-amber-400" />
+                          Orders Queued for Market Open ({rhData.queued_orders.length})
+                        </div>
+                        <span className="text-[10px] font-mono text-amber-300/80 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                          Awaiting Regular Session Open (Mon 9:30 AM ET)
+                        </span>
+                      </div>
+                      <div className="rounded-md border border-amber-500/25 overflow-x-auto bg-black/35">
+                        <Table>
+                          <TableHeader className="bg-amber-500/10">
+                            <TableRow className="border-amber-500/20">
+                              <TableHead className="text-xs text-amber-200">Ticker</TableHead>
+                              <TableHead className="text-xs text-amber-200">Action</TableHead>
+                              <TableHead className="text-xs text-right text-amber-200">Quantity</TableHead>
+                              <TableHead className="text-xs text-right text-amber-200">Limit Price</TableHead>
+                              <TableHead className="text-xs text-right text-amber-200">Est. Total</TableHead>
+                              <TableHead className="text-xs text-amber-200">Status</TableHead>
+                              <TableHead className="text-xs text-amber-200">Time Placed</TableHead>
+                              <TableHead className="text-xs text-amber-200">Robinhood Order ID</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rhData.queued_orders.map((qOrd: any, idx: number) => {
+                              const sym = qOrd.symbol || qOrd.ticker || '--';
+                              const qty = qOrd.quantity != null ? qOrd.quantity : (qOrd.total_quantity || 1);
+                              const price = qOrd.price || 0;
+                              const totalCost = qty * price;
+                              return (
+                                <TableRow key={qOrd.order_id || idx} className="border-white/5 hover:bg-white/5">
+                                  <TableCell className="font-bold text-white text-sm">{sym}</TableCell>
+                                  <TableCell>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                      {qOrd.action || qOrd.side || 'BUY'}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right text-white font-mono">{qty} sh</TableCell>
+                                  <TableCell className="text-right text-emerald-400 font-mono font-medium">{formatMoney(price)}</TableCell>
+                                  <TableCell className="text-right text-white font-mono font-semibold">{formatMoney(totalCost)}</TableCell>
+                                  <TableCell>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                      ● {qOrd.status || 'QUEUED'}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                                    {qOrd.timestamp || qOrd.created_at || '--'}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[120px]" title={qOrd.order_id}>
+                                    {qOrd.order_id ? qOrd.order_id.slice(0, 10) + '...' : '--'}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   )}
 
@@ -1087,20 +1626,42 @@ export function BrokersPanel() {
                 <CardHeader>
                   <CardTitle className="text-white text-base flex items-center justify-between">
                     <span>Execution Playground</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                      rhEnvironment === 'LIVE' 
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    }`}>
-                      {rhEnvironment}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {rhConfig?.market_status && (
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                          rhConfig.market_status.market_open
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        }`} title={rhConfig.market_status.market_open ? "Regular NYSE market session open (9:30 AM - 4:00 PM ET)" : "Outside regular NYSE market session hours"}>
+                          {rhConfig.market_status.market_open ? "● NYSE Open" : "○ NYSE Closed"}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        isLive 
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      }`}>
+                        {rhEnvironment}
+                      </span>
+                    </div>
                   </CardTitle>
                   <CardDescription>
-                    Push ad-hoc test orders directly to the Robinhood {rhEnvironment === 'LIVE' ? 'Live Router' : 'Sandbox'}
+                    {isLive 
+                      ? 'Push ad-hoc orders directly to your Robinhood MCP trading account' 
+                      : 'Push ad-hoc test orders directly to the local Sandbox environment'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleRhTradeSubmit} className="space-y-4">
+                    {isLive && rhConfig?.market_status && !rhConfig.market_status.market_open && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs p-2.5 rounded-md flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div className="leading-relaxed">
+                          <span className="font-semibold">NYSE Regular Market Hours Closed: </span>
+                          Live orders placed now will be transmitted to Robinhood and queued for execution when the market opens. Track execution updates below in the Live Gateway Audit Ledger.
+                        </div>
+                      </div>
+                    )}
                     {tradeError && (
                       <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-md font-medium">
                         {tradeError}
@@ -1113,21 +1674,57 @@ export function BrokersPanel() {
                     )}
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ticker Symbol</label>
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ticker Symbol</label>
+                        <span className="text-[10px] text-emerald-400 font-mono">
+                          {priceLoading ? "Fetching quote..." : `Price: $${tradePrice}`}
+                        </span>
+                      </div>
                       <select 
                         value={tradeTicker}
-                        onChange={(e) => setTradeTicker(e.target.value)}
-                        className="w-full bg-black/45 border-white/10 rounded-md h-9 text-xs text-white px-2 focus:border-emerald-500/50"
+                        onChange={(e) => handleTickerChange(e.target.value)}
+                        className="w-full bg-black/45 border-white/10 rounded-md h-9 text-xs text-white px-2 focus:border-emerald-500/50 font-medium"
                       >
-                        <option value="NVDA">NVDA (NVIDIA)</option>
-                        <option value="TSLA">TSLA (Tesla)</option>
-                        <option value="AVGO">AVGO (Broadcom)</option>
-                        <option value="BMY">BMY (Bristol-Myers)</option>
-                        <option value="DOW">DOW (Dow Inc)</option>
-                        <option value="NOW">NOW (ServiceNow)</option>
-                        <option value="DXCM">DXCM (DexCom)</option>
-                        <option value="VZ">VZ (Verizon)</option>
-                        <option value="F">F (Ford)</option>
+                        {/* Recommendations from Stage 1 if available */}
+                        {pipelineReport?.stage_1_backtester.ranked_recommendations && pipelineReport.stage_1_backtester.ranked_recommendations.length > 0 && (
+                          <optgroup label="Stage 1 Recommendations">
+                            {pipelineReport.stage_1_backtester.ranked_recommendations.map((r) => (
+                              <option key={`rec-${r.symbol}`} value={r.symbol}>
+                                {r.symbol} (#{r.rank} - ${r.current_price.toFixed(2)})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {/* Active Holdings */}
+                        {rhData?.holdings && rhData.holdings.length > 0 && (
+                          <optgroup label="Current Holdings">
+                            {rhData.holdings.map((h) => (
+                              <option key={`hld-${h.symbol}`} value={h.symbol}>
+                                {h.symbol} (Held: {h.total_quantity} shs @ ${h.current_price.toFixed(2)})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {/* Standard Popular Equities */}
+                        <optgroup label="Standard Equities">
+                          <option value="NVDA">NVDA (NVIDIA)</option>
+                          <option value="TSLA">TSLA (Tesla)</option>
+                          <option value="AAPL">AAPL (Apple)</option>
+                          <option value="MSFT">MSFT (Microsoft)</option>
+                          <option value="AMZN">AMZN (Amazon)</option>
+                          <option value="GOOGL">GOOGL (Alphabet)</option>
+                          <option value="META">META (Meta)</option>
+                          <option value="AVGO">AVGO (Broadcom)</option>
+                          <option value="BMY">BMY (Bristol-Myers)</option>
+                          <option value="DOW">DOW (Dow Inc)</option>
+                          <option value="NOW">NOW (ServiceNow)</option>
+                          <option value="DXCM">DXCM (DexCom)</option>
+                          <option value="VZ">VZ (Verizon)</option>
+                          <option value="F">F (Ford)</option>
+                          <option value="JPM">JPM (JPMorgan Chase)</option>
+                          <option value="SPY">SPY (S&P 500 ETF)</option>
+                          <option value="QQQ">QQQ (Invesco QQQ)</option>
+                        </optgroup>
                       </select>
                     </div>
 
@@ -1170,15 +1767,29 @@ export function BrokersPanel() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Limit Price ($)</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="125.00"
-                          value={tradePrice}
-                          onChange={(e) => setTradePrice(e.target.value)}
-                          className="bg-black/45 border-white/10 rounded-md text-white h-9 text-xs"
-                        />
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Limit Price ($)</label>
+                          <button
+                            type="button"
+                            onClick={() => fetchTickerPrice(tradeTicker)}
+                            disabled={priceLoading}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+                            title="Fetch latest live stock quote"
+                          >
+                            <RotateCcw className={`w-2.5 h-2.5 ${priceLoading ? 'animate-spin' : ''}`} />
+                            {priceLoading ? 'Fetching...' : 'Latest Quote'}
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="125.00"
+                            value={tradePrice}
+                            onChange={(e) => setTradePrice(e.target.value)}
+                            className="bg-black/45 border-white/10 rounded-md text-white h-9 text-xs font-mono"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -1188,13 +1799,52 @@ export function BrokersPanel() {
                       className={`w-full rounded-md font-bold text-xs h-9 uppercase tracking-wider shadow-md ${
                         rhKillSwitch 
                           ? 'bg-red-800/50 text-red-300 cursor-not-allowed'
-                          : rhEnvironment === 'LIVE'
+                          : isLive
                             ? 'bg-amber-500 text-black hover:bg-amber-400'
                             : 'bg-emerald-500 text-black hover:bg-emerald-400'
                       }`}
                     >
-                      {rhKillSwitch ? 'Blocked by Kill Switch' : `Execute ${rhEnvironment === 'LIVE' ? 'Live' : 'Sandbox'} Order`}
+                      {rhKillSwitch ? 'Blocked by Kill Switch' : 'Execute Order'}
                     </Button>
+
+                    {isLive && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={tradePreviewing}
+                        onClick={handleRhTradePreview}
+                        className="w-full rounded-md font-semibold text-xs h-8 border-white/10 hover:bg-white/5 text-amber-300 flex items-center justify-center gap-1.5"
+                      >
+                        {tradePreviewing ? "Verifying with Robinhood MCP..." : "Pre-Check / Review Order (Dry Run)"}
+                      </Button>
+                    )}
+
+                    {tradePreviewData && (
+                      <div className="bg-black/45 border border-white/10 p-3 rounded-md space-y-2 text-xs font-mono">
+                        <div className="text-[11px] text-muted-foreground uppercase font-sans font-bold flex items-center justify-between">
+                          <span>Robinhood MCP Verification</span>
+                          <span className="text-emerald-400 font-normal">Checks Passed</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-white">
+                          <div>Symbol: <span className="font-bold">{tradePreviewData.data?.symbol || tradeTicker}</span></div>
+                          <div>Side: <span className="font-bold">{tradePreviewData.data?.side?.toUpperCase() || tradeAction}</span></div>
+                          <div>Qty: <span className="font-bold">{tradePreviewData.data?.quantity || tradeQty}</span></div>
+                          <div>Limit: <span className="font-bold">${tradePreviewData.data?.limit_price || tradePrice}</span></div>
+                        </div>
+                        {tradePreviewData.data?.quote_data && (
+                          <div className="text-[11px] text-muted-foreground border-t border-white/5 pt-1.5 flex justify-between">
+                            <span>Bid: ${tradePreviewData.data.quote_data.bid_price}</span>
+                            <span>Ask: ${tradePreviewData.data.quote_data.ask_price}</span>
+                            <span>Last: ${tradePreviewData.data.quote_data.last_trade_price}</span>
+                          </div>
+                        )}
+                        {tradePreviewData.data?.market_data_disclosure && (
+                          <div className="text-[10px] text-muted-foreground italic border-t border-white/5 pt-1 leading-tight">
+                            {tradePreviewData.data.market_data_disclosure}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </form>
                 </CardContent>
               </Card>
@@ -1212,21 +1862,23 @@ export function BrokersPanel() {
                       <Activity className="w-4 h-4 text-emerald-400" />
                       Agentic Activity Ledger
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        {rhData.orders.length} Executed Orders
+                        {(rhData.orders || []).length} Executed Orders
                       </span>
                     </CardTitle>
                     <CardDescription>Live audit log of stock and option orders executed via Robinhood MCP</CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleRhResetSandbox} 
-                      className="text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-300 flex items-center gap-1.5 h-8"
-                      title="Reset cash to $25,000 and clear all holdings & orders"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> Reset Sandbox
-                    </Button>
+                    {!isLive && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRhResetSandbox} 
+                        className="text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-300 flex items-center gap-1.5 h-8"
+                        title="Reset cash to $25,000 and clear all holdings & orders"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Reset Sandbox
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={fetchRhData} className="text-xs text-muted-foreground flex items-center gap-1.5 hover:text-white h-8">
                       <RefreshCcw className="w-3.5 h-3.5" /> Refresh
                     </Button>
@@ -1234,7 +1886,7 @@ export function BrokersPanel() {
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                {rhData.orders.length === 0 ? (
+                {!rhData.orders || rhData.orders.length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground border rounded-lg bg-black/25 border-dashed border-white/5 text-xs">
                     No orders registered yet in this session. Execute the pipeline to populate the ledger.
                   </div>
@@ -1254,7 +1906,7 @@ export function BrokersPanel() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rhData.orders.map((ord, idx) => (
+                        {(rhData.orders || []).map((ord, idx) => (
                           <TableRow key={ord.order_id || idx} className="border-white/5 hover:bg-white/5">
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap font-mono">{ord.last_update || (ord as any).timestamp}</TableCell>
                             <TableCell>
@@ -1303,285 +1955,189 @@ export function BrokersPanel() {
             </Card>
           )}
 
+          {/* Live Gateway Audit Ledger (JSONL) */}
+          <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-2xl animate-in fade-in duration-300">
+            <CardHeader className="pb-3 border-b border-white/5">
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-white text-base flex items-center gap-2">
+                    <Database className="w-4 h-4 text-cyan-400" />
+                    Robinhood Live Gateway Audit Ledger
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                      {liveLedgerRecords.length} Events (ledger.jsonl)
+                    </span>
+                  </CardTitle>
+                  <CardDescription>
+                    Append-only audit trail logging every pre-flight firewall check, execution fill, and human approval decision
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchLiveLedger}
+                  disabled={ledgerLoading}
+                  className="text-xs text-muted-foreground flex items-center gap-1.5 hover:text-white h-8"
+                >
+                  <RefreshCcw className={`w-3.5 h-3.5 ${ledgerLoading ? 'animate-spin' : ''}`} />
+                  Refresh Ledger
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {liveLedgerRecords.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg bg-black/25 border-dashed border-white/5 text-xs">
+                  No events recorded in the live audit ledger yet.
+                </div>
+              ) : (
+                <div className="rounded-md border border-white/5 overflow-x-auto max-h-96">
+                  <Table>
+                    <TableHeader className="bg-black/35 sticky top-0 z-10 backdrop-blur-md">
+                      <TableRow className="border-white/5">
+                        <TableHead className="text-xs text-white">Timestamp</TableHead>
+                        <TableHead className="text-xs text-white">Event</TableHead>
+                        <TableHead className="text-xs text-white">Mode</TableHead>
+                        <TableHead className="text-xs text-white">Symbol / Target</TableHead>
+                        <TableHead className="text-xs text-white">Side / Action</TableHead>
+                        <TableHead className="text-xs text-right text-white">Qty</TableHead>
+                        <TableHead className="text-xs text-right text-white">Price</TableHead>
+                        <TableHead className="text-xs text-white">Status / Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {liveLedgerRecords.map((r, idx) => {
+                        const d = r.details || {};
+                        const symbol = d.symbol || d.ticker || r.symbol || '--';
+                        const side = d.side || d.action || r.side || r.action || '--';
+                        const qty = d.quantity != null ? d.quantity : (r.quantity != null ? r.quantity : (r.target_quantity != null ? r.target_quantity : '--'));
+                        const price = d.price != null ? formatMoney(d.price) : (d.limit_price != null ? formatMoney(d.limit_price) : (r.price != null ? formatMoney(r.price) : (r.limit_price != null ? formatMoney(r.limit_price) : '--')));
+                        const status = d.status || r.status || (r.event.includes('FAILED') || r.event.includes('BLOCKED') || r.event.includes('REJECTED') ? 'BLOCKED' : 'LOGGED');
+                        const message = d.summary || d.reason || d.message || r.summary || r.reason || r.error || (r.order_id ? `Order ID: ${r.order_id}` : (r.client_order_id ? `Client ID: ${r.client_order_id}` : ''));
+
+                        return (
+                          <TableRow key={idx} className="border-white/5 hover:bg-white/5 text-xs">
+                            <TableCell className="font-mono text-muted-foreground whitespace-nowrap">
+                              {r.ts ? new Date(r.ts).toLocaleTimeString() : (r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '--')}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-[10px] font-semibold text-cyan-300">
+                                {r.event}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/5 border border-white/10 text-white">
+                                {r.mode || '--'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-bold text-white">{symbol}</TableCell>
+                            <TableCell>
+                              {side !== '--' && (
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  side === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                                }`}>
+                                  {side}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-white">{qty}</TableCell>
+                            <TableCell className="text-right font-mono text-emerald-400">{price}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 max-w-xs">
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap ${
+                                  status === 'FILLED' || status === 'EXECUTED' || status === 'SUCCESS'
+                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                    : status === 'QUEUED' || status === 'CONFIRMED' || status === 'PENDING' || status === 'QUEUING'
+                                      ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                                      : status === 'BLOCKED' || status === 'REJECTED' || status === 'FAILED'
+                                        ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                                        : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                }`}>
+                                  {status}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground truncate" title={message}>
+                                  {message}
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
         </div>
       )}
 
-      {/* -------------------- INTERACTIVE BROKERS TAB -------------------- */}
-      {activeTab === 'ib' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="flex justify-between items-center bg-card/20 p-4 rounded-xl border border-white/5 shadow-md">
-            <div className="flex items-center gap-4">
-              <Button
-                variant={ibConfig?.is_connected ? "secondary" : "default"}
-                disabled={ibConfig?.is_connected || loginLoading}
-                onClick={() => setShowLoginModal(true)}
-                className={`flex items-center gap-2 rounded-md font-bold text-xs uppercase tracking-wider ${
-                  ibConfig?.is_connected 
-                    ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20' 
-                    : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md'
-                }`}
-              >
-                {ibConfig?.is_connected ? (
-                  <>
-                    <Unlock className="w-3.5 h-3.5 text-blue-400" /> Linked to IB Gateway
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-3.5 h-3.5" /> Connect IB Gateway
-                  </>
-                )}
-              </Button>
-              {ibConfig?.is_connected && (
-                <Button variant="ghost" size="sm" onClick={fetchIbData} className="text-xs text-muted-foreground flex items-center gap-1">
-                  <RefreshCcw className="w-3.5 h-3.5" /> Sync Data
+      {/* Autonomous Confirmation Modal */}
+      {autonomousConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-lg shadow-2xl border-rose-500/30 bg-black/95 backdrop-blur-md animate-in zoom-in-95 duration-200">
+            <CardHeader className="border-b border-rose-500/20 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <AlertTriangle className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <CardTitle className="text-white text-lg font-bold">
+                    Activate Autonomous Live Trading
+                  </CardTitle>
+                  <CardDescription className="text-xs text-rose-300/80">
+                    REAL MONEY BROKERAGE EXECUTION
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="bg-rose-950/40 border border-rose-500/30 rounded-lg p-3.5 text-xs text-rose-200 space-y-2">
+                <p className="font-semibold text-rose-100 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-rose-400" /> Warning: Unattended Real-Money Orders
+                </p>
+                <p className="leading-relaxed">
+                  You are about to switch the Robinhood Broker Agent into <strong className="text-white">LIVE_AUTONOMOUS</strong> mode.
+                  Real stock orders will be automatically submitted to your linked Robinhood Brokerage Account without manual confirmation.
+                </p>
+                <p className="text-[11px] text-rose-300">
+                  Equities only. Governed by the Live Gateway firewall (kill switch, rest window, 0.5% max spread, daily spend limits).
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-muted-foreground block">
+                  Type <span className="font-mono text-rose-300 font-bold select-all">&quot;I UNDERSTAND THIS TRADES REAL MONEY&quot;</span> to confirm:
+                </label>
+                <Input
+                  type="text"
+                  placeholder="I UNDERSTAND THIS TRADES REAL MONEY"
+                  value={autonomousInput}
+                  onChange={(e) => setAutonomousInput(e.target.value)}
+                  className="bg-black/60 border-rose-500/30 text-white font-mono text-xs h-9"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setAutonomousConfirmOpen(false);
+                    setAutonomousInput('');
+                  }}
+                  className="text-xs rounded-md text-white hover:bg-white/5"
+                >
+                  Cancel
                 </Button>
-              )}
-            </div>
-
-            {ibConfig?.is_configured && ibConfig?.is_connected && (
-              <div className="text-xs text-blue-400 font-medium flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5" /> Auto-login active via env variables
+                <Button
+                  onClick={() => handleSwitchMode('LIVE_AUTONOMOUS', autonomousInput.trim())}
+                  disabled={guardrailsSaving || autonomousInput.trim() !== "I UNDERSTAND THIS TRADES REAL MONEY"}
+                  className="px-5 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 disabled:opacity-50"
+                >
+                  {guardrailsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm & Enable Live Autonomous"}
+                </Button>
               </div>
-            )}
-          </div>
-
-          {ibData ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-lg">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cash Available</CardTitle>
-                    <DollarSign className="h-4 w-4 text-blue-400" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white font-mono">{formatMoney(ibData.cash_available)}</div>
-                    <p className="text-[10px] text-muted-foreground">Real-time IB Balance</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-lg">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invested Capital</CardTitle>
-                    <Briefcase className="h-4 w-4 text-blue-400" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white font-mono">{formatMoney(ibData.invested_capital)}</div>
-                    <p className="text-[10px] text-muted-foreground">IB Market Value</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-lg">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Equity</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-indigo-400" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white font-mono">{formatMoney(ibData.total_equity)}</div>
-                    <p className="text-[10px] text-muted-foreground">IB Account Net Liquidation</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-emerald-500/5 border-emerald-500/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Unrealized P&L</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-xl font-bold font-mono ${ibData.unrealized_pnl >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>
-                      {formatMoney(ibData.unrealized_pnl)}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-blue-500/5 border-blue-500/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Realized P&L</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-xl font-bold font-mono ${ibData.realized_pnl >= 0 ? 'text-blue-400' : 'text-destructive'}`}>
-                      {formatMoney(ibData.realized_pnl)}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-indigo-500/5 border-indigo-500/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider">Buying Power</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold text-indigo-400 font-mono">
-                      {formatMoney(ibData.buying_power)}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-16 border rounded-xl bg-card/25 border-dashed border-white/10 text-muted-foreground backdrop-blur-md">
-              <Landmark className="w-10 h-10 mx-auto mb-3 text-muted-foreground/35" />
-              <div className="font-semibold text-sm text-white/90">Interactive Brokers is disconnected</div>
-              <p className="text-xs text-muted-foreground/80 mt-1 max-w-sm mx-auto">
-                Connect to your local Interactive Brokers TWS or IB Gateway instance (typically port 4002) to sync real-time portfolio holdings.
-              </p>
-            </div>
-          )}
-
-          {/* IB Active Holdings Table */}
-          {ibData && (
-            <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-2xl">
-              <CardHeader>
-                <CardTitle className="text-white text-base">Active Positions</CardTitle>
-                <CardDescription>Real-time positions and performance from your IB account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!ibData.holdings || ibData.holdings.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground border rounded-lg bg-black/25 border-dashed border-white/5">
-                    No active positions found in this account.
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-white/5 overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-black/35">
-                        <TableRow className="border-white/5">
-                          <TableHead className="text-xs text-white">Ticker</TableHead>
-                          <TableHead className="text-xs text-right text-white">Quantity</TableHead>
-                          <TableHead className="text-xs text-right text-white">Avg Cost</TableHead>
-                          <TableHead className="text-xs text-right text-white">Market Price</TableHead>
-                          <TableHead className="text-xs text-right text-white">Position Value</TableHead>
-                          <TableHead className="text-xs text-right text-white">Unrealized P&L</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ibData.holdings.map((h, idx) => (
-                          <TableRow key={idx} className="border-white/5 hover:bg-white/5">
-                            <TableCell className="font-bold text-white">{h.symbol}</TableCell>
-                            <TableCell className="text-right text-white/95">{h.total_quantity}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">{formatMoney(h.avg_buy_price)}</TableCell>
-                            <TableCell className="text-right font-medium text-blue-400">{formatMoney(h.current_price)}</TableCell>
-                            <TableCell className="text-right font-semibold text-white">{formatMoney(h.total_value)}</TableCell>
-                            <TableCell className={`text-right font-bold ${h.unrealized_pnl < 0 ? 'text-destructive' : 'text-emerald-400'}`}>
-                              {h.unrealized_pnl > 0 ? '+' : ''}{formatMoney(h.unrealized_pnl)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* IB Order History */}
-          {ibData && (
-            <Card className="bg-card/30 backdrop-blur-md border-white/5 shadow-2xl">
-              <CardHeader>
-                <CardTitle className="text-white text-base">Execution Log</CardTitle>
-                <CardDescription>Real-time order status and execution details from your IB account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!ibData.orders || ibData.orders.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground border rounded-lg bg-black/25 border-dashed border-white/5">
-                    No recent order executions found.
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-white/5 overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-black/35">
-                        <TableRow className="border-white/5">
-                          <TableHead className="text-xs text-white">Date & Timestamp</TableHead>
-                          <TableHead className="text-xs text-white">Ticker</TableHead>
-                          <TableHead className="text-xs text-white">Status</TableHead>
-                          <TableHead className="text-xs text-white">Action</TableHead>
-                          <TableHead className="text-xs text-right text-white">Qty (Filled/Total)</TableHead>
-                          <TableHead className="text-xs text-right text-white">Price</TableHead>
-                          <TableHead className="text-xs text-white">Order ID</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ibData.orders.map((ord: IBOrder) => (
-                          <TableRow key={ord.order_id} className="border-white/5 hover:bg-white/5">
-                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{ord.last_update || "Pending..."}</TableCell>
-                            <TableCell className="font-bold text-white">{ord.symbol}</TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                ord.status === 'Filled' ? 'bg-emerald-500/10 text-emerald-400' : 
-                                ord.status === 'Cancelled' ? 'bg-destructive/10 text-destructive' : 
-                                'bg-blue-500/10 text-blue-400'
-                              }`}>
-                                {ord.status}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ord.action === 'BUY' ? 'bg-blue-500/10 text-blue-400' : 'bg-orange-500/10 text-orange-400'}`}>
-                                {ord.action}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right text-white">
-                              <span className="font-semibold">{ord.filled}</span>
-                              <span className="text-muted-foreground text-xs"> / {ord.total_quantity}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-emerald-400">
-                              {ord.avg_fill_price > 0 ? formatMoney(ord.avg_fill_price) : formatMoney(ord.price)}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{ord.order_id}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* IB Login Modal */}
-          {showLoginModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-              <Card className="w-full max-w-md shadow-2xl border-white/5 bg-card/65 animate-in zoom-in-95 duration-200">
-                <CardHeader>
-                  <CardTitle className="text-white">Interactive Brokers Login</CardTitle>
-                  <CardDescription>Enter your TWS/Gateway credentials to link your dashboard.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {modalError && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-md font-medium">
-                      {modalError}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Username</label>
-                    <Input
-                      placeholder="IB Username"
-                      value={ibUsername}
-                      onChange={(e) => setIbUsername(e.target.value)}
-                      className="bg-black/35 border-white/10 text-white rounded-md h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Password</label>
-                    <Input
-                      type="password"
-                      placeholder="IB Password"
-                      value={ibPassword}
-                      onChange={(e) => setIbPassword(e.target.value)}
-                      className="bg-black/35 border-white/10 text-white rounded-md h-9 text-xs"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-3 mt-4">
-                    <Button variant="ghost" onClick={() => setShowLoginModal(false)} className="text-xs rounded-md text-white hover:bg-white/5">Cancel</Button>
-                    <Button
-                      onClick={() => handleIbLogin(ibUsername, ibPassword)}
-                      disabled={loginLoading || !ibUsername || !ibPassword}
-                      className="px-6 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold"
-                    >
-                      {loginLoading ? "Connecting..." : "Login"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

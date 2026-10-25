@@ -20,6 +20,7 @@ if BACKEND_DIR not in sys.path:
 
 from agents.backtester_agent import BacktesterAgent
 from agents.broker_agent import BrokerAgent
+from trading import approval, ledger, market_calendar, state
 
 logger = logging.getLogger("TradingPipeline")
 MARKET_TIMEZONE = ZoneInfo("America/New_York")
@@ -84,14 +85,14 @@ class TradingPipeline:
                 if self.scheduler_enabled and not self.is_running:
                     now_ny = datetime.datetime.now(MARKET_TIMEZONE)
                     today_str = now_ny.strftime("%Y-%m-%d")
-                    is_weekday = now_ny.weekday() < 5  # 0=Mon, 4=Fri
+                    is_market_day = market_calendar.is_trading_day(now_ny.date())
                     
                     # Target trigger condition:
-                    # 1. Trading day (Monday through Friday)
+                    # 1. Trading day (NYSE session open today, skips holidays and weekends)
                     # 2. Reached or passed 14:00 (within trigger window 14:00-14:15)
                     # 3. Has NOT already executed today
                     if (
-                        is_weekday
+                        is_market_day
                         and now_ny.hour == self.scheduled_hour
                         and now_ny.minute >= self.scheduled_minute
                         and self.last_scheduled_date != today_str
@@ -116,19 +117,21 @@ class TradingPipeline:
             self._stop_event.wait(timeout=15.0)
 
     def get_next_run_time(self) -> str:
-        """Calculates the upcoming scheduled execution timestamp in Eastern Market Time."""
+        """Calculates the upcoming scheduled execution timestamp in Eastern Market Time (NYSE calendar aware)."""
         now_ny = datetime.datetime.now(MARKET_TIMEZONE)
         today_target = now_ny.replace(hour=self.scheduled_hour, minute=self.scheduled_minute, second=0, microsecond=0)
         
-        # Check if today is a weekday and the scheduled time hasn't passed yet
-        if now_ny.weekday() < 5 and now_ny < today_target and self.last_scheduled_date != now_ny.strftime("%Y-%m-%d"):
+        # Check if today is a valid trading session and the scheduled time hasn't passed yet
+        if market_calendar.is_trading_day(now_ny.date()) and now_ny < today_target and self.last_scheduled_date != now_ny.strftime("%Y-%m-%d"):
             next_run = today_target
         else:
-            # Advance to the next trading day
-            candidate = today_target + datetime.timedelta(days=1)
-            while candidate.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
-                candidate += datetime.timedelta(days=1)
-            next_run = candidate
+            # Advance to the next active NYSE trading session
+            next_date = market_calendar.next_trading_day(now_ny.date())
+            next_run = datetime.datetime.combine(
+                next_date,
+                datetime.time(self.scheduled_hour, self.scheduled_minute),
+                tzinfo=MARKET_TIMEZONE
+            )
 
         tz_abbr = now_ny.strftime("%Z")
         return next_run.strftime(f"%Y-%m-%d %H:%M:%S {tz_abbr}")
@@ -147,11 +150,21 @@ class TradingPipeline:
                 "stage": "Lock"
             }
 
+        # Pre-flight Guardrail Check: Emergency Kill Switch
+        if state.kill_switch_active():
+            logger.warning("[PIPELINE GUARD] Pipeline execution blocked: Emergency Kill Switch is active.")
+            return {
+                "success": False,
+                "error": "Execution blocked: Emergency Kill Switch is engaged.",
+                "stage": "Emergency Kill Switch"
+            }
+
+        current_mode = state.get_mode()
         start_time_ny = datetime.datetime.now(MARKET_TIMEZONE)
         self.is_running = True
         self.last_trigger_source = trigger_source
         
-        logger.info(f"================== [PIPELINE START - Trigger: {trigger_source}] ==================")
+        logger.info(f"================== [PIPELINE START - Mode: {current_mode} | Trigger: {trigger_source}] ==================")
         logger.info("Step 1: Invoking Backtester Agent...")
 
         try:
@@ -177,7 +190,8 @@ class TradingPipeline:
 
             pipeline_report = {
                 "success": True,
-                "pipeline_name": "Autonomous Daily Backtest & Sandbox Rebalance Pipeline",
+                "pipeline_name": f"Autonomous Daily Backtest & {current_mode} Execution Pipeline",
+                "trading_mode": current_mode,
                 "trigger_source": trigger_source,
                 "execution_timestamp": start_time_ny.strftime(f"%Y-%m-%d %H:%M:%S {tz_abbr}"),
                 "total_duration_sec": duration,
@@ -202,6 +216,21 @@ class TradingPipeline:
                 "overall_status": "SUCCESSFUL_EXECUTION"
             }
 
+            # If running in LIVE_APPROVAL mode, queue plan for manual operator approval
+            if current_mode == "LIVE_APPROVAL":
+                pending = approval.save_pending_plan(pipeline_report, source=trigger_source)
+                pipeline_report["pending_approval_plan"] = pending.get("plan_id")
+                pipeline_report["stage_2_broker"]["execution_summary"] += f" [QUEUED FOR APPROVAL: {pending.get('plan_id')} (15m TTL)]"
+
+            # Log to live audit ledger
+            ledger.get_ledger().append(
+                ledger.EV_RUN,
+                trigger=trigger_source,
+                mode=current_mode,
+                duration_sec=duration,
+                recommendations_count=len(backtest_result.get("ranked_recommendations", []))
+            )
+
             self.last_run_time = start_time_ny.strftime(f"%Y-%m-%d %H:%M:%S {tz_abbr}")
             self.last_report = pipeline_report
 
@@ -222,10 +251,15 @@ class TradingPipeline:
         """Returns the health, 24x7 autonomous scheduler state, and next trigger time."""
         scheduler_alive = self._scheduler_thread is not None and self._scheduler_thread.is_alive()
         next_run = self.get_next_run_time() if self.scheduler_enabled else "Scheduler Paused"
+        current_mode = state.get_mode()
+        broker_status = f"CONNECTED_{current_mode}"
         
         return {
             "pipeline_active": True,
             "is_running": self.is_running,
+            "trading_mode": current_mode,
+            "kill_switch_active": state.kill_switch_active(),
+            "circuit_breaker": state.breaker_state(),
             "scheduler_enabled": self.scheduler_enabled,
             "scheduler_running": scheduler_alive,
             "scheduled_time_est": f"{self.scheduled_time_est} EST/EDT",
@@ -235,6 +269,7 @@ class TradingPipeline:
             "last_trigger_source": self.last_trigger_source,
             "has_report": self.last_report is not None,
             "last_summary": self.last_report.get("stage_2_broker", {}).get("execution_summary") if self.last_report else "No pipeline runs yet.",
+            "pending_plan": approval.get_pending_plan(),
             "agents": {
                 "backtester": {
                     "name": self.backtester.name,
@@ -243,7 +278,7 @@ class TradingPipeline:
                 },
                 "broker": {
                     "name": self.broker.name,
-                    "status": "CONNECTED_SANDBOX",
+                    "status": broker_status,
                     "target_api": "Robinhood Model Context Protocol (MCP)"
                 }
             }

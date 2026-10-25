@@ -2,7 +2,82 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20260926 - Robinhood Agentic Trading, Model Context Protocol (MCP) Router & Risk Guardrails
+## 1. Release v20261026 - Institutional Robinhood Live Trading Architecture, Multi-Mode Execution & 9-Point Risk Gateway Firewall
+
+### 🏛️ Institutional Live Trading Engine & Architecture ([backend/trading/](file:///d:/AI/StockPickerStrategies/backend/trading/))
+- **4-Way Operating Modes (`SANDBOX`, `LIVE_SHADOW`, `LIVE_APPROVAL`, `LIVE_AUTONOMOUS`)**:
+  - **`SANDBOX`**: 0%-risk simulated execution against persistent local state (`rh_sandbox_state.json`), maintaining $25,000 mock cash.
+  - **`LIVE_SHADOW`**: Fetches real-time portfolio, positions, and quotes from Robinhood's remote Model Context Protocol (MCP) server, while simulating fills and logging intents to the audit ledger.
+  - **`LIVE_APPROVAL`**: Autonomous screening and portfolio rebalancing generates execution plans held in a Human-in-the-Loop (HITL) queue with a 15-minute countdown TTL, requiring explicit operator approval before placing real orders.
+  - **`LIVE_AUTONOMOUS`**: Fully autonomous real-money order execution directly against the linked Robinhood Brokerage account via Robinhood Trading MCP, protected by the 9-point execution firewall.
+- **Centralized Trading Factory Protocol (`TradingFactory` & `TradingClient`)**:
+  - Defined standard `TradingClient` protocol in [backend/trading/client_protocol.py](file:///d:/AI/StockPickerStrategies/backend/trading/client_protocol.py).
+  - Implemented dynamic client resolution via [backend/trading/factory.py](file:///d:/AI/StockPickerStrategies/backend/trading/factory.py), seamlessly returning `SandboxClient`, `ShadowClient`, or `LiveExecutionGateway`.
+- **Remote Robinhood Model Context Protocol (MCP) Client**:
+  - Built async JSON-RPC 2.0 client in [backend/trading/live_client.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_client.py) and tool mapper in [backend/trading/rh_tool_map.py](file:///d:/AI/StockPickerStrategies/backend/trading/rh_tool_map.py), connecting to `https://agent.robinhood.com/mcp/trading` with SSE stream transport for portfolio, positions, quotes, and equity order dispatch.
+- **OAuth 2.1 Token Lifecycle Management**:
+  - Implemented OAuth 2.1 authorization code flow with PKCE in [backend/trading/live_auth.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_auth.py), featuring local HTTP redirect callback listener (`ROBINHOOD_OAUTH_CALLBACK_PORT`), proactive refresh before token expiration, and secure externalized storage at `~/.strategicalpha/robinhood_oauth.json` outside the git repository.
+- **Append-Only Audit Ledger Engine**:
+  - Implemented high-fidelity JSONL audit trail in [backend/trading/ledger.py](file:///d:/AI/StockPickerStrategies/backend/trading/ledger.py) (`_data/live_trading/ledger.jsonl`), logging all pre-flight decisions, order intents, fills, cancellations, mode switches, and circuit-breaker trips with cumulative daily spend tracking.
+- **Persistent State & Automated Circuit Breaker**:
+  - Built thread-safe runtime state management in [backend/trading/state.py](file:///d:/AI/StockPickerStrategies/backend/trading/state.py) (`_data/live_trading/mode_state.json`) with an automated circuit breaker that trips after 3 consecutive order failures and dispatches emergency email alerts via SMTP.
+  - Enforced confirmation phrase safeguard (`"I UNDERSTAND THIS TRADES REAL MONEY"`) before allowing transitions to `LIVE_AUTONOMOUS`.
+- **Holiday-Aware NYSE Market Calendar**:
+  - Implemented exchange calendar engine in [backend/trading/market_calendar.py](file:///d:/AI/StockPickerStrategies/backend/trading/market_calendar.py), validating regular NYSE trading sessions (9:30 AM - 4:00 PM ET), midday broker rest blackout (11:30 AM - 1:55 PM ET), and calculating the next active market date.
+
+### 🛡️ 9-Point Institutional Execution Firewall & Risk Gateway ([backend/trading/live_gateway.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_gateway.py))
+- **Check 1: Emergency Kill Switch**: Pre-flight verification instantly blocking all orders if the manual kill switch or circuit breaker is engaged.
+- **Check 2: Market Session & Broker Rest Window**: Enforces regular NYSE market hours and restricts algorithmic trading during midday rest window (11:30 AM - 1:55 PM ET); off-hours orders are safely transmitted to Robinhood and queued for market open.
+- **Check 3: Equities-Only Live Policy**: Disallows synthetic options or crypto in live trading, logging them safely as `SKIPPED_LIVE_POLICY`.
+- **Check 4: Concentration Cap & Duplicate Guard**: Enforces portfolio equity concentration ceilings (default: 15% equity cap) while permitting single-share odd-lot testing.
+- **Check 5: Buying Power & Daily Spend Cap**: Validates cash availability, enforces daily spend budget (default: $5,000/day), and blocks execution if daily portfolio drawdown exceeds 2.0%.
+- **Check 6: Held Quantity & PDT Protection**: Ensures sell orders do not exceed sellable inventory and prevents Pattern Day Trader violations by disallowing intraday flipping of shares purchased today.
+- **Check 7: Fresh Quote Validation**: Verifies bid-ask spreads do not exceed 0.50% and price deviations from the signal target remain within $\pm 1.0\%$.
+- **Check 8: Order Execution Constraints**: Strict enforcement of `LIMIT`, `DAY`, and regular-session order types with dynamic price rounding buffers.
+- **Check 9: Idempotency & Fill Polling**: Employs deterministic client order IDs (`UUIDv4`) to eliminate duplicate executions, with active fill status polling and automated remainder cancellation after fill timeouts.
+
+### 🤖 Autonomous Agentic Pipeline & Human-in-the-Loop Rebalancing ([backend/agents/](file:///d:/AI/StockPickerStrategies/backend/agents/))
+- **NYSE Calendar-Aware Daemon Scheduler** ([backend/agents/pipeline.py](file:///d:/AI/StockPickerStrategies/backend/agents/pipeline.py)):
+  - Upgraded continuous 24x7 background scheduler thread to be NYSE calendar-aware, executing precisely at 2:00 PM EST/EDT on market weekdays while skipping exchange holidays and weekends.
+- **Two-Phase Portfolio Rebalancing** ([backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py)):
+  - Analyzes current portfolio against Backtester Top 5 recommendations, liquidating displaced non-strategy holdings in Phase 1 to free cash before deploying capital into Phase 2 allocations.
+- **Human-in-the-Loop Pending Plan Staging** ([backend/trading/approval.py](file:///d:/AI/StockPickerStrategies/backend/trading/approval.py)):
+  - Automatically stages rebalancing plans in `LIVE_APPROVAL` mode with a 15-minute countdown TTL or 3:55 PM ET cutoff, supporting operator approval and execution with fresh quotes or cancellation.
+
+### 🖥️ Interactive Broker Control Center & Live Telemetry ([frontend/src/components/BrokersPanel.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/BrokersPanel.tsx))
+- **4-Way Operating Mode Selector**:
+  - Interactive radio selector for `SANDBOX`, `LIVE_SHADOW`, `LIVE_APPROVAL`, and `LIVE_AUTONOMOUS` with live status indicators and account mask.
+- **Autonomous Mode Confirmation Modal**:
+  - High-visibility safety modal requiring users to type `"I UNDERSTAND THIS TRADES REAL MONEY"` before enabling live autonomous order routing.
+- **Human-in-the-Loop Approval Banner**:
+  - Live interactive alert displaying pending execution plans, countdown timer, proposed buy/sell legs, total allocation value, and **Approve Execution** / **Reject Plan** action buttons.
+- **Active Stock Holdings & Off-Hours Queued Orders**:
+  - Dynamic table displaying real-time Robinhood positions in Live modes (or sandbox mock holdings in Sandbox), plus a dedicated **Orders Queued for Market Open** sub-table tracking orders placed during off-hours or weekends (`VZ`, `NVDA`, `F`) with Robinhood order IDs and queued statuses.
+- **Live Execution Playground**:
+  - Ad-hoc order testing interface with live price autofill via Yahoo Finance API, BUY/SELL side selector, share quantity, limit price, Pre-Check dry run modal, and instant order dispatch.
+- **Live Gateway Audit Ledger**:
+  - Real-time event log viewer displaying pre-flight firewall decisions, fills, cancellations, and mode transitions with filterable badges.
+- **Live Health Diagnostics**:
+  - Visual indicator pills monitoring Robinhood MCP Server connectivity, OAuth token validity, circuit breaker state, and emergency kill switch.
+
+### 🔌 MCP Tools Catalog, Antigravity Agent Plugin & Docker Deployment
+- **Robinhood Trading MCP Remote Integration**:
+  - Configured root [.agents/mcp_config.json](file:///d:/AI/StockPickerStrategies/.agents/mcp_config.json) with `mcp-remote` connecting to `https://agent.robinhood.com/mcp/trading`.
+- **Plugin v1.1.0 & Guardrails**:
+  - Upgraded [.agents/plugins/robinhood-agentic-trading/plugin.json](file:///d:/AI/StockPickerStrategies/.agents/plugins/robinhood-agentic-trading/plugin.json), [trading_guardrails.md](file:///d:/AI/StockPickerStrategies/.agents/plugins/robinhood-agentic-trading/rules/trading_guardrails.md), and [SKILL.md](file:///d:/AI/StockPickerStrategies/.agents/plugins/robinhood-agentic-trading/skills/automated-trading-pipeline/SKILL.md) for live trading protocols.
+- **Tool Catalog & Architecture Diagrams**:
+  - Documented complete 70+ tool schema in [docs/robinhood_mcp_tools.json](file:///d:/AI/StockPickerStrategies/docs/robinhood_mcp_tools.json) and architectural flow diagrams in [fs_images/FlowCharts/AgneticFlow](file:///d:/AI/StockPickerStrategies/fs_images/FlowCharts/AgneticFlow) and [docs/Documentation.md](file:///d:/AI/StockPickerStrategies/docs/Documentation.md).
+- **Docker Container Volume Binding** ([docker-compose.yml](file:///d:/AI/StockPickerStrategies/docker-compose.yml)):
+  - Mounted `.env`, `_data/`, and `${USERPROFILE}/.strategicalpha` into Docker container environments.
+- **Comprehensive Test Suite** ([backend/tests/test_live_trading.py](file:///d:/AI/StockPickerStrategies/backend/tests/test_live_trading.py)):
+  - Unit tests validating state management, circuit breaker tripping, ledger recording, LiveExecutionGateway firewall checks, and factory mode resolution.
+
+### 🏷️ Version Synchronization (`v20261026`)
+- Synchronized platform version tags across `README.md`, `frontend/src/app/page.tsx`, `frontend/src/components/TickerSidebar.tsx`, and `docs/changes.md`.
+
+---
+
+## 2. Release v20260926 - Robinhood Agentic Trading, Model Context Protocol (MCP) Router & Risk Guardrails
 
 ### 🤖 Robinhood Agentic Trading Architecture ([backend/mcp/rh_mcp_server.py](file:///d:/AI/StockPickerStrategies/backend/mcp/rh_mcp_server.py))
 - **Dual Execution Engine (`SANDBOX` vs `LIVE`)**:
