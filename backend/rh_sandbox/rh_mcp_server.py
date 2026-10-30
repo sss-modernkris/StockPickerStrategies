@@ -43,7 +43,7 @@ class RobinhoodAgenticTradingEngine:
         
         # Risk Firewall Guardrail Defaults (configurable via UI and .env)
         self.daily_spend_limit = float(os.getenv("ROBINHOOD_DAILY_SPEND_LIMIT", "5000.0"))
-        self.position_cap_pct = float(os.getenv("ROBINHOOD_POSITION_CAP_PCT", "15.0"))
+        self.position_cap_pct = float(os.getenv("ROBINHOOD_POSITION_CAP_PCT", "25.0"))
         self.emergency_kill_switch = os.getenv("ROBINHOOD_EMERGENCY_KILL_SWITCH", "false").lower() in ["true", "1", "yes"]
         self.require_hitl = os.getenv("ROBINHOOD_REQUIRE_HITL_CONFIRMATION", "true").lower() in ["true", "1", "yes"]
         self.paused = self.emergency_kill_switch

@@ -92,6 +92,10 @@ def save_pending_plan(
         "source": source,
         "summary": broker_stage.get("execution_summary", "Rebalance plan pending approval"),
         "initial_cash": broker_stage.get("initial_cash", 0.0),
+        "liquidation_proceeds": broker_stage.get("liquidation_proceeds", 0.0),
+        "effective_buying_power": broker_stage.get("effective_buying_power", 0.0),
+        "total_spent_buys": broker_stage.get("total_spent_buys", 0.0),
+        "final_cash_remaining": broker_stage.get("final_cash_remaining", 0.0),
         "total_equity": broker_stage.get("total_portfolio_equity", 0.0),
         "planned_actions": actions,
         "pipeline_report": pipeline_report

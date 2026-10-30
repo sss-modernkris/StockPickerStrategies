@@ -2,7 +2,45 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20261026 - Institutional Robinhood Live Trading Architecture, Multi-Mode Execution & 9-Point Risk Gateway Firewall
+## 1. Release v20261029 - Dynamic Multi-Pass Capital Allocation Engine & Small-Account Risk Calibration
+
+### 💰 Dynamic Multi-Pass Capital Allocation Engine ([backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py))
+- **Total Buying Power Synchronization**:
+  - Resolved capital desynchronization in `LIVE_APPROVAL` and `LIVE_SHADOW` modes where post-liquidation cash fell back to Robinhood's stale account balance.
+  - Guaranteed deployable capital is explicitly calculated from initial cash plus realized liquidation proceeds (`$774.60 + $228.03 = $1,002.63`).
+- **Two-Pass Optimal Integer Sizing**:
+  - Replaced hardcoded $2,000 candidate sizing with dynamic portfolio distribution across qualified non-held recommendations (`base_budget = deployable_capital / num_candidates`).
+  - **Pass 1 (Base Allocation)**: Sizes candidates according to equal-weight targets while permitting 1 share for higher-priced setups like PM ($208.50) when within buying power.
+  - **Pass 2 (Residual Redistribution)**: Re-invests unallocated cash into top-ranked candidates within safe concentration ceilings, elevating capital deployment from 36.6% ($367.17) to **93.9% ($942.84)** with minimal cash drag.
+- **Equities-Only Live Execution**:
+  - Automatically filters option legs as `SKIPPED_LIVE_POLICY` in live environments without depleting cash, preserving 100% of buying power for equities.
+- **Post-Rebalance Holdings & Cash Projections**:
+  - Accurately tracks projected holdings and residual cash in plan payloads and logs.
+
+### 🛡️ Small-Account Risk Gateway & Position Cap Calibration ([backend/trading/live_gateway.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_gateway.py), [backend/trading/config.py](file:///d:/AI/StockPickerStrategies/backend/trading/config.py))
+- **25% Single-Position Concentration Ceiling**:
+  - Updated default `ROBINHOOD_POSITION_CAP_PCT` from 15.0% to 25.0% in configuration, `.env`, and `.env.example`, properly accommodating a standard 5-stock portfolio ($5 	imes 20\% = 100\%$).
+- **Retail Account (< $3,000 Equity) Tolerance**:
+  - Added smart account-size scaling in `LiveExecutionGateway` Check 5 and `BrokerAgent`, ensuring integer share granularity does not choke smaller portfolios or reject single-share orders.
+
+### 🖥️ Approval Plan Manager & UI Telemetry ([backend/trading/approval.py](file:///d:/AI/StockPickerStrategies/backend/trading/approval.py), [frontend/src/components/BrokersPanel.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/BrokersPanel.tsx))
+- **Plan Object Financial Telemetry**:
+  - Top-level pending plan dictionary now carries `effective_buying_power`, `liquidation_proceeds`, `total_spent_buys`, and `final_cash_remaining`.
+- **Planned Stock Buys Table Footer & Metrics Bar**:
+  - Added summary `TableFooter` in Brokers Panel displaying the Total Planned Stock Buys ($942.84).
+  - Integrated real-time metric pills displaying **Available Deployable Cash** ($1,002.63) and **Projected Remaining Cash** ($59.79).
+  - Corrected table cell formatting to use calculated order cost.
+
+### 🧪 Unit Test Suite Expansion ([backend/tests/test_broker_allocation.py](file:///d:/AI/StockPickerStrategies/backend/tests/test_broker_allocation.py))
+- Added comprehensive unit test suite validating dynamic capital allocation on small accounts ($1,000 equity) and duplicate holding prevention.
+- All 17 unit tests in test suite verified passing.
+
+### 🏷️ Version Synchronization (`v20261029`)
+- Synchronized version tags across `README.md`, `frontend/src/app/page.tsx`, `frontend/src/components/TickerSidebar.tsx`, `plugin.json`, and `docs/changes.md`.
+
+---
+
+## 2. Release v20261026 - Institutional Robinhood Live Trading Architecture, Multi-Mode Execution & 9-Point Risk Gateway Firewall
 
 ### 🏛️ Institutional Live Trading Engine & Architecture ([backend/trading/](file:///d:/AI/StockPickerStrategies/backend/trading/))
 - **4-Way Operating Modes (`SANDBOX`, `LIVE_SHADOW`, `LIVE_APPROVAL`, `LIVE_AUTONOMOUS`)**:

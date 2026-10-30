@@ -144,7 +144,7 @@ def get_settings() -> LiveSettings:
         fill_poll_interval_sec=_f("LIVE_FILL_POLL_INTERVAL_SEC", 2.0),
         max_daily_drawdown_pct=_f("LIVE_MAX_DAILY_DRAWDOWN_PCT", 2.0),
         daily_spend_limit=_f("ROBINHOOD_DAILY_SPEND_LIMIT", 5000.0),
-        position_cap_pct=_f("ROBINHOOD_POSITION_CAP_PCT", 15.0),
+        position_cap_pct=_f("ROBINHOOD_POSITION_CAP_PCT", 25.0),
         env_kill_switch=_b("ROBINHOOD_EMERGENCY_KILL_SWITCH", False),
         rest_start=_hhmm("BROKER_REST_START_ET", "11:30"),
         rest_end=_hhmm("BROKER_REST_END_ET", "13:55"),

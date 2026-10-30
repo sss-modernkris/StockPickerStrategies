@@ -235,10 +235,16 @@ class LiveExecutionGateway(TradingClient):
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
 
-            max_pos_dollars = total_equity * (self.settings.position_cap_pct / 100.0)
-            # Allow at least a single share test order if within buying power
+            # Sizing cap: enforce single-position concentration limit
+            effective_cap_pct = self.settings.position_cap_pct
+            if total_equity > 0 and total_equity < 3000.0 and effective_cap_pct < 25.0:
+                # On smaller retail accounts (under $3,000), integer share granularity requires at least 25% cap for 5-stock portfolios
+                effective_cap_pct = 25.0
+
+            max_pos_dollars = max(total_equity * (effective_cap_pct / 100.0), limit_price)
+            # Allow at least a single share order if within buying power
             if quantity > 1 and est_cost > max_pos_dollars:
-                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds {self.settings.position_cap_pct}% single-position cap (${max_pos_dollars:,.2f})."
+                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds {effective_cap_pct}% single-position cap (${max_pos_dollars:,.2f})."
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
 

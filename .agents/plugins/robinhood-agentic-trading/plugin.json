@@ -1,6 +1,6 @@
 {
   "name": "robinhood-agentic-trading",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "LIVE trading: Specialized AI Agents (Backtester Agent & Broker Agent) for automated daily stock screening and live execution in the Robinhood Agentic (MCP) account via the Robinhood Trading MCP (https://agent.robinhood.com/mcp/trading). Supports phased modes LIVE_SHADOW, LIVE_APPROVAL, LIVE_AUTONOMOUS. Sandbox simulation lives in the separate 'robinhood-sandbox-trading' plugin.",
   "authors": [
     {

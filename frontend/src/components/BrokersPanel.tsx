@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Lock, RefreshCcw, Unlock, Database, DollarSign, Briefcase, 
   TrendingUp, Cpu, Sliders, Play, Pause, PlayCircle, Shield, 
@@ -1356,11 +1356,30 @@ export function BrokersPanel() {
                               <TableCell className="font-bold text-emerald-300">{b.symbol}</TableCell>
                               <TableCell className="text-right font-mono text-white">{b.quantity}</TableCell>
                               <TableCell className="text-right font-mono text-muted-foreground">{formatMoney(b.target_price ?? b.price)}</TableCell>
-                              <TableCell className="text-right font-mono font-semibold text-white">{formatMoney(b.suggested_budget ?? b.total_cost ?? (b.quantity * (b.target_price ?? b.price ?? 0)))}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-white">{formatMoney(b.total_cost ?? ((b.quantity ?? 0) * (b.target_price ?? b.price ?? 0)))}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
+                        <TableFooter className="bg-black/60 border-t border-white/10 font-bold">
+                          <TableRow className="border-none">
+                            <TableCell colSpan={4} className="text-xs text-white">
+                              Total Planned Stock Buys
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs text-emerald-400">
+                              {formatMoney(
+                                (pendingPlan.plan?.buys || pendingPlan.plan?.planned_actions?.buys_stock || []).reduce(
+                                  (acc: number, curr: any) => acc + (curr.total_cost ?? ((curr.quantity ?? 0) * (curr.target_price ?? curr.price ?? 0))),
+                                  0
+                                )
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        </TableFooter>
                       </Table>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between text-xs font-mono text-muted-foreground pt-1 px-1">
+                      <span>Available Deployable Cash: <strong className="text-white">{formatMoney(pendingPlan.plan?.effective_buying_power ?? ((pendingPlan.plan?.initial_cash ?? 0) + (pendingPlan.plan?.liquidation_proceeds ?? 0)))}</strong></span>
+                      <span>Projected Remaining Cash: <strong className="text-emerald-300">{formatMoney(pendingPlan.plan?.final_cash_remaining ?? Math.max(0, (pendingPlan.plan?.effective_buying_power ?? ((pendingPlan.plan?.initial_cash ?? 0) + (pendingPlan.plan?.liquidation_proceeds ?? 0))) - (pendingPlan.plan?.buys || pendingPlan.plan?.planned_actions?.buys_stock || []).reduce((acc: number, curr: any) => acc + (curr.total_cost ?? ((curr.quantity ?? 0) * (curr.target_price ?? curr.price ?? 0))), 0)))}</strong></span>
                     </div>
                   </div>
                 )}
