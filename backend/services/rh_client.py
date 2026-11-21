@@ -19,40 +19,8 @@ class RHClient:
         
         # In-memory database for simulation mode
         self.sim_cash = 25000.0
-        self.sim_holdings = {
-            "NVDA": {"quantity": 100.0, "avg_price": 120.0, "current_price": 127.50},
-            "TSLA": {"quantity": 50.0, "avg_price": 180.0, "current_price": 178.20},
-            "AVGO": {"quantity": 20.0, "avg_price": 150.0, "current_price": 155.40},
-            "F": {"quantity": 500.0, "avg_price": 12.0, "current_price": 12.45}
-        }
-        self.sim_orders = [
-            {
-                "order_id": 9001,
-                "account": "RH-AGENT-101",
-                "ticker": "NVDA",
-                "action": "BUY",
-                "total_quantity": 100.0,
-                "filled": 100.0,
-                "remaining": 0.0,
-                "status": "Filled",
-                "price": 120.0,
-                "avg_fill_price": 120.0,
-                "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            },
-            {
-                "order_id": 9002,
-                "account": "RH-AGENT-101",
-                "ticker": "TSLA",
-                "action": "BUY",
-                "total_quantity": 50.0,
-                "filled": 50.0,
-                "remaining": 0.0,
-                "status": "Filled",
-                "price": 180.0,
-                "avg_fill_price": 180.0,
-                "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-        ]
+        self.sim_holdings = {}
+        self.sim_orders = []
 
     def connect(self, mcp_url: str = None, simulate: bool = False):
         """

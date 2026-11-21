@@ -2972,7 +2972,7 @@ export function TopTickersPanel({ analysisData, onUpdateAnalysisData }: TopTicke
           {screenSaveStatus === 'saved' && (
             <div className="text-xs font-semibold text-green-500 flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 p-2.5 rounded-lg w-fit">
               <Check className="w-4 h-4" />
-              Saved to Top_Tickers_to_buy.csv & dispatched email to modernkris@gmail.com!
+              Saved to Top_Tickers_to_buy.csv & dispatched email notification!
             </div>
           )}
         </div>

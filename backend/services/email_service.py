@@ -36,7 +36,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, file_path
     smtp_port_str = os.getenv("SMTP_PORT", "587")
     smtp_username = os.getenv("SMTP_USERNAME")
     smtp_password = os.getenv("SMTP_PASSWORD")
-    sender_email = os.getenv("SENDER_EMAIL", smtp_username or "modernkris@gmail.com")
+    sender_email = os.getenv("SENDER_EMAIL") or smtp_username or "user@example.com"
 
     try:
         smtp_port = int(smtp_port_str)

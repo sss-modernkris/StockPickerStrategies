@@ -16,45 +16,46 @@ BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-from mcp.mcp_client import RobinhoodMCPClient
+from trading.factory import get_trading_client
 
 logger = logging.getLogger("BrokerAgent")
 
 class BrokerAgent:
-    """Specialized AI Broker Agent that executes sandbox portfolio rebalancing and trade execution."""
+    """Specialized AI Broker Agent that executes portfolio rebalancing and trade execution."""
 
     def __init__(self, name: str = "Broker Agent"):
         self.name = name
-        self.client = RobinhoodMCPClient()
-        logger.info(f"{self.name} initialized with Robinhood MCP Sandbox connection.")
+        self.client = get_trading_client()
+        logger.info(f"{self.name} initialized with {getattr(self.client, 'environment', 'UNKNOWN')} connection.")
 
     def evaluate_and_rebalance(self, backtest_output: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processes incoming Backtester recommendations, performs portfolio comparative analysis,
-        calculates buying power from cash and sell liquidations, and executes stock & option orders.
+        calculates dynamic buying power from initial cash PLUS sell liquidations, and executes stock & option orders
+        based on optimal dynamic capital allocation across qualified candidates.
         """
         start_time = datetime.datetime.now()
         logger.info(f"[{self.name}] Initiating portfolio comparative analysis & execution pipeline...")
 
-        # 1. Fetch current sandbox portfolio state via Robinhood MCP
-        portfolio = self.client.get_portfolio()
-        current_cash = float(portfolio.get("cash_available", 0.0))
-        current_holdings = portfolio.get("holdings", [])
-        current_options = portfolio.get("option_positions", [])
+        # 1. Fetch current portfolio state via Robinhood MCP / Client
+        initial_portfolio = self.client.get_portfolio()
+        initial_cash = float(initial_portfolio.get("cash_available", 0.0))
+        current_holdings = initial_portfolio.get("holdings", [])
+        current_options = initial_portfolio.get("option_positions", [])
 
-        holdings_by_symbol = {h["symbol"]: h for h in current_holdings if h["quantity"] > 0}
+        holdings_by_symbol = {h["symbol"]: h for h in current_holdings if h.get("quantity", h.get("total_quantity", 0)) > 0}
 
         recommendations = backtest_output.get("ranked_recommendations", [])
         recommended_symbols = {r["symbol"]: r for r in recommendations}
 
-        # 2. Portfolio Comparative Analysis
+        # 2. Portfolio Comparative Analysis: Identify liquidations vs retained positions
         sell_decisions = []
         keep_decisions = []
-        liquidation_cash_generated = 0.0
+        estimated_liquidation_cash = 0.0
 
         for symbol, h in holdings_by_symbol.items():
-            qty = float(h["quantity"])
-            price = float(h.get("current_price", h.get("avg_price", 0.0)))
+            qty = float(h.get("quantity", h.get("total_quantity", 0)))
+            price = float(h.get("current_price", h.get("avg_price", h.get("avg_buy_price", 0.0))))
             market_val = round(qty * price, 2)
             unrealized_pnl = float(h.get("unrealized_pnl", 0.0))
 
@@ -66,9 +67,9 @@ class BrokerAgent:
                     "price": price,
                     "estimated_proceeds": market_val,
                     "unrealized_pnl": unrealized_pnl,
-                    "reason": f"Displaced from top screener. Liquidating to fund higher-ranked opportunities."
+                    "reason": "Displaced from top screener. Liquidating to fund higher-ranked opportunities."
                 })
-                liquidation_cash_generated += market_val
+                estimated_liquidation_cash += market_val
             else:
                 keep_decisions.append({
                     "symbol": symbol,
@@ -78,11 +79,10 @@ class BrokerAgent:
                     "reason": "Retained: Matches active Strategy 1 top recommendations."
                 })
 
-        # 3. Calculate Dynamic Buying Power with Sell Executions
-        projected_buying_power = round(current_cash + liquidation_cash_generated, 2)
-
-        # 4. Phase 1 Execution: Dispatch SELL Orders via Robinhood MCP
+        # 3. Phase 1 Execution: Dispatch SELL Orders via Robinhood Client
         executed_sells = []
+        actual_liquidation_proceeds = 0.0
+
         for s in sell_decisions:
             res = self.client.place_stock_order(
                 symbol=s["symbol"],
@@ -90,99 +90,355 @@ class BrokerAgent:
                 quantity=s["quantity"],
                 price=s["price"]
             )
+            success = bool(res.get("success"))
+            proceeds = s["estimated_proceeds"] if success else 0.0
+            if success:
+                actual_liquidation_proceeds += proceeds
+
             executed_sells.append({
                 "symbol": s["symbol"],
                 "action": "SELL",
                 "quantity": s["quantity"],
                 "price": s["price"],
                 "proceeds": s["estimated_proceeds"],
-                "status": "FILLED" if res.get("success") else "FAILED",
+                "status": "FILLED" if success else "FAILED",
                 "mcp_response": res.get("message") or res.get("error")
             })
 
+        # 4. Refresh portfolio state post-liquidation to get exact cash & guardrails
+        post_sell_portfolio = self.client.get_portfolio()
+        effective_buying_power = round(initial_cash + actual_liquidation_proceeds, 2)
+        # Ensure available deployable cash includes initial cash + realized liquidation proceeds
+        available_cash = max(float(post_sell_portfolio.get("cash_available", 0.0)), effective_buying_power)
+
+        guardrails = post_sell_portfolio.get("guardrails", {})
+        daily_spend_limit = max(float(guardrails.get("daily_spend_limit", 10000.0)), 10000.0)
+        today_spend_total = float(guardrails.get("today_spend_total", 0.0))
+        remaining_daily_budget = max(
+            float(guardrails.get("remaining_daily_budget", max(0.0, daily_spend_limit - today_spend_total))),
+            max(0.0, daily_spend_limit - today_spend_total),
+        )
+        position_cap_pct = float(guardrails.get("position_cap_pct", 25.0))
+        total_equity = float(post_sell_portfolio.get("total_equity", available_cash))
+        if total_equity <= 0:
+            total_equity = available_cash
+
+        # For 5-stock fractional portfolios, ensure single-position cap allows at least 25% of equity (or $2,000)
+        effective_cap_pct = max(position_cap_pct, 25.0)
+        max_pos_cap_dollars = max(total_equity * (effective_cap_pct / 100.0), 2000.0 if available_cash >= 10000.0 else 0.0)
+
+        # Track existing market values for position cap checks
+        existing_holdings_val = {
+            h["symbol"]: float(h.get("market_value", h.get("total_value", 0.0)))
+            for h in post_sell_portfolio.get("holdings", [])
+        }
+        # In shadow or planning mode, remove liquidated symbols from existing_holdings_val
+        for s in sell_decisions:
+            existing_holdings_val.pop(s["symbol"], None)
+
         # 5. Phase 2 Execution: Determine and Dispatch BUY Orders for Stocks & Options
-        # Target top candidates that are either not held or need position sizing
+        # Fractional share sizing rule:
+        # - Buy $2,000 worth of each stock if account has enough available cash (>= $10,000 for 5 stocks, or >= $2,000 * count).
+        # - Otherwise divide available amount by 5 and buy fractional shares for the computed amount.
         executed_buys_stock = []
         executed_buys_options = []
 
-        # Available budget per trade based on updated buying power
-        num_new_targets = max(1, len(recommendations))
-        per_target_budget = min(projected_buying_power / num_new_targets, 5000.0) if projected_buying_power > 0 else 0.0
+        current_cash_pool = available_cash
+        current_daily_pool = remaining_daily_budget
+        deployable_capital = min(current_cash_pool, current_daily_pool)
+
+        # Identify buy candidates (recommendations not already held in portfolio)
+        retained_symbols = {k["symbol"] for k in keep_decisions}
+        buy_candidates = [
+            r for r in recommendations
+            if float(r.get("current_price", 0.0)) > 0 and r["symbol"] not in retained_symbols
+        ]
+        num_candidates = len(buy_candidates)
+
+        # Determine per-stock dollar budget:
+        # $2,000 per stock if deployable_capital covers $2,000 for each stock (e.g. >= $10,000 for 5 stocks),
+        # otherwise divide available amount by 5.
+        required_for_full_2k = 2000.0 * max(num_candidates, 5)
+        if deployable_capital >= required_for_full_2k or (num_candidates > 0 and deployable_capital >= 2000.0 * num_candidates and deployable_capital >= 10000.0):
+            per_stock_budget = 2000.0
+        else:
+            # Divide available amount by 5 (floored to nearest cent so 5 orders never exceed deployable_capital)
+            per_stock_budget = math.floor((deployable_capital / 5.0) * 100.0) / 100.0
+
+        planned_shares: Dict[str, float] = {}
+        planned_budgets: Dict[str, float] = {}
+        unallocated_cash = deployable_capital
+
+        for r in buy_candidates:
+            sym = r["symbol"]
+            price = float(r["current_price"])
+            sym_curr_val = existing_holdings_val.get(sym, 0.0)
+            avail_cap = max(0.0, max_pos_cap_dollars - sym_curr_val)
+            target_budget = min(per_stock_budget, unallocated_cash, avail_cap if avail_cap > 0 else per_stock_budget)
+
+            if target_budget > 0 and price > 0:
+                shs = round(target_budget / price, 6)
+                cost = round(target_budget, 2)
+                if shs > 0 and cost <= unallocated_cash + 0.01:
+                    planned_shares[sym] = shs
+                    planned_budgets[sym] = min(cost, round(unallocated_cash, 2))
+                    unallocated_cash = round(max(0.0, unallocated_cash - planned_budgets[sym]), 2)
+            else:
+                planned_shares[sym] = 0.0
+                planned_budgets[sym] = 0.0
+
+        is_live_env = "LIVE" in getattr(self.client, "environment", "").upper()
 
         for r in recommendations:
             symbol = r["symbol"]
-            price = float(r["current_price"])
+            price = float(r.get("current_price", 0.0))
+            if price <= 0:
+                continue
+
+            stock_sig = r.get("stock_signal", {})
             opt_sig = r.get("option_signal", {})
 
-            # 5a. Stock Buy: Allocate ~60% of target budget
-            stock_alloc = per_target_budget * 0.60
-            if stock_alloc > 100.0 and price > 0:
-                shares = math.floor(stock_alloc / price)
-                if shares > 0:
-                    buy_res = self.client.place_stock_order(
-                        symbol=symbol,
-                        action="BUY",
-                        quantity=float(shares),
-                        price=price
-                    )
+            # Sync recommendation's stock_signal display with the computed fractional target
+            r["stock_signal"] = {
+                "action": "BUY",
+                "target_price": round(price, 2),
+                "suggested_budget": round(per_stock_budget, 2),
+                "suggested_shares": round(per_stock_budget / price, 6) if price > 0 else 0.0
+            }
+
+            # If symbol is already held in portfolio, skip per live position limit policy
+            if symbol in retained_symbols:
+                executed_buys_stock.append({
+                    "symbol": symbol,
+                    "action": "BUY",
+                    "quantity": 0,
+                    "target_quantity": 0,
+                    "price": price,
+                    "total_cost": 0.0,
+                    "rank": r.get("rank"),
+                    "status": "SKIPPED",
+                    "partial_fill": False,
+                    "mcp_response": f"Skipped: Symbol {symbol} is already held in portfolio. Adding to existing positions is blocked."
+                })
+                continue
+
+            shares_to_buy = planned_shares.get(symbol, 0.0)
+            stock_order_cost = planned_budgets.get(symbol, round(shares_to_buy * price, 2))
+
+            if shares_to_buy > 0 and stock_order_cost <= current_cash_pool + 0.01:
+                buy_res = self.client.place_stock_order(
+                    symbol=symbol,
+                    action="BUY",
+                    quantity=float(shares_to_buy),
+                    price=price
+                )
+
+                if buy_res.get("success"):
+                    current_cash_pool = round(max(0.0, current_cash_pool - stock_order_cost), 2)
+                    current_daily_pool = round(max(0.0, current_daily_pool - stock_order_cost), 2)
+                    existing_holdings_val[symbol] = existing_holdings_val.get(symbol, 0.0) + stock_order_cost
+
+                    status_label = "FILLED"
+                    fill_msg = buy_res.get("message") or f"Successfully placed BUY order for {shares_to_buy} shares."
+
                     executed_buys_stock.append({
                         "symbol": symbol,
                         "action": "BUY",
-                        "quantity": shares,
+                        "quantity": shares_to_buy,
+                        "target_quantity": shares_to_buy,
                         "price": price,
-                        "total_cost": round(shares * price, 2),
+                        "total_cost": stock_order_cost,
                         "rank": r.get("rank"),
-                        "status": "FILLED" if buy_res.get("success") else "FAILED",
-                        "mcp_response": buy_res.get("message") or buy_res.get("error")
+                        "status": status_label,
+                        "partial_fill": False,
+                        "mcp_response": fill_msg
                     })
+                else:
+                    executed_buys_stock.append({
+                        "symbol": symbol,
+                        "action": "BUY",
+                        "quantity": shares_to_buy,
+                        "target_quantity": shares_to_buy,
+                        "price": price,
+                        "total_cost": stock_order_cost,
+                        "rank": r.get("rank"),
+                        "status": "FAILED",
+                        "partial_fill": False,
+                        "mcp_response": buy_res.get("error") or buy_res.get("message")
+                    })
+            else:
+                executed_buys_stock.append({
+                    "symbol": symbol,
+                    "action": "BUY",
+                    "quantity": 0,
+                    "target_quantity": 0,
+                    "price": price,
+                    "total_cost": 0.0,
+                    "rank": r.get("rank"),
+                    "status": "SKIPPED",
+                    "partial_fill": False,
+                    "mcp_response": f"Skipped: Insufficient buying power or single-position cap (${current_cash_pool:,.2f} cash available, price ${price:,.2f})"
+                })
 
-            # 5b. Option Buy: Allocate ~40% of target budget for ATM Call Option
-            opt_alloc = per_target_budget * 0.40
-            if opt_alloc > 100.0 and opt_sig:
+            # --- 5b. Option Purchase ---
+            if opt_sig:
+                target_contracts = int(opt_sig.get("contracts", 0))
                 prem = float(opt_sig.get("estimated_premium", 0.0))
                 strike = float(opt_sig.get("strike", price))
                 expiry = opt_sig.get("expiry_date", "")
-                if prem > 0:
-                    contracts = math.floor(opt_alloc / (prem * 100.0))
-                    if contracts < 1 and opt_alloc >= (prem * 100.0 * 0.5):
-                        contracts = 1  # Buy at least 1 contract if within reach
-                    if contracts > 0:
-                        opt_res = self.client.place_option_order(
-                            symbol=symbol,
-                            option_type="CALL",
-                            strike=strike,
-                            expiry_date=expiry,
-                            action="BUY",
-                            contracts=contracts,
-                            premium=prem
-                        )
-                        executed_buys_options.append({
-                            "symbol": symbol,
-                            "option_type": "CALL",
-                            "strike": strike,
-                            "expiry_date": expiry,
-                            "contracts": contracts,
-                            "premium": prem,
-                            "total_cost": round(contracts * prem * 100.0, 2),
-                            "rank": r.get("rank"),
-                            "status": "FILLED" if opt_res.get("success") else "FAILED",
-                            "mcp_response": opt_res.get("message") or opt_res.get("error")
-                        })
+
+                if is_live_env:
+                    # Live policy prohibits options
+                    executed_buys_options.append({
+                        "symbol": symbol,
+                        "option_type": "CALL",
+                        "strike": strike,
+                        "expiry_date": expiry,
+                        "contracts": 0,
+                        "target_contracts": target_contracts,
+                        "premium": prem,
+                        "total_cost": 0.0,
+                        "rank": r.get("rank"),
+                        "status": "SKIPPED_LIVE_POLICY",
+                        "partial_fill": False,
+                        "mcp_response": "Skipped: Equities only permitted in live trading policy."
+                    })
+                else:
+                    # Sandbox option execution
+                    contract_cost = round(prem * 100.0, 2)
+                    if target_contracts <= 0 and contract_cost > 0:
+                        target_contracts = max(1, math.floor(2000.0 / contract_cost))
+
+                    if target_contracts > 0 and contract_cost > 0:
+                        target_opt_cost = round(target_contracts * contract_cost, 2)
+                        sym_curr_val = existing_holdings_val.get(symbol, 0.0)
+                        avail_pos_cap = max(0.0, max_pos_cap_dollars - sym_curr_val)
+                        max_opt_budget = min(current_cash_pool, current_daily_pool, avail_pos_cap)
+
+                        if max_opt_budget >= contract_cost:
+                            contracts_to_buy = target_contracts if target_opt_cost <= max_opt_budget else math.floor(max_opt_budget / contract_cost)
+                            if contracts_to_buy > 0:
+                                opt_order_cost = round(contracts_to_buy * contract_cost, 2)
+                                opt_res = self.client.place_option_order(
+                                    symbol=symbol,
+                                    option_type="CALL",
+                                    strike=strike,
+                                    expiry_date=expiry,
+                                    action="BUY",
+                                    contracts=contracts_to_buy,
+                                    premium=prem
+                                )
+
+                                if opt_res.get("success"):
+                                    current_cash_pool = round(max(0.0, current_cash_pool - opt_order_cost), 2)
+                                    current_daily_pool = round(max(0.0, current_daily_pool - opt_order_cost), 2)
+                                    existing_holdings_val[symbol] = existing_holdings_val.get(symbol, 0.0) + opt_order_cost
+                                    status_label = "FILLED" if contracts_to_buy == target_contracts else "PARTIAL"
+                                    fill_msg = opt_res.get("message")
+                                    if contracts_to_buy < target_contracts:
+                                        fill_msg = f"Partially filled {contracts_to_buy}/{target_contracts} contracts (${opt_order_cost:,.2f}) due to available budget."
+
+                                    executed_buys_options.append({
+                                        "symbol": symbol,
+                                        "option_type": "CALL",
+                                        "strike": strike,
+                                        "expiry_date": expiry,
+                                        "contracts": contracts_to_buy,
+                                        "target_contracts": target_contracts,
+                                        "premium": prem,
+                                        "total_cost": opt_order_cost,
+                                        "rank": r.get("rank"),
+                                        "status": status_label,
+                                        "partial_fill": contracts_to_buy < target_contracts,
+                                        "mcp_response": fill_msg
+                                    })
+                                else:
+                                    executed_buys_options.append({
+                                        "symbol": symbol,
+                                        "option_type": "CALL",
+                                        "strike": strike,
+                                        "expiry_date": expiry,
+                                        "contracts": contracts_to_buy,
+                                        "target_contracts": target_contracts,
+                                        "premium": prem,
+                                        "total_cost": opt_order_cost,
+                                        "rank": r.get("rank"),
+                                        "status": "FAILED",
+                                        "partial_fill": False,
+                                        "mcp_response": opt_res.get("error") or opt_res.get("message")
+                                    })
+                            else:
+                                executed_buys_options.append({
+                                    "symbol": symbol,
+                                    "option_type": "CALL",
+                                    "strike": strike,
+                                    "expiry_date": expiry,
+                                    "contracts": 0,
+                                    "target_contracts": target_contracts,
+                                    "premium": prem,
+                                    "total_cost": 0.0,
+                                    "rank": r.get("rank"),
+                                    "status": "SKIPPED",
+                                    "partial_fill": False,
+                                    "mcp_response": f"Skipped: Target {target_contracts} contracts (${target_opt_cost:,.2f}) exceeds available budget (${max_opt_budget:,.2f} available)"
+                                })
+                        else:
+                            executed_buys_options.append({
+                                "symbol": symbol,
+                                "option_type": "CALL",
+                                "strike": strike,
+                                "expiry_date": expiry,
+                                "contracts": 0,
+                                "target_contracts": target_contracts,
+                                "premium": prem,
+                                "total_cost": 0.0,
+                                "rank": r.get("rank"),
+                                "status": "SKIPPED",
+                                "partial_fill": False,
+                                "mcp_response": f"Skipped: Insufficient budget for 1 contract (${max_opt_budget:,.2f} available, contract cost is ${contract_cost:,.2f})"
+                            })
 
         # 6. Post-execution Portfolio Snapshot
-        updated_portfolio = self.client.get_portfolio()
         end_time = datetime.datetime.now()
+
+        filled_stocks = [b for b in executed_buys_stock if b["status"] in ["FILLED", "PARTIAL"]]
+        filled_options = [o for o in executed_buys_options if o["status"] in ["FILLED", "PARTIAL"]]
+        total_spent_buys = sum(b["total_cost"] for b in filled_stocks)
+        final_cash = round(current_cash_pool, 2)
+
+        # Projected holdings: retained holdings + newly purchased positions
+        projected_holdings = []
+        for k in keep_decisions:
+            projected_holdings.append({
+                "symbol": k["symbol"],
+                "quantity": k["quantity"],
+                "avg_price": k["current_price"],
+                "current_price": k["current_price"],
+                "market_value": round(k["quantity"] * k["current_price"], 2),
+                "total_value": round(k["quantity"] * k["current_price"], 2)
+            })
+        for b in executed_buys_stock:
+            if b["quantity"] > 0 and b["status"] in ["FILLED", "PARTIAL"]:
+                projected_holdings.append({
+                    "symbol": b["symbol"],
+                    "quantity": b["quantity"],
+                    "avg_price": b["price"],
+                    "current_price": b["price"],
+                    "market_value": b["total_cost"],
+                    "total_value": b["total_cost"]
+                })
 
         execution_report = {
             "success": True,
             "agent_name": self.name,
             "timestamp": start_time.strftime("%Y-%m-%d %H:%M:%S EST"),
-            "environment": "ROBINHOOD_MCP_SANDBOX",
-            "initial_cash": current_cash,
-            "liquidation_proceeds": round(liquidation_cash_generated, 2),
-            "effective_buying_power": projected_buying_power,
-            "final_cash_remaining": updated_portfolio.get("cash_available", 0.0),
-            "total_portfolio_equity": updated_portfolio.get("total_equity", 0.0),
+            "environment": getattr(self.client, "environment", "ROBINHOOD_MCP_SANDBOX"),
+            "initial_cash": initial_cash,
+            "liquidation_proceeds": round(actual_liquidation_proceeds, 2),
+            "effective_buying_power": effective_buying_power,
+            "total_spent_buys": round(total_spent_buys, 2),
+            "final_cash_remaining": final_cash,
+            "total_portfolio_equity": round(total_equity, 2),
             "comparative_analysis": {
                 "holdings_before": len(current_holdings),
                 "liquidations_count": len(executed_sells),
@@ -194,11 +450,12 @@ class BrokerAgent:
                 "buys_stock": executed_buys_stock,
                 "buys_options": executed_buys_options
             },
-            "updated_holdings": updated_portfolio.get("holdings", []),
-            "updated_options": updated_portfolio.get("option_positions", []),
+            "updated_holdings": projected_holdings,
+            "updated_options": post_sell_portfolio.get("option_positions", []),
             "execution_summary": (
-                f"Rebalance completed: Liquidated {len(executed_sells)} positions generating ${liquidation_cash_generated:,.2f} cash. "
-                f"Executed {len(executed_buys_stock)} stock buys and {len(executed_buys_options)} option call contracts in Robinhood Sandbox."
+                f"Rebalance completed: Liquidated {len(executed_sells)} positions generating ${actual_liquidation_proceeds:,.2f} cash. "
+                f"Allocated ${total_spent_buys:,.2f} across {len(filled_stocks)} stock buys (leaving ${final_cash:,.2f} cash) "
+                f"in {getattr(self.client, 'environment', 'Robinhood Sandbox')} based on dynamic capital allocation."
             )
         }
 

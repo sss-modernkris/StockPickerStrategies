@@ -6,7 +6,7 @@ Provides structured Python access to Robinhood MCP tools for the Broker Agent.
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from mcp.rh_mcp_server import get_sandbox, handle_mcp_request
+from rh_sandbox.rh_mcp_server import get_sandbox, handle_mcp_request
 
 logger = logging.getLogger("RobinhoodMCPClient")
 

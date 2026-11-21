@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +20,13 @@ import {
     Flame,
     Building2,
     Percent,
-    Sparkles
+    Sparkles,
+    Cpu,
+    Briefcase,
+    AlertTriangle,
+    DollarSign,
+    Shield,
+    RotateCcw
 } from 'lucide-react';
 
 export function StrategyGlossary() {
@@ -1218,15 +1226,169 @@ export function StrategyGlossary() {
             id: "ai-agents-pipeline",
             icon: <Bot className="w-5 h-5 text-emerald-400" />,
             title: "Specialized AI Agents & Robinhood MCP Pipeline",
-            badge: "Autonomous Sandbox Trading",
-            description: "A linear two-agent pipeline that automates daily market screening and simulated execution in the Robinhood MCP sandbox with strict 0% capital-risk guardrails.",
-            formula: "Buying Power = Current Cash + ∑(Liquidated Displaced Holdings Proceeds)",
-            bullets: [
-                { label: "1. Backtester Agent (Trigger: 2:00 PM EST)", text: "Automatically scans ~170 tickers across the Dow 30, Nasdaq 100, and S&P 500 every trading day at 2:00 PM EST. Applies Strategy 1 (1-Week lookback) quantitative filters (Bull Willy VWAP, 1-Wk Value > $10k, MACD Hist/Slope, RSI 30-70) and outputs a ranked recommendations payload with stock & ATM Call options signals." },
-                { label: "2. Broker Agent (Portfolio Comparative Analysis)", text: "Ingests the Backtester recommendations and queries the active Robinhood Sandbox account (RH-SIM-SANDBOX-001). Compares existing holdings vs. incoming top opportunities to determine which non-strategy positions to liquidate." },
-                { label: "3. Dynamic Buying Power & Trade Sizing", text: "Calculates total effective buying power as available cash plus proceeds from sell liquidations. Allocates capital across top-ranked stock positions and ATM Call options (sized to available budget)." },
-                { label: "4. MCP Sandbox Execution & Guardrails", text: "Dispatches sell orders first to release capital, then dispatches stock and option buy orders strictly via the Robinhood Model Context Protocol (MCP) server. Live-capital execution is blocked by design." }
-            ]
+            badge: "Autonomous Agentic Trading & Fractional Sizing",
+            description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with fractional share capital allocation ($2,000 per stock when funded ≥ $10,000, or Available Cash ÷ 5 fallback) and an institutional Risk Firewall.",
+            formula: "Per-Stock Budget = $2,000 (if Available Cash ≥ $10,000) else ⌊(Available Cash ÷ 5) × 100⌋ / 100 | Fractional Shares = round(Budget ÷ Price, 6)",
+            customContent: (
+                <div className="space-y-6 mt-4 text-sm text-foreground">
+                    {/* Architecture Overview */}
+                    <div className="bg-gradient-to-br from-emerald-950/40 via-black/40 to-indigo-950/40 p-5 rounded-xl border border-emerald-500/20 text-xs space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="font-bold text-white text-sm flex items-center gap-2">
+                                <Cpu className="w-4 h-4 text-emerald-400" />
+                                End-to-End Agentic Trading Workflow (2:00 PM EST Daily Execution &amp; On-Demand Pipeline)
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
+                                v20261115 • Fractional Shares Ready
+                            </span>
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed">
+                            The Strategic Alpha platform implements an autonomous multi-agent pipeline designed for both simulated research (<strong className="text-emerald-400">Sandbox Mode</strong>) and live brokerage execution (<strong className="text-amber-300">Live Shadow, Approval &amp; Autonomous Modes</strong>). Triggered automatically at 2:00 PM EST or on-demand via <strong className="text-foreground">Run Daily Pipeline Now</strong> in the Brokers tab, the pipeline sizes and executes precision fractional share orders (up to 6 decimal places).
+                        </p>
+                    </div>
+
+                    {/* Section 1: Multi-Agent Orchestration */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>1. Multi-Agent Orchestration Engine</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Linear Automated Pipeline</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Backtester Agent */}
+                            <div className="bg-card border border-emerald-500/30 p-4 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">
+                                        <Sparkles className="w-4 h-4" /> 1. Backtester Agent
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                                        Daily @ 2:00 PM EST
+                                    </span>
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Scans constituent tickers across the <strong className="text-foreground">Dow 30, Nasdaq 100, and S&amp;P 500</strong> (~170 equities) using the fast 6-month bulk vector screen and ranks the top 5 setups:
+                                </p>
+                                <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                                    <li><strong className="text-foreground">Willy Dynamic VWAP:</strong> Price action confirmed in Bull market regime.</li>
+                                    <li><strong className="text-foreground">1-Week Strategy Value:</strong> Minimum $10,000 threshold with positive 2-day slope trajectory.</li>
+                                    <li><strong className="text-foreground">Momentum &amp; Velocity:</strong> MACD Histogram in [-0.5, 0.5] and upward MACD Slope (&gt; 0).</li>
+                                    <li><strong className="text-foreground">RSI Range Guard:</strong> RSI(14) between 30 and 70 to exclude overextended extremes.</li>
+                                    <li><strong className="text-foreground">Fractional Equity &amp; ATM Option Signals:</strong> Computes baseline fractional share quantity (<code className="text-foreground">round(2000 / close, 6)</code>) and 30-day ATM Call option metrics.</li>
+                                </ul>
+                            </div>
+
+                            {/* Broker Agent */}
+                            <div className="bg-card border border-indigo-500/30 p-4 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-indigo-400 flex items-center gap-1.5 text-sm">
+                                        <Briefcase className="w-4 h-4" /> 2. Broker Agent
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
+                                        Fractional Rebalancer
+                                    </span>
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Queries active portfolio state, liquidates stale holdings, and executes fractional share allocation across the top 5 recommended stocks:
+                                </p>
+                                <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                                    <li><strong className="text-foreground">Comparative Liquidation:</strong> Positions falling out of top rankings are sold first so proceeds add to deployable buying power.</li>
+                                    <li><strong className="text-foreground">$2,000 Full Fractional Rule:</strong> If available deployable cash covers $2,000 per stock (<code className="text-foreground">≥ $10,000</code> for 5 stocks), buys exactly <strong className="text-emerald-400">$2,000.00</strong> of fractional shares (<code className="text-foreground">round(2000 / price, 6)</code>) for each stock.</li>
+                                    <li><strong className="text-foreground">Available ÷ 5 Fallback Rule:</strong> If available cash is under the full threshold, divides available amount equally by <strong className="text-indigo-400">5</strong> (<code className="text-foreground">⌊(Cash / 5) × 100⌋ / 100</code>) and buys fractional shares of each stock for that computed dollar amount.</li>
+                                    <li><strong className="text-foreground">Robinhood MCP Fractional Protocol:</strong> Formats fractional share quantities up to 6 decimal places and routes fractional orders as <code className="text-foreground">market</code> orders during <code className="text-foreground">regular_hours</code>.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Institutional Risk Firewall Guardrails */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>2. Institutional Risk Firewall &amp; Execution Safeguards</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Configurable via UI &amp; .env</span>
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="p-3.5 rounded-xl bg-card border border-red-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-red-400 flex items-center gap-1.5">
+                                    <AlertTriangle className="w-4 h-4" /> Emergency Kill Switch
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Instant 1-click execution freeze. Halts all manual order submissions and blocks automated daily agent pipeline dispatches immediately.
+                                </p>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-card border border-emerald-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                                    <DollarSign className="w-4 h-4" /> Daily Spend Limit
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Maximum daily capital cap ($10,000 default to support 5 × $2,000 fractional stock positions). Accumulates daily spend and rejects BUY orders exceeding the cap. Resets at midnight.
+                                </p>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-card border border-indigo-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-indigo-400 flex items-center gap-1.5">
+                                    <Shield className="w-4 h-4" /> Max Position Cap
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Enforces a single-position allocation ceiling (25.0% default to accommodate 5 equal-weight 20% fractional positions). Prevents portfolio over-concentration.
+                                </p>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-card border border-purple-500/30 space-y-1.5 text-xs">
+                                <div className="font-bold text-purple-400 flex items-center gap-1.5">
+                                    <RotateCcw className="w-4 h-4" /> State &amp; Token Sync
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    Persists sandbox state to <code className="text-foreground">rh_sandbox_state.json</code>, audit logs to <code className="text-foreground">ledger.jsonl</code>, and automatically syncs refreshed OAuth 2.1 MCP tokens.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Dual Execution Modes (Sandbox vs Live) */}
+                    <div className="space-y-3">
+                        <h4 className="text-base font-semibold text-foreground border-b border-border/40 pb-1.5 flex items-center justify-between">
+                            <span>3. Dual Execution Architecture (Sandbox vs Live API)</span>
+                            <span className="text-xs font-mono font-normal text-muted-foreground">Model Context Protocol (MCP) Standard</span>
+                        </h4>
+                        <div className="bg-card border border-border/40 p-4 rounded-xl space-y-3 text-xs sm:text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-1.5 text-xs">
+                                    <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                                        <span>🛡️ Mode A: Sandbox Simulation (0% Risk)</span>
+                                    </div>
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        Operates with virtual cash ($25,000 starting capital) in account <code className="text-foreground">RH-SIM-SANDBOX-001</code>. Simulates realistic order fills, bid/ask spreads, and options pricing without risking real capital. Supports 1-click sandbox reset.
+                                    </p>
+                                </div>
+
+                                <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1.5 text-xs">
+                                    <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                                        <span>⚡ Mode B: Live Robinhood Agentic Trading</span>
+                                    </div>
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        Routes trades to the official Robinhood Agentic Trading API with timestamped HMAC-SHA256 / ECDSA cryptographic request signatures (<code className="text-foreground">X-API-KEY</code>, <code className="text-foreground">X-SIGNATURE</code>, <code className="text-foreground">X-TIMESTAMP</code>).
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="bg-muted/50 p-3 rounded-lg border border-border/40 text-xs space-y-1">
+                                <p className="font-semibold text-foreground">Standardized MCP Tools Exposed:</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono text-[11px]">
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-emerald-400">
+                                        robinhood_get_portfolio
+                                    </div>
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-indigo-300">
+                                        robinhood_place_stock_order
+                                    </div>
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-purple-300">
+                                        robinhood_place_option_order
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             id: "compare-charts-linear-fit",
@@ -1748,7 +1910,7 @@ export function StrategyGlossary() {
             (item.id === 'backtest-30d-strategy3' && "30-Day Strategy 3 Backtesting Model Historical Simulation Universe Selection Trades ROI Timeline Shift 2:50 PM".toLowerCase().includes(query)) ||
             (item.id === 'options-backtest' && "Options Strategy Backtesting Black-Scholes Call Premium Strike Expiry Intraday Relative Hold Baseline P&L Leverage Theta Volatility".toLowerCase().includes(query)) ||
             (item.id === 'options-alpha-rank' && "Options Alpha Rank Stage 1 Stage 2 Bullish Tickers Call Option Greeks Efficiency Delta Theta Ratio Daily Decay DTE 30 45 Bid Ask Liquidity".toLowerCase().includes(query)) ||
-            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls".toLowerCase().includes(query))
+            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls Fractional Shares 2000 Divide by 5 v20261115".toLowerCase().includes(query))
         );
     });
 
@@ -1778,7 +1940,7 @@ export function StrategyGlossary() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredItems.map((item) => (
-                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' || item.id === 'options-alpha-rank' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
+                        <Card key={item.id} className={`flex flex-col h-full ${item.id === 'xgboost' || item.id === 'danaher-fundamental-data' || item.id === 'compare-charts-linear-fit' || item.id === 'percentage-slope-std-metrics' || item.id === 'call-option-criteria-framework' || item.id === 'options-alpha-rank' || item.id === 'ai-agents-pipeline' ? 'md:col-span-2 shadow-md border-primary/40 bg-card' : 'bg-card'}`}>
                             <CardHeader className="pb-3 border-b border-border/10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
