@@ -126,7 +126,11 @@ class LiveMCPClient:
                 if attempt < max_attempts and is_read:
                     await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
 
-        err_msg = f"Failed to execute MCP tool '{tool_name}': {last_error}"
+        err_detail = last_error
+        if hasattr(last_error, "exceptions") and last_error.exceptions:
+            sub_errs = "; ".join(f"{type(sub).__name__}: {sub}" for sub in last_error.exceptions)
+            err_detail = f"{last_error} [{sub_errs}]"
+        err_msg = f"Failed to execute MCP tool '{tool_name}': {err_detail}"
         logger.error(err_msg)
         state.record_failure(err_msg)
         return {"success": False, "error": err_msg}
@@ -410,8 +414,14 @@ class LiveMCPClient:
             "is_simulated": False,
             "cash_available": 0.0,
             "buying_power": 0.0,
+            "invested_capital": 0.0,
+            "stock_equity": 0.0,
+            "option_equity": 0.0,
             "total_equity": 0.0,
+            "unrealized_pnl": 0.0,
+            "realized_pnl": 0.0,
             "holdings": [],
+            "queued_orders": [],
             "option_positions": [],
             "orders": [],
             "guardrails": {

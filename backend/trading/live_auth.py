@@ -69,16 +69,24 @@ class FileTokenStorage(TokenStorage):
             self.token_path,
             os.path.expanduser("~/.strategicalpha/robinhood_oauth.json"),
             "/root/.strategicalpha/robinhood_oauth.json",
+            os.path.join(config.LIVE_DATA_DIR, "robinhood_oauth.json"),
+            os.path.join(config.PROJECT_ROOT, "_data", "robinhood_oauth.json"),
         ]
-        target = next((p for p in candidates if p and os.path.exists(p)), None)
-        if not target:
-            return {}
-        try:
-            with open(target, "r", encoding="utf-8") as f:
-                return json.load(f) or {}
-        except Exception as e:
-            logger.error(f"Failed to read token file {target}: {e}")
-            return {}
+        for target in candidates:
+            if not target or not os.path.exists(target):
+                continue
+            try:
+                with open(target, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                    if not raw:
+                        continue
+                    data = json.loads(raw)
+                    if isinstance(data, dict) and data:
+                        logger.info(f"Loaded token storage from {target} (keys: {list(data.keys())})")
+                        return data
+            except Exception as e:
+                logger.error(f"Failed to read token file {target}: {e}")
+        return {}
 
     def _write_data(self, data: Dict[str, Any]) -> None:
         self._ensure_dir()
@@ -94,6 +102,13 @@ class FileTokenStorage(TokenStorage):
     async def get_tokens(self) -> Optional[OAuthToken]:
         data = self._read_data()
         token_dict = data.get("tokens")
+        if not isinstance(token_dict, dict):
+            # Check if tokens are stored flat at top-level
+            if data.get("access_token") or data.get("accessToken") or data.get("token"):
+                token_dict = data
+            else:
+                token_dict = None
+
         if not token_dict:
             # Fall back to IDE's mcp-remote tokens if available
             tf, _ = self._find_mcp_remote_files()
@@ -110,11 +125,31 @@ class FileTokenStorage(TokenStorage):
                     logger.warning(f"Failed to load tokens from {tf}: {e}")
 
         if not token_dict:
+            logger.warning(f"No tokens found in token storage (checked keys: {list(data.keys())})")
             return None
+
+        # Normalize camelCase to snake_case for Pydantic OAuthToken
+        norm = {}
+        access_tok = token_dict.get("access_token") or token_dict.get("accessToken") or token_dict.get("token")
+        if access_tok:
+            norm["access_token"] = str(access_tok)
+        refresh_tok = token_dict.get("refresh_token") or token_dict.get("refreshToken")
+        if refresh_tok:
+            norm["refresh_token"] = str(refresh_tok)
+        norm["token_type"] = token_dict.get("token_type") or token_dict.get("tokenType") or "Bearer"
+        exp = token_dict.get("expires_in") or token_dict.get("expiresIn")
+        if exp is not None:
+            try:
+                norm["expires_in"] = int(exp)
+            except Exception:
+                pass
+        if token_dict.get("scope"):
+            norm["scope"] = token_dict["scope"]
+
         try:
-            return OAuthToken.model_validate(token_dict)
+            return OAuthToken.model_validate(norm)
         except Exception as e:
-            logger.warning(f"Failed to parse stored tokens: {e}")
+            logger.error(f"Failed to parse stored tokens into OAuthToken: {e} | Raw keys: {list(token_dict.keys())}")
             return None
 
     async def set_tokens(self, tokens: OAuthToken) -> None:
@@ -137,7 +172,14 @@ class FileTokenStorage(TokenStorage):
 
     async def get_client_info(self) -> Optional[OAuthClientInformationFull]:
         data = self._read_data()
-        client_dict = data.get("client_info")
+        client_dict = data.get("client_info") or data.get("clientInfo")
+        if not isinstance(client_dict, dict):
+            # Check if client info is stored flat at top-level
+            if data.get("client_id") or data.get("clientId"):
+                client_dict = data
+            else:
+                client_dict = None
+
         if not client_dict:
             # Fall back to IDE's mcp-remote client info if available
             _, cf = self._find_mcp_remote_files()
@@ -154,8 +196,16 @@ class FileTokenStorage(TokenStorage):
 
         if not client_dict:
             return None
+
+        # Normalize camelCase to snake_case for Pydantic OAuthClientInformationFull
+        norm = dict(client_dict)
+        if "clientId" in norm and "client_id" not in norm:
+            norm["client_id"] = norm["clientId"]
+        if "clientSecret" in norm and "client_secret" not in norm:
+            norm["client_secret"] = norm["clientSecret"]
+
         try:
-            return OAuthClientInformationFull.model_validate(client_dict)
+            return OAuthClientInformationFull.model_validate(norm)
         except Exception as e:
             logger.warning(f"Failed to parse stored client_info: {e}")
             return None
@@ -338,8 +388,6 @@ async def interactive_login(port: int = 33418) -> bool:
     """Executes the interactive browser OAuth login flow."""
     print("Initiating Robinhood MCP OAuth 2.1 login flow...")
     provider = build_oauth_provider(redirect_port=port, interactive=True)
-    cb_server = _AuthCallbackServer(port=port)
-    cb_server.start()
 
     try:
         from mcp.shared._httpx_utils import create_mcp_http_client
@@ -357,8 +405,6 @@ async def interactive_login(port: int = 33418) -> bool:
         print(f"\nOAuth login failed: {e}")
         state.trip_breaker(f"OAuth interactive login failed: {e}")
         return False
-    finally:
-        cb_server.stop()
 
 
 def main():

@@ -35,7 +35,9 @@ class BrokerAgent:
         based on optimal dynamic capital allocation across qualified candidates.
         """
         start_time = datetime.datetime.now()
-        logger.info(f"[{self.name}] Initiating portfolio comparative analysis & execution pipeline...")
+        # Dynamically reload trading client to reflect active runtime trading mode
+        self.client = get_trading_client()
+        logger.info(f"[{self.name}] Initiating portfolio comparative analysis & execution pipeline ({getattr(self.client, 'environment', 'UNKNOWN')})...")
 
         # 1. Fetch current portfolio state via Robinhood MCP / Client
         initial_portfolio = self.client.get_portfolio()

@@ -55,6 +55,7 @@ interface RHConfig {
 }
 
 interface RHData {
+  error?: string;
   unrealized_pnl: number;
   realized_pnl: number;
   buying_power: number;
@@ -1388,6 +1389,19 @@ export function BrokersPanel() {
           )}
 
           {/* Account PNL Summary Metric Cards */}
+          {rhData?.error && (
+            <div className="p-3 mb-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+              <div>
+                <span className="font-semibold text-amber-200">Robinhood MCP Live Portfolio Offline:</span>
+                <p className="text-[11px] text-amber-300/80 mt-0.5 font-mono break-all">{rhData.error}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Cash and equity show $0.00 because live balances could not be fetched from the Robinhood Trading MCP server. Check your OAuth token authentication.
+                </p>
+              </div>
+            </div>
+          )}
+
           {rhData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-3 duration-300">
               <Card className="bg-gradient-to-br from-emerald-500/5 to-transparent border-white/5 shadow-lg relative overflow-hidden">

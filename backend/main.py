@@ -367,6 +367,13 @@ def set_kill_switch_endpoint(req: KillSwitchRequest):
     from trading import state
     res = state.set_kill_switch(active=req.active, actor="frontend_ui", reason=req.reason or "")
     return {"status": "success", "result": res}
+
+@app.post("/api/trading/circuit-breaker/reset")
+def reset_circuit_breaker_endpoint():
+    """Resets the safety circuit breaker and clears consecutive failure counters."""
+    from trading import state
+    res = state.reset_breaker(actor="frontend_ui")
+    return {"status": "success", "result": res}
 
 @app.get("/api/trading/live/health")
 async def get_live_health_endpoint():
