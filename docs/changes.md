@@ -2,7 +2,35 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20261029 - Dynamic Multi-Pass Capital Allocation Engine & Small-Account Risk Calibration
+## 1. Release v20261123 - Proactive Silent OAuth Token Rotation, Resilient Multi-Source Token Discovery & Live Autonomous Trading Engine
+
+### 🔑 Proactive Silent Token Rotation & Resilient Multi-Source Token Discovery ([backend/trading/token_refresh.py](file:///d:/AI/StockPickerStrategies/backend/trading/token_refresh.py), [backend/trading/live_auth.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_auth.py))
+- **Automated Silent Token Rotation Engine (`TokenRefreshManager`)**:
+  - Implemented background token renewal directly against `https://api.robinhood.com/oauth2/token/` using the OAuth 2.1 `refresh_token`.
+  - Added pre-flight token lifetime checks (`ensure_valid_token()`) in `LiveMCPClient._call_mcp_tool_async()` with a 2-hour buffer to eliminate `OAuthFlowError: No redirect handler provided` during unattended market operations.
+- **Resilient Multi-Source Token Resolution (`FileTokenStorage`)**:
+  - Upgraded `FileTokenStorage._read_data()` to inspect all token candidate paths (`~/.strategicalpha`, `~/.mcp-auth/mcp-remote-v1`, and `_data/live_trading`), decode JWT `exp` claims, and automatically load the freshest valid token.
+  - Automatically mirrors valid tokens across host paths (`%USERPROFILE%\.strategicalpha\robinhood_oauth.json`), Docker container mounts (`/root/.strategicalpha`), and project paths (`_data/live_trading/robinhood_oauth.json`).
+- **Streamable HTTP POST Interactive Login Handshake**:
+  - Replaced legacy HTTP `GET` in `interactive_login()` with standard Streamable HTTP session initialization (`POST`), correctly resolving `405 Method Not Allowed` and guaranteeing the OAuth redirect flow launches the browser popup cleanly.
+  - Dynamically extracts and binds redirect URI ports from registered client metadata, eliminating `redirect_uri_mismatch` errors.
+
+### 🛡️ Institutional Live Trading Resilience & Circuit Breaker Protection ([backend/trading/live_client.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_client.py), [backend/agents/pipeline.py](file:///d:/AI/StockPickerStrategies/backend/agents/pipeline.py))
+- **ExceptionGroup & TaskGroup Unwrapping**:
+  - Added recursive unwrapping for Python 3.11+ `ExceptionGroup` in `LiveMCPClient` to surface exact underlying exceptions in logs and audit ledger rather than opaque task group errors.
+- **Authentication Error Circuit Breaker Shield**:
+  - Suppressed institutional circuit breaker tripping on transient OAuth authentication or token expiration errors, preventing unexpected system lockouts.
+- **Proactive 30-Minute Token Heartbeat**:
+  - Integrated periodic token health checks every 30 minutes into `TradingPipeline._scheduler_loop()` during live operating modes (`LIVE_SHADOW`, `LIVE_APPROVAL`, `LIVE_AUTONOMOUS`).
+- **Zero-Value Metrics Guardrail**:
+  - Standardized `_build_empty_portfolio()` with all required numeric metric fields (`invested_capital`, `stock_equity`, `option_equity`, `total_equity`, `queued_orders`), preventing dashboard null errors.
+
+### 🏷️ Version Synchronization (`v20261123`)
+- Synchronized version tags across `README.md` (`v20261123`), `frontend/src/app/page.tsx` (`v20261123`), `frontend/src/components/TickerSidebar.tsx` (`v20261123`), `frontend/package.json` (`0.2.0`), `backend/main.py` (`1.1.0`), `plugin.json` (`1.3.0`), and `docs/changes.md`.
+
+---
+
+## 2. Release v20261029 - Dynamic Multi-Pass Capital Allocation Engine & Small-Account Risk Calibration
 
 ### 💰 Dynamic Multi-Pass Capital Allocation Engine ([backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py))
 - **Total Buying Power Synchronization**:

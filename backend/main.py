@@ -20,7 +20,7 @@ import json
 app = FastAPI(
     title="Strategic Alpha Dashboard API",
     description="Backend for the Quant Strategies Dashboard",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 @app.on_event("startup")

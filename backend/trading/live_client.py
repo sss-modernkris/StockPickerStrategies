@@ -88,6 +88,17 @@ class LiveMCPClient:
         last_error = None
         settings = config.get_settings()
 
+        # Pre-flight token check to ensure fresh tokens before remote call
+        try:
+            from trading.token_refresh import ensure_valid_token
+            tok_status = ensure_valid_token(buffer_seconds=1800)
+            if tok_status.get("reauth_required"):
+                err_msg = "Robinhood OAuth session expired. Please run 'python -m trading.live_auth login' to re-authenticate."
+                logger.error(err_msg)
+                return {"success": False, "error": err_msg, "auth_expired": True}
+        except Exception as te:
+            logger.debug(f"Pre-flight token check skipped: {te}")
+
         for attempt in range(1, max_attempts + 1):
             try:
                 provider = build_oauth_provider(interactive=False)
@@ -132,8 +143,20 @@ class LiveMCPClient:
             err_detail = f"{last_error} [{sub_errs}]"
         err_msg = f"Failed to execute MCP tool '{tool_name}': {err_detail}"
         logger.error(err_msg)
-        state.record_failure(err_msg)
-        return {"success": False, "error": err_msg}
+
+        # Guardrail: Suppress circuit breaker trip on OAuth expiration errors
+        is_auth_error = (
+            "OAuthFlowError" in str(err_detail)
+            or "No redirect handler" in str(err_detail)
+            or "401" in str(err_detail)
+            or "invalid_grant" in str(err_detail)
+        )
+        if not is_auth_error:
+            state.record_failure(err_msg)
+        else:
+            logger.warning(f"[AUTH GUARD] Suppressed circuit breaker trip for OAuth expiration error: {err_detail}")
+
+        return {"success": False, "error": err_msg, "auth_expired": is_auth_error}
 
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], is_read: bool = True) -> Dict[str, Any]:
         """Synchronous wrapper for tool execution."""

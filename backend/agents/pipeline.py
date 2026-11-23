@@ -44,6 +44,7 @@ class TradingPipeline:
         # Scheduler state
         self.scheduler_enabled = True
         self.last_scheduled_date: Optional[str] = None
+        self._last_token_check = 0.0
         self._scheduler_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         
@@ -87,6 +88,18 @@ class TradingPipeline:
                     today_str = now_ny.strftime("%Y-%m-%d")
                     is_market_day = market_calendar.is_trading_day(now_ny.date())
                     
+                    # Proactive OAuth Token Refresh Heartbeat (Every 30 minutes in Live modes)
+                    if (
+                        time.time() - self._last_token_check > 1800
+                        and state.get_mode() in ("LIVE_SHADOW", "LIVE_APPROVAL", "LIVE_AUTONOMOUS")
+                    ):
+                        self._last_token_check = time.time()
+                        try:
+                            from trading.token_refresh import ensure_valid_token
+                            ensure_valid_token(buffer_seconds=7200)
+                        except Exception as te:
+                            logger.debug(f"[SCHEDULER] Periodic token refresh check error: {te}")
+
                     # Target trigger condition:
                     # 1. Trading day (NYSE session open today, skips holidays and weekends)
                     # 2. Reached or passed 14:00 (within trigger window 14:00-14:15)
