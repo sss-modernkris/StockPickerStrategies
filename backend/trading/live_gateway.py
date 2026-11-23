@@ -97,7 +97,9 @@ class LiveExecutionGateway(TradingClient):
         symbol: str,
         action: str,
         quantity: float,
-        price: float
+        price: float,
+        order_type: str = "limit",
+        market_hours: str = "regular_hours"
     ) -> Dict[str, Any]:
         symbol = symbol.strip().upper()
         action = action.strip().upper()
@@ -209,9 +211,10 @@ class LiveExecutionGateway(TradingClient):
         else:
             logger.info(f"[GATEWAY] Market is closed. Bypassing live spread/deviation filters so order can queue in Robinhood.")
 
-        # --- Check 8: Limit Price Calculation with Buffer ---
+        # --- Check 8: Price & Order Type Calculation ---
+        is_fractional = not round(quantity, 6).is_integer()
         buf_mult = self.settings.limit_buffer_pct / 100.0
-        if market_open and ask > 0 and bid > 0:
+        if not is_fractional and market_open and ask > 0 and bid > 0:
             if action == "BUY":
                 limit_price = min(ask, round(signal_price * (1.0 + buf_mult), 2))
             else:
@@ -220,6 +223,10 @@ class LiveExecutionGateway(TradingClient):
             limit_price = round(signal_price, 2)
 
         est_cost = round(quantity * limit_price, 2)
+
+        # Fractional share orders must be routed as type='market' and market_hours='regular_hours'
+        eff_order_type = "market" if is_fractional else order_type
+        eff_market_hours = "regular_hours" if is_fractional else market_hours
 
         # --- Check 5: BUY Budget, Position Cap & Daily Drawdown ---
         if action == "BUY":
@@ -322,6 +329,8 @@ class LiveExecutionGateway(TradingClient):
             action=action,
             quantity=quantity,
             price=limit_price,
+            order_type=eff_order_type,
+            market_hours=eff_market_hours,
             client_order_id=client_order_id
         )
 

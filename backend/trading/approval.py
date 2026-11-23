@@ -91,6 +91,7 @@ def save_pending_plan(
         "cutoff_et": f"{settings.approval_cutoff[0]}:{settings.approval_cutoff[1]:02d}",
         "source": source,
         "summary": broker_stage.get("execution_summary", "Rebalance plan pending approval"),
+        "sizing_mode": broker_stage.get("sizing_mode", "INTEGER"),
         "initial_cash": broker_stage.get("initial_cash", 0.0),
         "liquidation_proceeds": broker_stage.get("liquidation_proceeds", 0.0),
         "effective_buying_power": broker_stage.get("effective_buying_power", 0.0),
@@ -177,8 +178,16 @@ def execute_approved_plan(actor: str = "user") -> Dict[str, Any]:
 
     logger.info(f"[PLAN APPROVAL] Executing approved plan {plan.get('plan_id')} by actor '{actor}'")
 
-    # 1. Execute Sells first to free up buying power
+    # 1. Execute Sells first to free up buying power (if not already filled automatically)
     for s in actions.get("sells", []):
+        if s.get("status") == "FILLED":
+            executed_sells.append({
+                "symbol": s.get("symbol"),
+                "action": "SELL",
+                "quantity": s.get("quantity"),
+                "result": {"success": True, "message": "Already executed automatically"}
+            })
+            continue
         sym = s["symbol"]
         qty = float(s["quantity"])
         price = float(s["price"])

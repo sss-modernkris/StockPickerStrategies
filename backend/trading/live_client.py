@@ -585,6 +585,9 @@ class LiveMCPClient:
         action: str,
         quantity: float,
         price: float,
+        order_type: str = "limit",
+        time_in_force: str = "gfd",
+        market_hours: str = "regular_hours",
         client_order_id: Optional[str] = None,
         account_number: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -596,9 +599,9 @@ class LiveMCPClient:
             action=action,
             quantity=quantity,
             price=price,
-            order_type="limit",
-            time_in_force="gfd",
-            market_hours="regular_hours",
+            order_type=order_type,
+            time_in_force=time_in_force,
+            market_hours=market_hours,
             client_order_id=client_order_id,
             account_number=account_id,
             is_review=False

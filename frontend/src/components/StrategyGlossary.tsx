@@ -1226,9 +1226,9 @@ export function StrategyGlossary() {
             id: "ai-agents-pipeline",
             icon: <Bot className="w-5 h-5 text-emerald-400" />,
             title: "Specialized AI Agents & Robinhood MCP Pipeline",
-            badge: "Autonomous Agentic Trading & Guardrails",
-            description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with an institutional Risk Firewall (Daily Spend Limits, Position Caps, Emergency Kill Switch, and Dual Sandbox/Live execution).",
-            formula: "Buying Power = Cash + ∑(Liquidated Proceeds) | Max Allocation = Total Equity × (Cap % / 100)",
+            badge: "Autonomous Agentic Trading & Fractional Sizing",
+            description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with flexible capital allocation (Default Two-Pass Dynamic Integer Sizing or precision Fractional Share Sizing up to 6 decimal places) and an institutional Risk Firewall.",
+            formula: "Two-Pass Integer: Pass 1 Base + Pass 2 Residual | Fractional: $2,000 (if Cash ≥ $10,000) else ⌊(Cash ÷ 5) × 100⌋ / 100 | Sizing: round(Budget ÷ Price, 6)",
             customContent: (
                 <div className="space-y-6 mt-4 text-sm text-foreground">
                     {/* Architecture Overview */}
@@ -1236,14 +1236,14 @@ export function StrategyGlossary() {
                         <div className="flex items-center justify-between">
                             <span className="font-bold text-white text-sm flex items-center gap-2">
                                 <Cpu className="w-4 h-4 text-emerald-400" />
-                                End-to-End Agentic Trading Workflow (2:00 PM EST Daily Execution)
+                                Two-Phase Agentic Workflow (11:00 AM Morning Sell &amp; 14:00 EST Afternoon Buy)
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
-                                Robinhood Agentic API Ready
+                                Two-Phase Pipeline Ready
                             </span>
                         </div>
                         <p className="text-muted-foreground leading-relaxed">
-                            The Strategic Alpha platform implements an autonomous multi-agent pipeline designed for both simulated research (<strong className="text-emerald-400">Sandbox Mode</strong>) and live brokerage execution (<strong className="text-amber-300">Live Trading Mode</strong>). The system operates on a linear data flow orchestrated by continuous 24x7 background schedulers aligned with US Eastern Market Time.
+                            The Strategic Alpha platform implements an autonomous multi-agent pipeline operating on a <strong className="text-emerald-400">Two-Phase Daily Schedule</strong> on trading days: <strong className="text-amber-400">Phase 1 (11:00 AM EST)</strong> automatically liquidates currently held shares brought in the prior market session across all modes (in both <strong className="text-amber-300">Approval</strong> and <strong className="text-rose-400">Auto</strong> modes, sells are 100% automatic without waiting for approval); <strong className="text-emerald-400">Phase 2 (14:00 EST)</strong> screens index setups and executes or queues stock buys (Approval mode queues buys for 1-click operator verification; Auto mode dispatches buys automatically).
                         </p>
                     </div>
 
@@ -1265,7 +1265,7 @@ export function StrategyGlossary() {
                                     </span>
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Scans constituent tickers across the <strong className="text-foreground">Dow 30, Nasdaq 100, and S&P 500</strong> (~170 equities). Evaluates 5 quantitative screening layers:
+                                    Scans constituent tickers across the <strong className="text-foreground">Dow 30, Nasdaq 100, and S&amp;P 500</strong> (~170 equities). Evaluates 5 quantitative screening layers:
                                 </p>
                                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                                     <li><strong className="text-foreground">Willy Dynamic VWAP:</strong> Price action confirmed in Bull market regime.</li>
@@ -1283,17 +1283,18 @@ export function StrategyGlossary() {
                                         <Briefcase className="w-4 h-4" /> 2. Broker Agent
                                     </span>
                                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
-                                        Portfolio Rebalancer
+                                        Integer &amp; Fractional Rebalancer
                                     </span>
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Queries active portfolio state and compares existing positions against incoming recommendations:
+                                    Queries active portfolio state, liquidates stale holdings, and dynamically executes capital allocation across recommended setups:
                                 </p>
                                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                                    <li><strong className="text-foreground">Comparative Liquidation:</strong> Positions falling out of top rankings are sold to free up capital.</li>
-                                    <li><strong className="text-foreground">Dynamic Buying Power:</strong> Available cash is calculated as initial cash + sell proceeds.</li>
-                                    <li><strong className="text-foreground">Order Sizing &amp; Staging:</strong> Allocates capital to top candidates within budget constraints.</li>
-                                    <li><strong className="text-foreground">Two-Phase Execution:</strong> Dispatches liquidations first, followed by stock &amp; Call option purchases.</li>
+                                    <li><strong className="text-foreground">Comparative Liquidation:</strong> Positions falling out of top rankings are sold first so proceeds add to deployable buying power.</li>
+                                    <li><strong className="text-foreground">Two-Pass Dynamic Integer Sizing (Default):</strong> Calculates base integer allocation per candidate (<code className="text-foreground">floor(base_budget / price)</code>) and redistributes unallocated residual cash to top setups within concentration caps.</li>
+                                    <li><strong className="text-foreground">$2,000 Full Fractional Rule:</strong> When Fractional Sizing is active and deployable cash covers $2,000 per stock (<code className="text-foreground">≥ $10,000</code> for 5 stocks), buys exactly <strong className="text-emerald-400">$2,000.00</strong> of fractional shares (<code className="text-foreground">round(2000 / price, 6)</code>) for each stock.</li>
+                                    <li><strong className="text-foreground">Available ÷ 5 Fallback Rule:</strong> If available cash is below $10,000, divides available amount equally by <strong className="text-indigo-400">5</strong> (<code className="text-foreground">⌊(Cash / 5) × 100⌋ / 100</code>) and buys fractional shares of each stock for that computed dollar amount.</li>
+                                    <li><strong className="text-foreground">Robinhood MCP Execution Protocol:</strong> Formats fractional share quantities up to 6 decimal places and routes fractional orders as <code className="text-foreground">market</code> orders during <code className="text-foreground">regular_hours</code>.</li>
                                 </ul>
                             </div>
                         </div>
@@ -1910,7 +1911,7 @@ export function StrategyGlossary() {
             (item.id === 'backtest-30d-strategy3' && "30-Day Strategy 3 Backtesting Model Historical Simulation Universe Selection Trades ROI Timeline Shift 2:50 PM".toLowerCase().includes(query)) ||
             (item.id === 'options-backtest' && "Options Strategy Backtesting Black-Scholes Call Premium Strike Expiry Intraday Relative Hold Baseline P&L Leverage Theta Volatility".toLowerCase().includes(query)) ||
             (item.id === 'options-alpha-rank' && "Options Alpha Rank Stage 1 Stage 2 Bullish Tickers Call Option Greeks Efficiency Delta Theta Ratio Daily Decay DTE 30 45 Bid Ask Liquidity".toLowerCase().includes(query)) ||
-            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls".toLowerCase().includes(query))
+            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls Fractional Shares Two-Pass Integer Sizing 2000 Divide by 5 v20261115 v20261123 v20261124 Two-Phase 11:00 AM Morning Sell".toLowerCase().includes(query))
         );
     });
 

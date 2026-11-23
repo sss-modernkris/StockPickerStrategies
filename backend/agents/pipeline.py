@@ -1,8 +1,10 @@
 """
 Automated AI Trading Pipeline
 Connects the Backtester Agent and Broker Agent into a seamless linear workflow
-with autonomous 24x7 scheduled execution at 2:00 PM Market Time (EST/EDT) on trading days
-and Robinhood MCP Sandbox integration.
+with autonomous 24x7 two-phase scheduled execution:
+  - 11:00 AM EST: Automatic Morning Sell (liquidates held shares from prior session)
+  - 14:00 EST: Afternoon Buy (Backtester screening & Broker capital allocation)
+with Robinhood MCP Sandbox and Live execution.
 """
 
 import datetime
@@ -36,21 +38,40 @@ class TradingPipeline:
         self.last_report: Optional[Dict[str, Any]] = None
         self.last_trigger_source: Optional[str] = None
         
-        # Schedule configuration: 2:00 PM Eastern Time (Market Time)
-        self.scheduled_hour = 14
-        self.scheduled_minute = 0
-        self.scheduled_time_est = f"{self.scheduled_hour:02d}:{self.scheduled_minute:02d}"
+        # Two-Phase Daily Schedule configuration (Eastern Market Time)
+        # Phase 1: Morning Sell @ 11:00 AM EST (liquidates yesterday's holdings automatically)
+        self.morning_sell_hour = 11
+        self.morning_sell_minute = 0
+        self.morning_sell_time_est = f"{self.morning_sell_hour:02d}:{self.morning_sell_minute:02d}"
+
+        # Phase 2: Afternoon Buy @ 2:00 PM (14:00) EST (screens universe & buys top setups)
+        self.afternoon_buy_hour = 14
+        self.afternoon_buy_minute = 0
+        self.afternoon_buy_time_est = f"{self.afternoon_buy_hour:02d}:{self.afternoon_buy_minute:02d}"
+
+        # Backward compatibility aliases
+        self.scheduled_hour = self.afternoon_buy_hour
+        self.scheduled_minute = self.afternoon_buy_minute
+        self.scheduled_time_est = self.afternoon_buy_time_est
         
         # Scheduler state
         self.scheduler_enabled = True
+        self.last_morning_sell_date: Optional[str] = None
+        self.last_afternoon_buy_date: Optional[str] = None
         self.last_scheduled_date: Optional[str] = None
+        self.last_morning_sell_time: Optional[str] = None
+        self.last_morning_sell_report: Optional[Dict[str, Any]] = None
         self._last_token_check = 0.0
         self._scheduler_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         
         # Start the autonomous background scheduler daemon
         self.start_scheduler()
-        logger.info(f"TradingPipeline initialized. 24x7 Daily Trigger scheduled for {self.scheduled_time_est} EST/EDT (Trading Days).")
+        logger.info(
+            f"TradingPipeline initialized. Two-Phase Daily Schedule: "
+            f"Morning Sell @ {self.morning_sell_time_est} EST (Auto) | "
+            f"Afternoon Buy @ {self.afternoon_buy_time_est} EST (Trading Days)."
+        )
 
     def start_scheduler(self):
         """Starts the autonomous 24x7 background scheduler thread if not already running."""
@@ -77,9 +98,14 @@ class TradingPipeline:
     def _scheduler_loop(self):
         """
         Continuous background worker loop checking Eastern Market Time every 15 seconds.
-        Triggers run_pipeline() at 2:00 PM EST (14:00) on active trading days (Monday-Friday).
+        Two-Phase Daily Schedule on active trading days (Monday-Friday):
+        - 11:00 AM EST (11:00): Automatic Morning Sell (liquidates currently held shares from prior session).
+        - 14:00 EST (14:00): Afternoon Buy (runs Backtester screening & Broker capital allocation).
         """
-        logger.info(f"[SCHEDULER] Started monitoring clock for daily trigger at {self.scheduled_time_est} EST...")
+        logger.info(
+            f"[SCHEDULER] Started monitoring clock for Two-Phase Daily Schedule: "
+            f"Morning Sell @ {self.morning_sell_time_est} EST | Afternoon Buy @ {self.afternoon_buy_time_est} EST..."
+        )
         
         while not self._stop_event.is_set():
             try:
@@ -100,54 +126,118 @@ class TradingPipeline:
                         except Exception as te:
                             logger.debug(f"[SCHEDULER] Periodic token refresh check error: {te}")
 
-                    # Target trigger condition:
-                    # 1. Trading day (NYSE session open today, skips holidays and weekends)
-                    # 2. Reached or passed 14:00 (within trigger window 14:00-14:15)
-                    # 3. Has NOT already executed today
-                    if (
-                        is_market_day
-                        and now_ny.hour == self.scheduled_hour
-                        and now_ny.minute >= self.scheduled_minute
-                        and self.last_scheduled_date != today_str
-                    ):
-                        self.last_scheduled_date = today_str
-                        logger.info(
-                            f"[SCHEDULER] >>> Trigger condition met! Starting scheduled execution for trading date {today_str} at {now_ny.strftime('%H:%M:%S %Z')} <<<"
-                        )
-                        # Run pipeline in a separate thread so scheduler loop remains responsive
-                        exec_thread = threading.Thread(
-                            target=self.run_pipeline,
-                            args=("AUTOMATIC_SCHEDULED",),
-                            name="ScheduledPipelineWorker",
-                            daemon=True
-                        )
-                        exec_thread.start()
+                    if is_market_day:
+                        # 1. Morning Sell Trigger @ 11:00 AM EST (Window: 11:00 - 11:15)
+                        if (
+                            now_ny.hour == self.morning_sell_hour
+                            and now_ny.minute >= self.morning_sell_minute
+                            and self.last_morning_sell_date != today_str
+                        ):
+                            self.last_morning_sell_date = today_str
+                            logger.info(
+                                f"[SCHEDULER] >>> Morning Sell Condition Met! Triggering 11:00 AM Sell for date {today_str} at {now_ny.strftime('%H:%M:%S %Z')} <<<"
+                            )
+                            sell_thread = threading.Thread(
+                                target=self.run_morning_sell,
+                                args=("AUTOMATIC_SCHEDULED_11AM",),
+                                name="ScheduledMorningSellWorker",
+                                daemon=True
+                            )
+                            sell_thread.start()
+
+                        # 2. Afternoon Buy Trigger @ 14:00 EST (Window: 14:00 - 14:15)
+                        elif (
+                            now_ny.hour == self.afternoon_buy_hour
+                            and now_ny.minute >= self.afternoon_buy_minute
+                            and self.last_afternoon_buy_date != today_str
+                        ):
+                            self.last_afternoon_buy_date = today_str
+                            self.last_scheduled_date = today_str
+                            logger.info(
+                                f"[SCHEDULER] >>> Afternoon Buy Condition Met! Triggering 14:00 EST Pipeline for date {today_str} at {now_ny.strftime('%H:%M:%S %Z')} <<<"
+                            )
+                            buy_thread = threading.Thread(
+                                target=self.run_pipeline,
+                                args=("AUTOMATIC_SCHEDULED_2PM",),
+                                name="ScheduledAfternoonBuyWorker",
+                                daemon=True
+                            )
+                            buy_thread.start()
 
             except Exception as e:
                 logger.error(f"[SCHEDULER] Error in scheduler loop: {e}", exc_info=True)
 
-            # Wait 15 seconds before next evaluation (or until stopped)
             self._stop_event.wait(timeout=15.0)
 
     def get_next_run_time(self) -> str:
         """Calculates the upcoming scheduled execution timestamp in Eastern Market Time (NYSE calendar aware)."""
         now_ny = datetime.datetime.now(MARKET_TIMEZONE)
-        today_target = now_ny.replace(hour=self.scheduled_hour, minute=self.scheduled_minute, second=0, microsecond=0)
-        
-        # Check if today is a valid trading session and the scheduled time hasn't passed yet
-        if market_calendar.is_trading_day(now_ny.date()) and now_ny < today_target and self.last_scheduled_date != now_ny.strftime("%Y-%m-%d"):
-            next_run = today_target
-        else:
-            # Advance to the next active NYSE trading session
-            next_date = market_calendar.next_trading_day(now_ny.date())
-            next_run = datetime.datetime.combine(
-                next_date,
-                datetime.time(self.scheduled_hour, self.scheduled_minute),
-                tzinfo=MARKET_TIMEZONE
-            )
+        today_date = now_ny.date()
+        is_today_trading = market_calendar.is_trading_day(today_date)
+        today_str = now_ny.strftime("%Y-%m-%d")
+
+        target_11am = now_ny.replace(hour=self.morning_sell_hour, minute=self.morning_sell_minute, second=0, microsecond=0)
+        target_2pm = now_ny.replace(hour=self.afternoon_buy_hour, minute=self.afternoon_buy_minute, second=0, microsecond=0)
 
         tz_abbr = now_ny.strftime("%Z")
-        return next_run.strftime(f"%Y-%m-%d %H:%M:%S {tz_abbr}")
+
+        # Case 1: Today is a trading day and 11:00 AM Morning Sell has not yet run
+        if is_today_trading and now_ny < target_11am and self.last_morning_sell_date != today_str:
+            return f"{target_11am.strftime(f'%Y-%m-%d %H:%M:%S {tz_abbr}')} (Morning Sell)"
+
+        # Case 2: Today is a trading day and 14:00 Afternoon Buy has not yet run
+        if is_today_trading and now_ny < target_2pm and self.last_afternoon_buy_date != today_str:
+            return f"{target_2pm.strftime(f'%Y-%m-%d %H:%M:%S {tz_abbr}')} (Afternoon Buy)"
+
+        # Case 3: Both phases finished today, or non-trading day -> Next trading day @ 11:00 AM Morning Sell
+        next_date = market_calendar.next_trading_day(today_date)
+        next_run = datetime.datetime.combine(
+            next_date,
+            datetime.time(self.morning_sell_hour, self.morning_sell_minute),
+            tzinfo=MARKET_TIMEZONE
+        )
+        return f"{next_run.strftime(f'%Y-%m-%d %H:%M:%S {tz_abbr}')} (Morning Sell)"
+
+    def run_morning_sell(self, trigger_source: str = "MANUAL_TRIGGER") -> Dict[str, Any]:
+        """
+        Executes the Morning Sell Phase @ 11:00 AM EST:
+        Liquidates currently held shares brought in yesterday's market session.
+        CRITICAL RULE: Irrespective of Operating Mode (Approval or Auto), selling is automatic
+        without waiting for user approval.
+        """
+        if self.is_running:
+            logger.warning("[MORNING SELL] Pipeline is currently busy. Ignoring concurrent request.")
+            return {
+                "success": False,
+                "error": "Pipeline is already running.",
+                "phase": "MORNING_SELL"
+            }
+
+        if state.kill_switch_active():
+            logger.warning("[MORNING SELL] Execution blocked: Emergency Kill Switch is engaged.")
+            return {
+                "success": False,
+                "error": "Emergency Kill Switch is engaged.",
+                "phase": "MORNING_SELL"
+            }
+
+        start_time_ny = datetime.datetime.now(MARKET_TIMEZONE)
+        tz_abbr = start_time_ny.strftime("%Z")
+        self.is_running = True
+        try:
+            report = self.broker.execute_morning_sell(trigger_source=trigger_source)
+            self.last_morning_sell_time = start_time_ny.strftime(f"%Y-%m-%d %H:%M:%S {tz_abbr}")
+            self.last_morning_sell_report = report
+            return report
+        except Exception as e:
+            logger.error(f"[MORNING SELL] Error executing morning sell: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "phase": "MORNING_SELL"
+            }
+        finally:
+            self.is_running = False
 
     def run_pipeline(self, trigger_source: str = "MANUAL_TRIGGER") -> Dict[str, Any]:
         """
@@ -208,7 +298,8 @@ class TradingPipeline:
                 "trigger_source": trigger_source,
                 "execution_timestamp": start_time_ny.strftime(f"%Y-%m-%d %H:%M:%S {tz_abbr}"),
                 "total_duration_sec": duration,
-                "schedule_target": f"{self.scheduled_time_est} EST/EDT (Trading Days)",
+                "phase": "AFTERNOON_BUY",
+                "schedule_target": f"Morning Sell: {self.morning_sell_time_est} EST (Auto) | Afternoon Buy: {self.afternoon_buy_time_est} EST (Trading Days)",
                 "stage_1_backtester": {
                     "agent": self.backtester.name,
                     "universe_scanned": backtest_result.get("universe_scanned"),
@@ -275,10 +366,14 @@ class TradingPipeline:
             "circuit_breaker": state.breaker_state(),
             "scheduler_enabled": self.scheduler_enabled,
             "scheduler_running": scheduler_alive,
-            "scheduled_time_est": f"{self.scheduled_time_est} EST/EDT",
-            "schedule_description": "Autonomous execution every Trading Day at 2:00 PM Market Time (EST/EDT)",
+            "scheduled_time_est": f"{self.afternoon_buy_time_est} EST/EDT",
+            "morning_sell_time_est": f"{self.morning_sell_time_est} EST/EDT",
+            "afternoon_buy_time_est": f"{self.afternoon_buy_time_est} EST/EDT",
+            "schedule_description": f"Two-Phase Daily Schedule: {self.morning_sell_time_est} EST Automatic Morning Sell | {self.afternoon_buy_time_est} EST Afternoon Buy (Trading Days)",
             "next_run_time_est": next_run,
             "last_run_time": self.last_run_time,
+            "last_morning_sell_time": self.last_morning_sell_time,
+            "last_morning_sell_summary": self.last_morning_sell_report.get("summary") if self.last_morning_sell_report else None,
             "last_trigger_source": self.last_trigger_source,
             "has_report": self.last_report is not None,
             "last_summary": self.last_report.get("stage_2_broker", {}).get("execution_summary") if self.last_report else "No pipeline runs yet.",

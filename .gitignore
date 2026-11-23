@@ -5,6 +5,8 @@ build/
 dist/
 
 # Python
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -43,3 +45,4 @@ CompTable_*.csv
 Top_Tickers_*.csv
 *_Raw_Tech_Option_Summary.json
 *.log
+rh_sandbox_state.json

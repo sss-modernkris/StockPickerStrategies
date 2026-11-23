@@ -42,7 +42,8 @@ class ShadowClient(TradingClient):
         symbol: str,
         action: str,
         quantity: float,
-        price: float
+        price: float,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Records shadow intent into the ledger without submitting to Robinhood.

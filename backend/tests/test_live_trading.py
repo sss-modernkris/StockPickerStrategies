@@ -85,8 +85,12 @@ class TestAuditLedger(unittest.TestCase):
 
 class TestLiveExecutionGateway(unittest.TestCase):
     def setUp(self):
+        self.test_ledger_path = os.path.join(BACKEND_DIR, "_data", "test_gateway_ledger.jsonl")
+        if os.path.exists(self.test_ledger_path):
+            os.remove(self.test_ledger_path)
         self.mock_client = MagicMock()
         self.gateway = LiveExecutionGateway(mode="LIVE_AUTONOMOUS", live_client=self.mock_client)
+        self.gateway.ledger = ledger.Ledger(path=self.test_ledger_path)
         state.reset_breaker()
         state.set_kill_switch(False)
 
@@ -106,6 +110,10 @@ class TestLiveExecutionGateway(unittest.TestCase):
             "total_equity": 25000.0,
             "holdings": []
         }
+
+    def tearDown(self):
+        if hasattr(self, "test_ledger_path") and os.path.exists(self.test_ledger_path):
+            os.remove(self.test_ledger_path)
 
     @patch("trading.market_calendar.is_market_open", return_value=True)
     @patch("trading.market_calendar.in_broker_rest_window", return_value=False)

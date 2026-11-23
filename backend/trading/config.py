@@ -32,6 +32,7 @@ TOOL_MAP_FILE = os.path.join(DOCS_DIR, "robinhood_mcp_tool_map.json")
 
 VALID_MODES = ("SANDBOX", "LIVE_SHADOW", "LIVE_APPROVAL", "LIVE_AUTONOMOUS")
 LIVE_MODES = ("LIVE_SHADOW", "LIVE_APPROVAL", "LIVE_AUTONOMOUS")
+VALID_SIZING_MODES = ("INTEGER", "FRACTIONAL")
 AUTONOMOUS_CONFIRMATION_PHRASE = "I UNDERSTAND THIS TRADES REAL MONEY"
 
 _env_loaded = False
@@ -124,6 +125,7 @@ class LiveSettings:
     circuit_breaker_threshold: int
     oauth_callback_port: int
     alert_email: Optional[str]
+    share_sizing_mode: str = "INTEGER"
 
 
 def get_settings() -> LiveSettings:
@@ -132,6 +134,9 @@ def get_settings() -> LiveSettings:
     if mode not in VALID_MODES:
         logger.warning(f"Unknown TRADING_MODE={mode!r}; falling back to SANDBOX")
         mode = "SANDBOX"
+    sizing = os.getenv("SHARE_SIZING_MODE", "INTEGER").strip().upper()
+    if sizing not in VALID_SIZING_MODES:
+        sizing = "INTEGER"
     return LiveSettings(
         env_mode=mode,
         mcp_url=os.getenv("ROBINHOOD_MCP_URL", "https://agent.robinhood.com/mcp/trading").strip(),
@@ -153,6 +158,7 @@ def get_settings() -> LiveSettings:
         circuit_breaker_threshold=int(_f("LIVE_CIRCUIT_BREAKER_THRESHOLD", 3)),
         oauth_callback_port=int(_f("ROBINHOOD_OAUTH_CALLBACK_PORT", 33418)),
         alert_email=os.getenv("LIVE_ALERT_EMAIL") or os.getenv("SENDER_EMAIL") or None,
+        share_sizing_mode=sizing,
     )
 
 

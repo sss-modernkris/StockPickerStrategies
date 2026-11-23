@@ -75,6 +75,34 @@ def set_mode(mode: str, confirmation: Optional[str] = None, actor: str = "api") 
     return {"previous": previous, "mode": mode}
 
 
+# --------------------------------------------------------------- sizing mode
+def get_sizing_mode() -> str:
+    """Returns active share sizing mode ('INTEGER' [default] or 'FRACTIONAL')."""
+    with _lock:
+        st = _read()
+        mode = (st.get("sizing_mode") or "").strip().upper()
+        if mode in config.VALID_SIZING_MODES:
+            return mode
+        env_val = getattr(config.get_settings(), "share_sizing_mode", "INTEGER").strip().upper()
+        return env_val if env_val in config.VALID_SIZING_MODES else "INTEGER"
+
+
+def set_sizing_mode(mode: str, actor: str = "api") -> Dict[str, Any]:
+    """Persists user selection for share sizing: 'INTEGER' or 'FRACTIONAL'."""
+    mode = (mode or "").strip().upper()
+    if mode not in config.VALID_SIZING_MODES:
+        raise ValueError(f"Invalid sizing mode {mode!r}. Valid options: {', '.join(config.VALID_SIZING_MODES)}")
+    with _lock:
+        st = _read()
+        previous = st.get("sizing_mode") or "INTEGER"
+        st["sizing_mode"] = mode
+        st["sizing_mode_changed_at"] = now_et().isoformat(timespec="seconds")
+        st["sizing_mode_changed_by"] = actor
+        _write(st)
+    logger.info(f"SHARE SIZING MODE CHANGED: {previous} -> {mode} (by {actor})")
+    return {"previous": previous, "sizing_mode": mode}
+
+
 # --------------------------------------------------------------- kill switch
 def kill_switch_active() -> bool:
     if config.get_settings().env_kill_switch:
@@ -182,4 +210,5 @@ def snapshot() -> Dict[str, Any]:
         "kill_switch": kill_switch_active(),
         "env_kill_switch": s.env_kill_switch,
         "circuit_breaker": breaker_state(),
+        "sizing_mode": get_sizing_mode(),
     }

@@ -176,22 +176,23 @@ class ToolMap:
         elif "action" in props:
             args["action"] = action.upper()
 
-        # Quantity (string formatting for precision)
-        qty_num = float(quantity)
-        qty_str = str(int(qty_num)) if qty_num.is_integer() else f"{qty_num:.4f}"
+        # Quantity (string formatting for precision; Robinhood supports up to 6 decimal places for fractional shares)
+        qty_num = round(float(quantity), 6)
+        is_fractional = not qty_num.is_integer()
+        qty_str = str(int(qty_num)) if not is_fractional else f"{qty_num:.6f}".rstrip("0").rstrip(".")
         if "quantity" in props or not props:
             args["quantity"] = qty_str
         elif "shares" in props:
             args["shares"] = qty_num
 
-        # Order Type
-        typ_val = order_type.lower()
+        # Order Type: Robinhood requires type='market' and market_hours='regular_hours' for fractional share orders
+        typ_val = "market" if is_fractional else order_type.lower()
         if "type" in props or not props:
             args["type"] = typ_val
         elif "order_type" in props:
-            args["order_type"] = order_type.upper()
+            args["order_type"] = typ_val.upper()
 
-        # Limit Price (required for limit orders)
+        # Limit Price (required only for limit or stop_limit orders)
         if typ_val in ("limit", "stop_limit"):
             price_str = f"{float(price):.2f}"
             if "limit_price" in props or not props:
@@ -206,9 +207,10 @@ class ToolMap:
         if "time_in_force" in props or not props:
             args["time_in_force"] = tif_val
 
-        # Market Hours
+        # Market Hours (fractional/market orders must use 'regular_hours')
+        eff_market_hours = "regular_hours" if is_fractional else market_hours
         if "market_hours" in props:
-            args["market_hours"] = market_hours
+            args["market_hours"] = eff_market_hours
 
         # Idempotency Ref ID (UUID)
         if not is_review:

@@ -20,7 +20,7 @@ import json
 app = FastAPI(
     title="Strategic Alpha Dashboard API",
     description="Backend for the Quant Strategies Dashboard",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 @app.on_event("startup")
@@ -351,6 +351,25 @@ def get_trading_mode_endpoint():
         "mcp_url": config.get_settings().mcp_url
     }
 
+class SizingModeRequest(BaseModel):
+    sizing_mode: str
+
+@app.get("/api/trading/sizing-mode")
+def get_sizing_mode_endpoint():
+    """Returns the active share sizing mode ('INTEGER' [default] or 'FRACTIONAL')."""
+    from trading import state
+    return {"status": "success", "sizing_mode": state.get_sizing_mode()}
+
+@app.post("/api/trading/sizing-mode")
+def set_sizing_mode_endpoint(req: SizingModeRequest):
+    """Sets the active share sizing mode ('INTEGER' or 'FRACTIONAL')."""
+    from trading import state
+    try:
+        res = state.set_sizing_mode(mode=req.sizing_mode, actor="frontend_ui")
+        return {"status": "success", "result": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/trading/mode")
 def set_trading_mode_endpoint(req: TradingModeRequest):
     """Changes active trading mode (LIVE_AUTONOMOUS requires confirmation phrase)."""
@@ -367,13 +386,20 @@ def set_kill_switch_endpoint(req: KillSwitchRequest):
     from trading import state
     res = state.set_kill_switch(active=req.active, actor="frontend_ui", reason=req.reason or "")
     return {"status": "success", "result": res}
-
-@app.post("/api/trading/circuit-breaker/reset")
-def reset_circuit_breaker_endpoint():
-    """Resets the safety circuit breaker and clears consecutive failure counters."""
-    from trading import state
-    res = state.reset_breaker(actor="frontend_ui")
-    return {"status": "success", "result": res}
+
+
+@app.post("/api/trading/circuit-breaker/reset")
+
+def reset_circuit_breaker_endpoint():
+
+    """Resets the safety circuit breaker and clears consecutive failure counters."""
+
+    from trading import state
+
+    res = state.reset_breaker(actor="frontend_ui")
+
+    return {"status": "success", "result": res}
+
 
 @app.get("/api/trading/live/health")
 async def get_live_health_endpoint():
@@ -472,13 +498,41 @@ def get_ticker_quote(ticker: str):
 
 @app.get("/api/agents/pipeline/status")
 def get_agents_pipeline_status():
-    """Returns the live status of the Backtester Agent, Broker Agent, and scheduled 2:00 PM EST trigger."""
+    """Returns the live status of the Backtester Agent, Broker Agent, and Two-Phase Daily Schedule (11:00 AM Sell / 14:00 Buy)."""
     try:
         from agents.pipeline import get_pipeline
         pipeline = get_pipeline()
         return pipeline.get_status()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch pipeline status: {str(e)}")
+
+@app.post("/api/agents/pipeline/morning-sell")
+def run_agents_pipeline_morning_sell():
+    """
+    Triggers Morning Sell Phase (11:00 AM EST trigger):
+    Liquidates currently held shares brought in yesterday's market session.
+    Irrespective of operating mode (Approval or Auto), selling is automatic without waiting for approval.
+    """
+    try:
+        from agents.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        report = pipeline.run_morning_sell("API_MANUAL")
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Morning Sell execution failed: {str(e)}")
+
+@app.post("/api/agents/broker/morning-sell")
+def run_broker_morning_sell():
+    """
+    Runs the Broker Agent to automatically liquidate currently held shares in morning session.
+    """
+    try:
+        from agents.broker_agent import BrokerAgent
+        broker = BrokerAgent()
+        report = broker.execute_morning_sell("API_MANUAL")
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Broker Morning Sell failed: {str(e)}")
 
 @app.post("/api/agents/pipeline/run")
 def run_agents_pipeline():

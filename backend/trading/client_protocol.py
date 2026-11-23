@@ -32,7 +32,8 @@ class TradingClient(Protocol):
         symbol: str,
         action: str,
         quantity: float,
-        price: float
+        price: float,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Places an equity order.

@@ -130,6 +130,16 @@ class BacktesterAgent:
             if contracts < 1:
                 contracts = 1
 
+            # Dynamically check active sizing mode ('INTEGER' [default] vs 'FRACTIONAL')
+            from trading import state
+            sizing_mode = state.get_sizing_mode() if hasattr(state, "get_sizing_mode") else "INTEGER"
+            if sizing_mode == "FRACTIONAL":
+                suggested_shares = round(2000.0 / close, 6) if close > 0 else 0.0
+                suggested_budget = 2000.0
+            else:
+                suggested_shares = max(1, int(2000.0 / close)) if close > 0 else 0
+                suggested_budget = round(suggested_shares * close, 2)
+
             screened_candidates.append({
                 "symbol": ticker,
                 "strategy_value_1w": float(strat_val_1w),
@@ -144,8 +154,8 @@ class BacktesterAgent:
                 "stock_signal": {
                     "action": "BUY",
                     "target_price": round(close, 2),
-                    "suggested_budget": round((max(1, int(2000.0 / close)) if close > 0 else 0) * close, 2),
-                    "suggested_shares": max(1, int(2000.0 / close)) if close > 0 else 0
+                    "suggested_budget": suggested_budget,
+                    "suggested_shares": suggested_shares
                 },
                 "option_signal": {
                     "action": "BUY",

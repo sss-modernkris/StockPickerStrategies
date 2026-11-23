@@ -2,7 +2,35 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20261123 - Proactive Silent OAuth Token Rotation, Resilient Multi-Source Token Discovery & Live Autonomous Trading Engine
+## 1. Release v20261124 - Two-Phase Automated Trading Pipeline (11:00 AM Morning Sell & 14:00 Afternoon Buy) & Dynamic Fractional Sizing
+
+### ⏰ Two-Phase Daily Trading Pipeline (11:00 AM Morning Sell & 14:00 EST Afternoon Buy) ([backend/agents/pipeline.py](file:///d:/AI/StockPickerStrategies/backend/agents/pipeline.py), [backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py))
+- **Phase 1: Automatic Morning Sell Trigger @ 11:00 AM EST**:
+  - Automatically liquidates currently held shares brought in yesterday's (or prior) market sessions.
+  - **Zero-Block Automatic Execution in Approval & Auto Modes**: Irrespective of operating mode (`LIVE_APPROVAL` or `LIVE_AUTONOMOUS`), morning share liquidations execute automatically without waiting for manual human approval.
+- **Phase 2: Afternoon Buy Trigger @ 14:00 EST**:
+  - Executes Backtester Agent constituent screening across Dow 30, Nasdaq 100, and S&P 500 (~170 equities).
+  - Broker Agent sizes candidate buys across refreshed buying power using the active sizing mode (Two-Pass Dynamic Integer or Fractional).
+  - In `LIVE_APPROVAL` mode: Buys wait for user review and 1-click approval (`pending_plan.json`).
+  - In `LIVE_AUTONOMOUS` mode: Buys execute automatically without waiting for user approval.
+- **Dedicated Morning Sell Endpoints & UI Telemetry**:
+  - Added `POST /api/agents/pipeline/morning-sell` and `POST /api/agents/broker/morning-sell`.
+  - Added dedicated **Morning Sell (11:00 AM)** action button and two-phase schedule status pills in `BrokersPanel.tsx`.
+
+### ✂️ User-Selectable Fractional ($2,000 / Available ÷ 5) & Two-Pass Integer Sizing ([backend/trading/state.py](file:///d:/AI/StockPickerStrategies/backend/trading/state.py), [backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py))
+- **Dynamic Switchable Sizing Mode**:
+  - Default: Two-Pass Dynamic Integer Sizing (Pass 1 base equal-weight allocation + Pass 2 residual redistribution).
+  - Selectable: Fractional Share Sizing ($2,000 per stock if funds $\ge \$10,000$ else Available ÷ 5; precision `round(budget / price, 6)`; routes orders as `type='market'` during `regular_hours`).
+  - Added `GET /api/trading/sizing-mode` and `POST /api/trading/sizing-mode` endpoints.
+  - Added interactive sizing mode toggle in `BrokersPanel.tsx` Guardrail Controls.
+  - Added `formatShares()` helper to display both whole integer and up to 6-decimal fractional shares cleanly across all UI tables.
+
+### 🏷️ Version Synchronization (`v20261124`)
+- Synchronized version tags across `README.md` (`v20261124`), `frontend/src/app/page.tsx` (`v20261124`), `frontend/src/components/TickerSidebar.tsx` (`v20261124`), `frontend/package.json` (`0.3.0`), `backend/main.py` (`1.2.0`), `plugin.json` (`1.4.0`), and `docs/changes.md`.
+
+---
+
+## 2. Release v20261123 - Proactive Silent OAuth Token Rotation, Resilient Multi-Source Token Discovery & Live Autonomous Trading Engine
 
 ### 🔑 Proactive Silent Token Rotation & Resilient Multi-Source Token Discovery ([backend/trading/token_refresh.py](file:///d:/AI/StockPickerStrategies/backend/trading/token_refresh.py), [backend/trading/live_auth.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_auth.py))
 - **Automated Silent Token Rotation Engine (`TokenRefreshManager`)**:
@@ -30,7 +58,32 @@ This document maintains a chronological record of architectural updates, feature
 
 ---
 
-## 2. Release v20261029 - Dynamic Multi-Pass Capital Allocation Engine & Small-Account Risk Calibration
+## 2. Release v20261115 - Fractional Share Capital Allocation ($2,000 / Available ÷ 5) & Robinhood MCP OAuth Auto-Sync
+
+### 📈 Fractional Share Sizing Strategy ([backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py), [backend/agents/backtester_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/backtester_agent.py))
+- **Full $2,000 Fractional Allocation**:
+  - When available deployable cash in the account covers $2,000.00 per recommended stock ($\ge \$10,000.00$ for the top 5 stocks), the Broker Agent allocates **$2,000.00** per stock and computes fractional share quantities (`round(2000.0 / price, 6)`).
+- **Proportional `Available ÷ 5` Fallback**:
+  - When available account cash is below the full $10,000 threshold, the Broker Agent divides the available deployable amount by **5** ($\lfloor (\text{deployable\_capital} / 5) \times 100 \rfloor / 100$) and purchases fractional shares of each stock for the computed dollar amount.
+- **Stage 1 & Stage 2 Signal Synchronization**:
+  - Synchronizes each recommendation's `stock_signal` (`suggested_budget` and `suggested_shares`) with the computed per-stock dollar allocation and fractional share target.
+
+### 🔗 Robinhood MCP Fractional Order Formatting & Guardrails ([backend/trading/rh_tool_map.py](file:///d:/AI/StockPickerStrategies/backend/trading/rh_tool_map.py), [backend/trading/live_gateway.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_gateway.py), [backend/trading/live_auth.py](file:///d:/AI/StockPickerStrategies/backend/trading/live_auth.py))
+- **6-Decimal Fractional Precision & Market Order Routing**:
+  - Updated `ToolMap.format_order_args` to format fractional quantities up to 6 decimal places without trailing zeros and automatically set `type="market"` and `market_hours="regular_hours"` as required by Robinhood's `place_equity_order` MCP specification.
+- **Guardrail Calibration ($10,000 Daily Cap & 25% Position Cap)**:
+  - Calibrated default `ROBINHOOD_DAILY_SPEND_LIMIT` to `$10,000.00` and `ROBINHOOD_POSITION_CAP_PCT` to `25.0%` across Sandbox and Live gateways so 5 equal-weight fractional positions (up to $2,000 each) execute without artificial throttling.
+- **OAuth 2.1 Token Auto-Synchronization**:
+  - Enhanced `FileTokenStorage.get_tokens` in `live_auth.py` to automatically synchronize newer OAuth tokens from `~/.mcp-auth/mcp-remote-v1/*_tokens.json` when refreshed by the IDE.
+
+### 🖥️ Brokers Panel & Strategy Glossary UI Updates ([frontend/src/components/BrokersPanel.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/BrokersPanel.tsx), [frontend/src/components/StrategyGlossary.tsx](file:///d:/AI/StockPickerStrategies/frontend/src/components/StrategyGlossary.tsx))
+- Added `formatShares()` helper in `BrokersPanel.tsx` to display fractional share counts cleanly (up to 6 decimal places) across Stage 1 Recommendations, Stage 2 Purchased Stocks, Pending Approval Plans, and Active Holdings.
+- Added interactive Share Sizing Mode toggle in `BrokersPanel.tsx` allowing traders to dynamically switch between **Two-Pass Dynamic Integer Sizing** (default) and **Fractional Share Sizing**.
+- Updated the **Specialized AI Agents & Robinhood MCP Pipeline** section in `StrategyGlossary.tsx` with the fractional share sizing formula and rules.
+
+---
+
+## 3. Release v20261029 - Dynamic Multi-Pass Capital Allocation Engine & Small-Account Risk Calibration
 
 ### 💰 Dynamic Multi-Pass Capital Allocation Engine ([backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py))
 - **Total Buying Power Synchronization**:
