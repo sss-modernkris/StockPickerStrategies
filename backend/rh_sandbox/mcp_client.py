@@ -38,7 +38,7 @@ class RobinhoodMCPClient:
             return {"error": resp["error"]["message"]}
         return self.sandbox.get_portfolio()
 
-    def place_stock_order(self, symbol: str, action: str, quantity: float, price: float) -> Dict[str, Any]:
+    def place_stock_order(self, symbol: str, action: str, quantity: float, price: float, **kwargs) -> Dict[str, Any]:
         """Calls the 'robinhood_place_stock_order' MCP tool."""
         req = {
             "jsonrpc": "2.0",

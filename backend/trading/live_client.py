@@ -88,6 +88,17 @@ class LiveMCPClient:
         last_error = None
         settings = config.get_settings()
 
+        # Pre-flight token check to ensure fresh tokens before remote call
+        try:
+            from trading.token_refresh import ensure_valid_token
+            tok_status = ensure_valid_token(buffer_seconds=1800)
+            if tok_status.get("reauth_required"):
+                err_msg = "Robinhood OAuth session expired. Please run 'python -m trading.live_auth login' to re-authenticate."
+                logger.error(err_msg)
+                return {"success": False, "error": err_msg, "auth_expired": True}
+        except Exception as te:
+            logger.debug(f"Pre-flight token check skipped: {te}")
+
         for attempt in range(1, max_attempts + 1):
             try:
                 provider = build_oauth_provider(interactive=False)
@@ -123,19 +134,29 @@ class LiveMCPClient:
             except Exception as e:
                 last_error = e
                 logger.warning(f"Error calling MCP tool '{tool_name}' (attempt {attempt}/{max_attempts}): {e}")
-                # Force an OAuth token refresh before retrying in case the server rejected the access token
-                try:
-                    from trading.live_auth import get_token_storage
-                    await get_token_storage().refresh_tokens()
-                except Exception as refresh_err:
-                    logger.debug(f"Token refresh during retry failed: {refresh_err}")
                 if attempt < max_attempts and is_read:
                     await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
 
-        err_msg = f"Failed to execute MCP tool '{tool_name}': {last_error}"
+        err_detail = last_error
+        if hasattr(last_error, "exceptions") and last_error.exceptions:
+            sub_errs = "; ".join(f"{type(sub).__name__}: {sub}" for sub in last_error.exceptions)
+            err_detail = f"{last_error} [{sub_errs}]"
+        err_msg = f"Failed to execute MCP tool '{tool_name}': {err_detail}"
         logger.error(err_msg)
-        state.record_failure(err_msg)
-        return {"success": False, "error": err_msg}
+
+        # Guardrail: Suppress circuit breaker trip on OAuth expiration errors
+        is_auth_error = (
+            "OAuthFlowError" in str(err_detail)
+            or "No redirect handler" in str(err_detail)
+            or "401" in str(err_detail)
+            or "invalid_grant" in str(err_detail)
+        )
+        if not is_auth_error:
+            state.record_failure(err_msg)
+        else:
+            logger.warning(f"[AUTH GUARD] Suppressed circuit breaker trip for OAuth expiration error: {err_detail}")
+
+        return {"success": False, "error": err_msg, "auth_expired": is_auth_error}
 
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], is_read: bool = True) -> Dict[str, Any]:
         """Synchronous wrapper for tool execution."""
@@ -416,8 +437,14 @@ class LiveMCPClient:
             "is_simulated": False,
             "cash_available": 0.0,
             "buying_power": 0.0,
+            "invested_capital": 0.0,
+            "stock_equity": 0.0,
+            "option_equity": 0.0,
             "total_equity": 0.0,
+            "unrealized_pnl": 0.0,
+            "realized_pnl": 0.0,
             "holdings": [],
+            "queued_orders": [],
             "option_positions": [],
             "orders": [],
             "guardrails": {
@@ -558,6 +585,9 @@ class LiveMCPClient:
         action: str,
         quantity: float,
         price: float,
+        order_type: str = "limit",
+        time_in_force: str = "gfd",
+        market_hours: str = "regular_hours",
         client_order_id: Optional[str] = None,
         account_number: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -569,9 +599,9 @@ class LiveMCPClient:
             action=action,
             quantity=quantity,
             price=price,
-            order_type="limit",
-            time_in_force="gfd",
-            market_hours="regular_hours",
+            order_type=order_type,
+            time_in_force=time_in_force,
+            market_hours=market_hours,
             client_order_id=client_order_id,
             account_number=account_id,
             is_review=False

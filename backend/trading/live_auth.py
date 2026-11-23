@@ -20,7 +20,6 @@ import sys
 import threading
 import time
 import urllib.parse
-import urllib.request
 import webbrowser
 from typing import Any, Dict, Optional
 
@@ -34,7 +33,6 @@ from mcp.client.auth.oauth2 import (
 from mcp.shared.auth import (
     OAuthClientInformationFull,
     OAuthClientMetadata,
-    OAuthMetadata,
     OAuthToken,
 )
 
@@ -66,127 +64,164 @@ class FileTokenStorage(TokenStorage):
         cf = glob.glob(os.path.join(mcp_auth_dir, "*_client_info.json"))
         return (tf[0] if tf else None, cf[0] if cf else None)
 
+    @staticmethod
+    def _parse_exp(data: Dict[str, Any]) -> float:
+        """Extracts expiration timestamp from token data."""
+        tokens = data.get("tokens") or (data if data.get("access_token") else {})
+        access_tok = tokens.get("access_token") or tokens.get("accessToken") or tokens.get("token")
+        if access_tok and isinstance(access_tok, str):
+            try:
+                parts = access_tok.split(".")
+                if len(parts) >= 2:
+                    padded = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+                    import base64
+                    payload = json.loads(base64.urlsafe_b64decode(padded))
+                    exp = payload.get("exp")
+                    if exp:
+                        return float(exp)
+            except Exception:
+                pass
+        if "expires_at" in tokens:
+            exp_ms = tokens["expires_at"]
+            return exp_ms / 1000.0 if exp_ms > 1e11 else float(exp_ms)
+        return 0.0
+
     def _read_data(self) -> Dict[str, Any]:
         candidates = [
             self.token_path,
             os.path.expanduser("~/.strategicalpha/robinhood_oauth.json"),
             "/root/.strategicalpha/robinhood_oauth.json",
+            os.path.join(config.LIVE_DATA_DIR, "robinhood_oauth.json"),
+            os.path.join(config.PROJECT_ROOT, "_data", "robinhood_oauth.json"),
         ]
-        target = next((p for p in candidates if p and os.path.exists(p)), None)
-        if not target:
-            return {}
-        try:
-            with open(target, "r", encoding="utf-8") as f:
-                return json.load(f) or {}
-        except Exception as e:
-            logger.error(f"Failed to read token file {target}: {e}")
-            return {}
+        tf, cf = self._find_mcp_remote_files()
+
+        best_data: Dict[str, Any] = {}
+        best_exp: float = -1.0
+        best_source: str = ""
+
+        now = time.time()
+
+        for target in candidates:
+            if not target or not os.path.exists(target):
+                continue
+            try:
+                with open(target, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                    if not raw:
+                        continue
+                    data = json.loads(raw)
+                    if isinstance(data, dict) and data:
+                        exp = self._parse_exp(data)
+                        if exp > best_exp:
+                            best_exp = exp
+                            best_data = data
+                            best_source = target
+            except Exception as e:
+                logger.error(f"Failed to read token file {target}: {e}")
+
+        # Check mcp-remote if candidates are empty or expired
+        if tf and os.path.exists(tf) and (best_exp < now):
+            try:
+                with open(tf, "r", encoding="utf-8") as f:
+                    mcp_tokens = json.load(f)
+                mcp_data = {"tokens": mcp_tokens, "tokens_source": tf}
+                if cf and os.path.exists(cf):
+                    try:
+                        with open(cf, "r", encoding="utf-8") as fcf:
+                            mcp_data["client_info"] = json.load(fcf)
+                    except Exception:
+                        pass
+                mcp_exp = self._parse_exp(mcp_data)
+                if mcp_exp > best_exp:
+                    best_exp = mcp_exp
+                    best_data = mcp_data
+                    best_source = tf
+                    logger.info(f"Loaded freshest token from mcp-remote ({tf}), expires in {int(mcp_exp - now)}s")
+            except Exception as me:
+                logger.warning(f"Failed to check mcp-remote file {tf}: {me}")
+
+        if best_data:
+            logger.info(f"Using token storage from {best_source} (exp: {best_exp}, valid={best_exp > now})")
+            return best_data
+
+        return {}
 
     def _write_data(self, data: Dict[str, Any]) -> None:
         self._ensure_dir()
-        tmp = self.token_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp, self.token_path)
-        try:
-            os.chmod(self.token_path, 0o600)
-        except Exception:
-            pass
+        targets = [
+            self.token_path,
+            os.path.expanduser("~/.strategicalpha/robinhood_oauth.json"),
+            os.path.join(config.LIVE_DATA_DIR, "robinhood_oauth.json"),
+            os.path.join(config.PROJECT_ROOT, "_data", "robinhood_oauth.json"),
+        ]
+        for target in targets:
+            if not target:
+                continue
+            try:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                tmp = target + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                os.replace(tmp, target)
+                try:
+                    os.chmod(target, 0o600)
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.warning(f"Could not persist tokens to {target}: {e}")
 
     async def get_tokens(self) -> Optional[OAuthToken]:
         data = self._read_data()
         token_dict = data.get("tokens")
-        tf, _ = self._find_mcp_remote_files()
-        if tf and os.path.exists(tf):
-            try:
-                tf_mtime = os.path.getmtime(tf)
-                saved_at = float(data.get("tokens_saved_at") or 0.0)
-                if not token_dict or tf_mtime > saved_at:
-                    with open(tf, "r", encoding="utf-8") as f:
-                        fresh_tokens = json.load(f)
-                    if fresh_tokens:
-                        token_dict = fresh_tokens
-                        data["tokens"] = token_dict
-                        data["tokens_source"] = tf
-                        data["tokens_saved_at"] = tf_mtime
-                        self._write_data(data)
-                        logger.info(f"Loaded and synced fresh Robinhood OAuth tokens from {tf}")
-            except Exception as e:
-                logger.warning(f"Failed to load tokens from {tf}: {e}")
+        if not isinstance(token_dict, dict):
+            # Check if tokens are stored flat at top-level
+            if data.get("access_token") or data.get("accessToken") or data.get("token"):
+                token_dict = data
+            else:
+                token_dict = None
 
         if not token_dict:
-            return None
-        try:
-            tokens = OAuthToken.model_validate(token_dict)
-        except Exception as e:
-            logger.warning(f"Failed to parse stored tokens: {e}")
-            return None
+            # Fall back to IDE's mcp-remote tokens if available
+            tf, _ = self._find_mcp_remote_files()
+            if tf and os.path.exists(tf):
+                try:
+                    with open(tf, "r", encoding="utf-8") as f:
+                        token_dict = json.load(f)
+                    if token_dict:
+                        data["tokens"] = token_dict
+                        data["tokens_source"] = tf
+                        self._write_data(data)
+                        logger.info(f"Loaded and synced Robinhood OAuth tokens from {tf}")
+                except Exception as e:
+                    logger.warning(f"Failed to load tokens from {tf}: {e}")
 
-        # Proactively refresh if token is expired or within 5 minutes of expiry
-        saved_at = float(data.get("tokens_saved_at") or 0.0)
-        expires_in = float(tokens.expires_in or 86400)
-        if saved_at > 0 and (time.time() - saved_at) >= max(60.0, expires_in - 300.0):
-            if tokens.refresh_token:
-                refreshed = await self.refresh_tokens(tokens.refresh_token)
-                if refreshed:
-                    return refreshed
-
-        return tokens
-
-    async def refresh_tokens(self, refresh_token: Optional[str] = None) -> Optional[OAuthToken]:
-        """Exchanges the stored OAuth 2.1 refresh_token against Robinhood's token endpoint."""
-        data = self._read_data()
-        token_dict = data.get("tokens") or {}
-        rt = refresh_token or token_dict.get("refresh_token")
-        if not rt:
-            logger.warning("Cannot refresh Robinhood OAuth token: no refresh_token available.")
+        if not token_dict:
+            logger.warning(f"No tokens found in token storage (checked keys: {list(data.keys())})")
             return None
 
-        client_info = await self.get_client_info()
-        client_id = client_info.client_id if client_info else None
-        if not client_id:
-            logger.warning("Cannot refresh Robinhood OAuth token: no client_id available.")
-            return None
-
-        token_endpoint = "https://api.robinhood.com/oauth2/token/"
-        form_data = urllib.parse.urlencode({
-            "grant_type": "refresh_token",
-            "refresh_token": rt,
-            "client_id": client_id,
-        }).encode("utf-8")
-
-        def _do_refresh() -> Optional[Dict[str, Any]]:
-            req = urllib.request.Request(
-                token_endpoint,
-                data=form_data,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json",
-                    "User-Agent": "StrategicAlpha-MCP/1.0",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                body = resp.read().decode("utf-8")
-                return json.loads(body)
+        # Normalize camelCase to snake_case for Pydantic OAuthToken
+        norm = {}
+        access_tok = token_dict.get("access_token") or token_dict.get("accessToken") or token_dict.get("token")
+        if access_tok:
+            norm["access_token"] = str(access_tok)
+        refresh_tok = token_dict.get("refresh_token") or token_dict.get("refreshToken")
+        if refresh_tok:
+            norm["refresh_token"] = str(refresh_tok)
+        norm["token_type"] = token_dict.get("token_type") or token_dict.get("tokenType") or "Bearer"
+        exp = token_dict.get("expires_in") or token_dict.get("expiresIn")
+        if exp is not None:
+            try:
+                norm["expires_in"] = int(exp)
+            except Exception:
+                pass
+        if token_dict.get("scope"):
+            norm["scope"] = token_dict["scope"]
 
         try:
-            loop = asyncio.get_running_loop()
-            new_token_dict = await loop.run_in_executor(None, _do_refresh)
-            if not new_token_dict or "access_token" not in new_token_dict:
-                logger.warning("Robinhood OAuth token refresh returned empty payload.")
-                return None
-            if not new_token_dict.get("refresh_token"):
-                new_token_dict["refresh_token"] = rt
-            if not new_token_dict.get("scope") and token_dict.get("scope"):
-                new_token_dict["scope"] = token_dict.get("scope")
-
-            new_tokens = OAuthToken.model_validate(new_token_dict)
-            await self.set_tokens(new_tokens)
-            logger.info("Successfully refreshed expired Robinhood OAuth access_token via refresh_token grant.")
-            return new_tokens
+            return OAuthToken.model_validate(norm)
         except Exception as e:
-            logger.warning(f"Robinhood OAuth refresh_token exchange failed: {e}")
+            logger.error(f"Failed to parse stored tokens into OAuthToken: {e} | Raw keys: {list(token_dict.keys())}")
             return None
 
     async def set_tokens(self, tokens: OAuthToken) -> None:
@@ -209,27 +244,40 @@ class FileTokenStorage(TokenStorage):
 
     async def get_client_info(self) -> Optional[OAuthClientInformationFull]:
         data = self._read_data()
-        client_dict = data.get("client_info")
-        _, cf = self._find_mcp_remote_files()
-        if cf and os.path.exists(cf):
-            try:
-                with open(cf, "r", encoding="utf-8") as f:
-                    remote_client_dict = json.load(f)
-                if remote_client_dict and (
-                    not client_dict
-                    or remote_client_dict.get("client_id") != client_dict.get("client_id")
-                ):
-                    client_dict = remote_client_dict
-                    data["client_info"] = client_dict
-                    self._write_data(data)
-                    logger.info(f"Loaded and synced Robinhood OAuth client info from {cf}")
-            except Exception as e:
-                logger.warning(f"Failed to load client info from {cf}: {e}")
+        client_dict = data.get("client_info") or data.get("clientInfo")
+        if not isinstance(client_dict, dict):
+            # Check if client info is stored flat at top-level
+            if data.get("client_id") or data.get("clientId"):
+                client_dict = data
+            else:
+                client_dict = None
+
+        if not client_dict:
+            # Fall back to IDE's mcp-remote client info if available
+            _, cf = self._find_mcp_remote_files()
+            if cf and os.path.exists(cf):
+                try:
+                    with open(cf, "r", encoding="utf-8") as f:
+                        client_dict = json.load(f)
+                    if client_dict:
+                        data["client_info"] = client_dict
+                        self._write_data(data)
+                        logger.info(f"Loaded and synced Robinhood OAuth client info from {cf}")
+                except Exception as e:
+                    logger.warning(f"Failed to load client info from {cf}: {e}")
 
         if not client_dict:
             return None
+
+        # Normalize camelCase to snake_case for Pydantic OAuthClientInformationFull
+        norm = dict(client_dict)
+        if "clientId" in norm and "client_id" not in norm:
+            norm["client_id"] = norm["clientId"]
+        if "clientSecret" in norm and "client_secret" not in norm:
+            norm["client_secret"] = norm["clientSecret"]
+
         try:
-            return OAuthClientInformationFull.model_validate(client_dict)
+            return OAuthClientInformationFull.model_validate(norm)
         except Exception as e:
             logger.warning(f"Failed to parse stored client_info: {e}")
             return None
@@ -319,8 +367,20 @@ def build_oauth_provider(
 ) -> OAuthClientProvider:
     """Creates configured OAuthClientProvider with redirect and callback handlers."""
     settings = config.get_settings()
+    storage = get_token_storage()
+
+    # Align callback port with registered client_info redirect_uris if present
+    ci_data = storage._read_data().get("client_info") or {}
+    ci_uris = ci_data.get("redirect_uris") or []
     port = redirect_port or settings.oauth_callback_port
     redirect_uri = f"http://127.0.0.1:{port}/callback"
+
+    if ci_uris and isinstance(ci_uris, list) and not redirect_port:
+        first_uri = str(ci_uris[0])
+        parsed = urllib.parse.urlparse(first_uri)
+        if parsed.port:
+            port = parsed.port
+            redirect_uri = first_uri
 
     client_metadata = OAuthClientMetadata(
         client_name="Strategic Alpha AI Trading Agent",
@@ -329,10 +389,14 @@ def build_oauth_provider(
         application_type="native",
     )
 
-    storage = get_token_storage()
     cb_server: Optional[_AuthCallbackServer] = None
 
     async def redirect_handler(auth_url: str) -> None:
+        nonlocal cb_server
+        if cb_server is None:
+            cb_server = _AuthCallbackServer(port=port)
+            cb_server.start()
+
         logger.info(f"Opening browser for Robinhood OAuth authorization:\n{auth_url}")
         print("\n" + "=" * 70)
         print("ROBINHOOD OAUTH AUTHORIZATION REQUIRED")
@@ -352,8 +416,11 @@ def build_oauth_provider(
 
         # Run wait in threadpool so asyncio event loop isn't blocked
         loop = asyncio.get_running_loop()
-        res = await loop.run_in_executor(None, cb_server.wait_for_code, 180.0)
-        cb_server.stop()
+        try:
+            res = await loop.run_in_executor(None, cb_server.wait_for_code, 180.0)
+        finally:
+            cb_server.stop()
+            cb_server = None
 
         if not res or not res[0]:
             raise TimeoutError("Timed out waiting for Robinhood OAuth redirect callback (180s).")
@@ -361,37 +428,24 @@ def build_oauth_provider(
         code, auth_state = res
         return AuthorizationCodeResult(code=code, state=auth_state)
 
-    provider = OAuthClientProvider(
+    return OAuthClientProvider(
         server_url=settings.mcp_url,
         client_metadata=client_metadata,
         storage=storage,
         redirect_handler=redirect_handler if interactive else None,
         callback_handler=callback_handler if interactive else None,
     )
-    # Pre-populate Robinhood OAuth Authorization Server metadata so refreshes hit api.robinhood.com/oauth2/token/
-    try:
-        provider.context.oauth_metadata = OAuthMetadata(
-            issuer=AnyUrl("https://agent.robinhood.com/mcp/trading"),
-            authorization_endpoint=AnyUrl("https://robinhood.com/oauth"),
-            token_endpoint=AnyUrl("https://api.robinhood.com/oauth2/token/"),
-            registration_endpoint=AnyUrl("https://agent.robinhood.com/oauth/trading/register"),
-            response_types_supported=["code"],
-            grant_types_supported=["authorization_code", "refresh_token"],
-            token_endpoint_auth_methods_supported=["none"],
-            code_challenge_methods_supported=["S256"],
-        )
-    except Exception as e:
-        logger.debug(f"Could not pre-populate OAuthMetadata: {e}")
-    return provider
 
 
 async def check_auth_health() -> Dict[str, Any]:
     """Returns detailed status of stored OAuth tokens and authentication health."""
+    from trading.token_refresh import get_token_status
+    tok_status = get_token_status()
     storage = get_token_storage()
     tokens = await storage.get_tokens()
     settings = config.get_settings()
 
-    if not tokens or not tokens.access_token:
+    if not tok_status.get("has_token") or not tokens or not tokens.access_token:
         return {
             "authenticated": False,
             "status": "NOT_AUTHENTICATED",
@@ -402,18 +456,15 @@ async def check_auth_health() -> Dict[str, Any]:
             "configured_account": config.mask_account(settings.agentic_account_number),
         }
 
-    token_data = storage._read_data()
-    saved_at = token_data.get("tokens_saved_at", 0)
-    expires_in = tokens.expires_in or 86400
-    now = time.time()
-    expired = (now - saved_at) > expires_in if saved_at else False
-    remaining_sec = max(0, int(expires_in - (now - saved_at))) if saved_at else None
+    is_expired = tok_status.get("expired", False)
+    remaining_sec = tok_status.get("seconds_remaining")
 
     return {
-        "authenticated": not expired,
-        "status": "TOKEN_VALID" if not expired else "TOKEN_EXPIRED",
-        "has_refresh_token": bool(tokens.refresh_token),
-        "expires_in_sec": expires_in,
+        "authenticated": not is_expired,
+        "status": "TOKEN_VALID" if not is_expired else "TOKEN_EXPIRED",
+        "has_refresh_token": tok_status.get("refresh_token_available", False),
+        "can_refresh": tok_status.get("can_refresh", False),
+        "expires_in_sec": tokens.expires_in,
         "seconds_remaining": remaining_sec,
         "token_path": storage.token_path,
         "token_file_exists": True,
@@ -423,18 +474,29 @@ async def check_auth_health() -> Dict[str, Any]:
     }
 
 
-async def interactive_login(port: int = 33418) -> bool:
-    """Executes the interactive browser OAuth login flow."""
+async def interactive_login(port: Optional[int] = None) -> bool:
+    """Executes the interactive browser OAuth login flow via Streamable HTTP (POST)."""
     print("Initiating Robinhood MCP OAuth 2.1 login flow...")
+    storage = get_token_storage()
+    data = storage._read_data()
+    # If existing tokens are expired, remove them so MCP SDK triggers clean authorization flow
+    if storage._parse_exp(data) < time.time() and "tokens" in data:
+        data.pop("tokens", None)
+        storage._write_data(data)
+
     provider = build_oauth_provider(redirect_port=port, interactive=True)
-    cb_server = _AuthCallbackServer(port=port)
-    cb_server.start()
 
     try:
+        from mcp.client.streamable_http import streamable_http_client
+        from mcp.client.session import ClientSession
         from mcp.shared._httpx_utils import create_mcp_http_client
-        async with create_mcp_http_client(auth=provider) as client:
-            resp = await client.get(config.get_settings().mcp_url)
-            logger.info(f"Handshake response: {resp.status_code}")
+
+        http_client = create_mcp_http_client(auth=provider)
+        settings = config.get_settings()
+        async with streamable_http_client(settings.mcp_url, http_client=http_client) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                init_res = await session.initialize()
+                logger.info(f"Interactive MCP session initialized: {init_res}")
 
         health = await check_auth_health()
         print("\nLogin successful!")
@@ -446,8 +508,14 @@ async def interactive_login(port: int = 33418) -> bool:
         print(f"\nOAuth login failed: {e}")
         state.trip_breaker(f"OAuth interactive login failed: {e}")
         return False
-    finally:
-        cb_server.stop()
+        print(f"Tokens saved to: {health.get('token_path')}")
+        print(f"Status: {health.get('status')}")
+        return True
+    except Exception as e:
+        logger.error(f"OAuth login failed: {e}", exc_info=True)
+        print(f"\nOAuth login failed: {e}")
+        state.trip_breaker(f"OAuth interactive login failed: {e}")
+        return False
 
 
 def main():

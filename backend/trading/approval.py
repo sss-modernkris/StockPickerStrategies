@@ -91,6 +91,7 @@ def save_pending_plan(
         "cutoff_et": f"{settings.approval_cutoff[0]}:{settings.approval_cutoff[1]:02d}",
         "source": source,
         "summary": broker_stage.get("execution_summary", "Rebalance plan pending approval"),
+        "sizing_mode": broker_stage.get("sizing_mode", "INTEGER"),
         "initial_cash": broker_stage.get("initial_cash", 0.0),
         "liquidation_proceeds": broker_stage.get("liquidation_proceeds", 0.0),
         "effective_buying_power": broker_stage.get("effective_buying_power", 0.0),
@@ -177,8 +178,16 @@ def execute_approved_plan(actor: str = "user") -> Dict[str, Any]:
 
     logger.info(f"[PLAN APPROVAL] Executing approved plan {plan.get('plan_id')} by actor '{actor}'")
 
-    # 1. Execute Sells first to free up buying power
+    # 1. Execute Sells first to free up buying power (if not already filled automatically)
     for s in actions.get("sells", []):
+        if s.get("status") == "FILLED":
+            executed_sells.append({
+                "symbol": s.get("symbol"),
+                "action": "SELL",
+                "quantity": s.get("quantity"),
+                "result": {"success": True, "message": "Already executed automatically"}
+            })
+            continue
         sym = s["symbol"]
         qty = float(s["quantity"])
         price = float(s["price"])
@@ -190,19 +199,26 @@ def execute_approved_plan(actor: str = "user") -> Dict[str, Any]:
             "result": res
         })
 
-    # 2. Execute Stock Buys
-    for b in actions.get("buys_stock", []):
+    # 2. Execute Stock Buys (allow equal-weight position cap across the N active buy tickers)
+    active_buys = [b for b in actions.get("buys_stock", []) if float(b.get("quantity", 0)) > 0]
+    equal_cap_override = min(100.0, (100.0 / len(active_buys)) + 1.0) if active_buys else None
+    for b in active_buys:
         sym = b["symbol"]
         qty = float(b["quantity"])
         price = float(b["price"])
-        if qty > 0:
-            res = gateway.place_stock_order(symbol=sym, action="BUY", quantity=qty, price=price)
-            executed_buys.append({
-                "symbol": sym,
-                "action": "BUY",
-                "quantity": qty,
-                "result": res
-            })
+        res = gateway.place_stock_order(
+            symbol=sym,
+            action="BUY",
+            quantity=qty,
+            price=price,
+            position_cap_override_pct=equal_cap_override,
+        )
+        executed_buys.append({
+            "symbol": sym,
+            "action": "BUY",
+            "quantity": qty,
+            "result": res
+        })
 
     # Mark plan completed
     plan["status"] = "APPROVED_EXECUTED"

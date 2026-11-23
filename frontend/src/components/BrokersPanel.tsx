@@ -8,7 +8,7 @@ import {
   TrendingUp, Cpu, Sliders, Play, Pause, PlayCircle, Shield, 
   ArrowUpRight, Landmark, Badge, CheckCircle2, AlertTriangle, ToggleLeft,
   Bot, Sparkles, Clock, ArrowRight, FileSpreadsheet, Layers, Activity, Check, Loader2, Zap, RotateCcw,
-  Eye, AlertCircle, XCircle, X
+  Eye, AlertCircle, XCircle, X, Scale
 } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { logger } from '@/lib/logger';
@@ -55,6 +55,7 @@ interface RHConfig {
 }
 
 interface RHData {
+  error?: string;
   unrealized_pnl: number;
   realized_pnl: number;
   buying_power: number;
@@ -105,9 +106,13 @@ export interface PipelineStatus {
   scheduler_enabled?: boolean;
   scheduler_running?: boolean;
   scheduled_time_est: string;
+  morning_sell_time_est?: string;
+  afternoon_buy_time_est?: string;
   schedule_description: string;
   next_run_time_est?: string;
   last_run_time: string | null;
+  last_morning_sell_time?: string | null;
+  last_morning_sell_summary?: string | null;
   last_trigger_source?: string | null;
   has_report: boolean;
   last_summary: string;
@@ -214,6 +219,8 @@ export function BrokersPanel() {
   const [rhKillSwitch, setRhKillSwitch] = useState(false);
   const [rhRequireHitl, setRhRequireHitl] = useState(true);
   const [guardrailsSaving, setGuardrailsSaving] = useState(false);
+  const [sizingMode, setSizingMode] = useState<'INTEGER' | 'FRACTIONAL'>('INTEGER');
+  const [sizingModeLoading, setSizingModeLoading] = useState(false);
   const isLive = rhEnvironment !== 'SANDBOX';
 
   // Live Trading, Approval & Ledger State
@@ -229,6 +236,7 @@ export function BrokersPanel() {
   // --- Automated AI Pipeline State ---
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState<boolean>(false);
+  const [morningSellLoading, setMorningSellLoading] = useState<boolean>(false);
   const [pipelineReport, setPipelineReport] = useState<PipelineReport | null>(null);
 
   // Controls & Manual Orders State
@@ -314,6 +322,49 @@ export function BrokersPanel() {
       setError("Error saving guardrail settings.");
     } finally {
       setGuardrailsSaving(false);
+    }
+  };
+
+  const fetchSizingMode = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/trading/sizing-mode`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sizing_mode) {
+          setSizingMode(data.sizing_mode);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleSwitchSizingMode = async (mode: 'INTEGER' | 'FRACTIONAL') => {
+    try {
+      setSizingModeLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE_URL}/api/trading/sizing-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizing_mode: mode, actor: 'BrokersPanel' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSizingMode(data.sizing_mode || mode);
+        setSuccessMsg(
+          mode === 'INTEGER'
+            ? 'Switched to Two-Pass Dynamic Integer Sizing (Default).'
+            : 'Switched to Fractional Share Sizing ($2,000 / Available ÷ N tickers).'
+        );
+        fetchPipelineStatus();
+      } else {
+        const errData = await res.json();
+        setError(errData.detail || 'Failed to switch share sizing mode.');
+      }
+    } catch (e) {
+      setError('Error changing share sizing mode.');
+    } finally {
+      setSizingModeLoading(false);
     }
   };
 
@@ -633,6 +684,31 @@ export function BrokersPanel() {
     }
   };
 
+  const handleRunMorningSell = async () => {
+    try {
+      setMorningSellLoading(true);
+      setError(null);
+      setSuccessMsg(null);
+      const res = await fetch(`${API_BASE_URL}/api/agents/pipeline/morning-sell`, { method: 'POST' });
+      if (res.ok) {
+        const report = await res.json();
+        setSuccessMsg(
+          report.summary || 
+          `Morning Sell completed: Liquidated ${report.holdings_count || 0} holdings for ${formatMoney(report.total_proceeds)}.`
+        );
+        fetchRhData();
+        fetchPipelineStatus();
+      } else {
+        const err = await res.json();
+        setError(err.detail || "Morning Sell execution failed.");
+      }
+    } catch (e) {
+      setError("Error triggering morning sell execution.");
+    } finally {
+      setMorningSellLoading(false);
+    }
+  };
+
   const handleRunPipeline = async () => {
     try {
       setPipelineLoading(true);
@@ -679,6 +755,7 @@ export function BrokersPanel() {
     fetchTickerPrice(tradeTicker);
     fetchPendingPlan();
     fetchLiveLedger();
+    fetchSizingMode();
 
     const interval = setInterval(() => {
       fetchPendingPlan();
@@ -737,7 +814,7 @@ export function BrokersPanel() {
                         </span>
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground">
-                        Automated daily screening (Backtester Agent) and portfolio rebalancing (Broker Agent) via Model Context Protocol.
+                        Two-Phase Daily Schedule: Automatic Morning Sell @ 11:00 AM EST (liquidates held shares) &amp; Afternoon Buy @ 14:00 EST (Backtester screening &amp; capital allocation).
                       </CardDescription>
                     </div>
                   </div>
@@ -751,16 +828,36 @@ export function BrokersPanel() {
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-muted-foreground text-[11px]">24x7 Auto-Trigger:</span>
+                    <span className="text-muted-foreground text-[11px]">24x7 Schedule:</span>
                     <span className="font-semibold text-white text-[11px]">
-                      {pipelineStatus?.next_run_time_est ? `Next: ${pipelineStatus.next_run_time_est}` : "2:00 PM EST (Mon-Fri)"}
+                      {pipelineStatus?.next_run_time_est ? `Next: ${pipelineStatus.next_run_time_est}` : "11:00 AM / 2:00 PM EST"}
                     </span>
                   </div>
 
                   <Button
+                    onClick={handleRunMorningSell}
+                    disabled={morningSellLoading || pipelineLoading}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider px-4 h-9 rounded-md shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5"
+                    title="Liquidate all currently held shares in morning session @ 11:00 AM EST (Automatic in all modes without waiting for approval)"
+                  >
+                    {morningSellLoading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Selling...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        Morning Sell (11:00 AM)
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
                     onClick={handleRunPipeline}
-                    disabled={pipelineLoading}
+                    disabled={pipelineLoading || morningSellLoading}
                     className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-wider px-5 h-9 rounded-md shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+                    title="Run Afternoon Buy Pipeline @ 14:00 EST (Screens universe & sizes buy orders)"
                   >
                     {pipelineLoading ? (
                       <>
@@ -770,7 +867,7 @@ export function BrokersPanel() {
                     ) : (
                       <>
                         <Zap className="w-3.5 h-3.5 fill-black" />
-                        Run Daily Pipeline Now
+                        Run Afternoon Buys (14:00)
                       </>
                     )}
                   </Button>
@@ -1189,6 +1286,59 @@ export function BrokersPanel() {
                   </Button>
                 </div>
               </div>
+
+              {/* Share Capital Allocation & Sizing Mode Switcher */}
+              <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                      <Scale className="w-3.5 h-3.5 text-indigo-400" /> Share Sizing Strategy
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                      sizingMode === 'INTEGER' 
+                        ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' 
+                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    }`}>
+                      {sizingMode === 'INTEGER' ? 'Two-Pass Dynamic Integer (Default)' : 'Fractional ($2k / Avail÷N)'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {sizingMode === 'INTEGER'
+                      ? 'Sizes whole integer shares with Two-Pass Dynamic Allocation and residual re-investment. Rebalances using limit orders.'
+                      : 'Allocates $2,000 per stock if funds ≥ $2,000 × N tickers, else Available ÷ N tickers. Precision round(budget / price, 6). Routes market orders during regular hours.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleSwitchSizingMode('INTEGER')}
+                    disabled={sizingModeLoading}
+                    className={`h-8 px-3 text-xs font-semibold ${
+                      sizingMode === 'INTEGER'
+                        ? 'bg-blue-600 text-white hover:bg-blue-500 font-bold shadow-md shadow-blue-600/20'
+                        : 'bg-black/40 text-muted-foreground hover:text-white border border-white/10'
+                    }`}
+                    title="Two-Pass Dynamic Integer Allocation (Default retail integer share sizing)"
+                  >
+                    🔢 Integer (Default)
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleSwitchSizingMode('FRACTIONAL')}
+                    disabled={sizingModeLoading}
+                    className={`h-8 px-3 text-xs font-semibold ${
+                      sizingMode === 'FRACTIONAL'
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-500 font-bold shadow-md shadow-emerald-600/20'
+                        : 'bg-black/40 text-muted-foreground hover:text-white border border-white/10'
+                    }`}
+                    title="Fractional Share Sizing ($2,000/stock or Available ÷ N tickers, market orders)"
+                  >
+                    ✂️ Fractional ($2k / Avail÷N)
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -1395,6 +1545,19 @@ export function BrokersPanel() {
           )}
 
           {/* Account PNL Summary Metric Cards */}
+          {rhData?.error && (
+            <div className="p-3 mb-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+              <div>
+                <span className="font-semibold text-amber-200">Robinhood MCP Live Portfolio Offline:</span>
+                <p className="text-[11px] text-amber-300/80 mt-0.5 font-mono break-all">{rhData.error}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Cash and equity show $0.00 because live balances could not be fetched from the Robinhood Trading MCP server. Check your OAuth token authentication.
+                </p>
+              </div>
+            </div>
+          )}
+
           {rhData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-3 duration-300">
               <Card className="bg-gradient-to-br from-emerald-500/5 to-transparent border-white/5 shadow-lg relative overflow-hidden">

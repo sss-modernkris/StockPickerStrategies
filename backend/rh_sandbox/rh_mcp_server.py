@@ -42,7 +42,7 @@ class RobinhoodAgenticTradingEngine:
         self.is_simulated = True
         
         # Risk Firewall Guardrail Defaults (configurable via UI and .env)
-        self.daily_spend_limit = float(os.getenv("ROBINHOOD_DAILY_SPEND_LIMIT", "10000.0"))
+        self.daily_spend_limit = float(os.getenv("ROBINHOOD_DAILY_SPEND_LIMIT", "5000.0"))
         self.position_cap_pct = float(os.getenv("ROBINHOOD_POSITION_CAP_PCT", "25.0"))
         self.emergency_kill_switch = os.getenv("ROBINHOOD_EMERGENCY_KILL_SWITCH", "false").lower() in ["true", "1", "yes"]
         self.require_hitl = os.getenv("ROBINHOOD_REQUIRE_HITL_CONFIRMATION", "true").lower() in ["true", "1", "yes"]
@@ -221,29 +221,27 @@ class RobinhoodAgenticTradingEngine:
 
         # Sells only generate cash, so spend limits apply strictly to BUY orders
         if action.upper() == "BUY":
-            # Guardrail 2: Daily Spend Limit (allow at least $10,000 for 5 x $2,000 fractional portfolios)
-            effective_daily_limit = max(self.daily_spend_limit, 10000.0)
-            if self.today_spend_total + cost > effective_daily_limit + 0.05:
-                rem = max(0.0, effective_daily_limit - self.today_spend_total)
+            # Guardrail 2: Daily Spend Limit
+            if self.today_spend_total + cost > self.daily_spend_limit:
+                rem = max(0.0, self.daily_spend_limit - self.today_spend_total)
                 return False, (
                     f"GUARDRAIL TRIGGERED: Order cost (${cost:,.2f}) exceeds remaining Daily Spend Limit "
-                    f"(${rem:,.2f} available out of ${effective_daily_limit:,.2f} daily cap)."
+                    f"(${rem:,.2f} available out of ${self.daily_spend_limit:,.2f} daily cap)."
                 )
 
-            # Guardrail 3: Single Position Equity Cap (ensure at least 25% allowance for 5-stock fractional portfolios)
+            # Guardrail 3: Single Position Equity Cap
             portfolio = self.get_portfolio()
             total_equity = portfolio.get("total_equity", DEFAULT_STARTING_CASH)
-            effective_cap_pct = max(self.position_cap_pct, 25.0)
-            max_allowed_position = max(total_equity * (effective_cap_pct / 100.0), 2000.0 if self.cash >= 10000.0 else 0.0)
+            max_allowed_position = total_equity * (self.position_cap_pct / 100.0)
             
             existing_pos_value = 0.0
             if symbol in self.holdings:
                 existing_pos_value = float(self.holdings[symbol].get("market_value", 0.0))
             
-            if (existing_pos_value + cost) > max_allowed_position + 0.05:
+            if (existing_pos_value + cost) > max_allowed_position:
                 return False, (
                     f"GUARDRAIL TRIGGERED: Total allocation for {symbol} (${existing_pos_value + cost:,.2f}) "
-                    f"exceeds maximum {effective_cap_pct}% single-position cap (${max_allowed_position:,.2f} max allowed on ${total_equity:,.2f} equity)."
+                    f"exceeds maximum {self.position_cap_pct}% single-position cap (${max_allowed_position:,.2f} max allowed on ${total_equity:,.2f} equity)."
                 )
 
         return True, None

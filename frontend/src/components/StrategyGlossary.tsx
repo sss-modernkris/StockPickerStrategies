@@ -1227,8 +1227,8 @@ export function StrategyGlossary() {
             icon: <Bot className="w-5 h-5 text-emerald-400" />,
             title: "Specialized AI Agents & Robinhood MCP Pipeline",
             badge: "Autonomous Agentic Trading & Fractional Sizing",
-            description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with fractional share capital allocation ($2,000 per stock when funded ≥ $10,000, or Available Cash ÷ 5 fallback) and an institutional Risk Firewall.",
-            formula: "Per-Stock Budget = $2,000 (if Available Cash ≥ $10,000) else ⌊(Available Cash ÷ 5) × 100⌋ / 100 | Fractional Shares = round(Budget ÷ Price, 6)",
+            description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with flexible capital allocation (Default Two-Pass Dynamic Integer Sizing or precision Fractional Share Sizing up to 6 decimal places) and an institutional Risk Firewall.",
+            formula: "Two-Pass Integer: Pass 1 Base + Pass 2 Residual | Fractional: $2,000 (if Cash ≥ $2,000 × N) else ⌊(Cash ÷ N) × 100⌋ / 100 | Sizing: round(Budget ÷ Price, 6)",
             customContent: (
                 <div className="space-y-6 mt-4 text-sm text-foreground">
                     {/* Architecture Overview */}
@@ -1236,14 +1236,14 @@ export function StrategyGlossary() {
                         <div className="flex items-center justify-between">
                             <span className="font-bold text-white text-sm flex items-center gap-2">
                                 <Cpu className="w-4 h-4 text-emerald-400" />
-                                End-to-End Agentic Trading Workflow (2:00 PM EST Daily Execution &amp; On-Demand Pipeline)
+                                Two-Phase Agentic Workflow (11:00 AM Morning Sell &amp; 14:00 EST Afternoon Buy)
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
-                                v20261115 • Fractional Shares Ready
+                                Two-Phase Pipeline Ready
                             </span>
                         </div>
                         <p className="text-muted-foreground leading-relaxed">
-                            The Strategic Alpha platform implements an autonomous multi-agent pipeline designed for both simulated research (<strong className="text-emerald-400">Sandbox Mode</strong>) and live brokerage execution (<strong className="text-amber-300">Live Shadow, Approval &amp; Autonomous Modes</strong>). Triggered automatically at 2:00 PM EST or on-demand via <strong className="text-foreground">Run Daily Pipeline Now</strong> in the Brokers tab, the pipeline sizes and executes precision fractional share orders (up to 6 decimal places).
+                            The Strategic Alpha platform implements an autonomous multi-agent pipeline operating on a <strong className="text-emerald-400">Two-Phase Daily Schedule</strong> on trading days: <strong className="text-amber-400">Phase 1 (11:00 AM EST)</strong> automatically liquidates currently held shares brought in the prior market session across all modes (in both <strong className="text-amber-300">Approval</strong> and <strong className="text-rose-400">Auto</strong> modes, sells are 100% automatic without waiting for approval); <strong className="text-emerald-400">Phase 2 (14:00 EST)</strong> screens index setups and executes or queues stock buys (Approval mode queues buys for 1-click operator verification; Auto mode dispatches buys automatically).
                         </p>
                     </div>
 
@@ -1265,14 +1265,14 @@ export function StrategyGlossary() {
                                     </span>
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Scans constituent tickers across the <strong className="text-foreground">Dow 30, Nasdaq 100, and S&amp;P 500</strong> (~170 equities) using the fast 6-month bulk vector screen and ranks the top 5 setups:
+                                    Scans constituent tickers across the <strong className="text-foreground">Dow 30, Nasdaq 100, and S&amp;P 500</strong> (~170 equities). Evaluates 5 quantitative screening layers:
                                 </p>
                                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                                     <li><strong className="text-foreground">Willy Dynamic VWAP:</strong> Price action confirmed in Bull market regime.</li>
-                                    <li><strong className="text-foreground">1-Week Strategy Value:</strong> Minimum $10,000 threshold with positive 2-day slope trajectory.</li>
-                                    <li><strong className="text-foreground">Momentum &amp; Velocity:</strong> MACD Histogram in [-0.5, 0.5] and upward MACD Slope (&gt; 0).</li>
+                                    <li><strong className="text-foreground">1-Week Strategy Value:</strong> Minimum $10,000 threshold with positive slope trajectory.</li>
+                                    <li><strong className="text-foreground">Momentum &amp; Velocity:</strong> Positive MACD Histogram and upward MACD Slope.</li>
                                     <li><strong className="text-foreground">RSI Range Guard:</strong> RSI(14) between 30 and 70 to exclude overextended extremes.</li>
-                                    <li><strong className="text-foreground">Fractional Equity &amp; ATM Option Signals:</strong> Computes baseline fractional share quantity (<code className="text-foreground">round(2000 / close, 6)</code>) and 30-day ATM Call option metrics.</li>
+                                    <li><strong className="text-foreground">ATM Option Sizing:</strong> Computes 30-day ATM Call strike, expiry, and contracts.</li>
                                 </ul>
                             </div>
 
@@ -1283,17 +1283,18 @@ export function StrategyGlossary() {
                                         <Briefcase className="w-4 h-4" /> 2. Broker Agent
                                     </span>
                                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
-                                        Fractional Rebalancer
+                                        Integer &amp; Fractional Rebalancer
                                     </span>
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Queries active portfolio state, liquidates stale holdings, and executes fractional share allocation across the top 5 recommended stocks:
+                                    Queries active portfolio state, liquidates stale holdings, and dynamically executes capital allocation across recommended setups:
                                 </p>
                                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                                     <li><strong className="text-foreground">Comparative Liquidation:</strong> Positions falling out of top rankings are sold first so proceeds add to deployable buying power.</li>
-                                    <li><strong className="text-foreground">$2,000 Full Fractional Rule:</strong> If available deployable cash covers $2,000 per stock (<code className="text-foreground">≥ $10,000</code> for 5 stocks), buys exactly <strong className="text-emerald-400">$2,000.00</strong> of fractional shares (<code className="text-foreground">round(2000 / price, 6)</code>) for each stock.</li>
-                                    <li><strong className="text-foreground">Available ÷ 5 Fallback Rule:</strong> If available cash is under the full threshold, divides available amount equally by <strong className="text-indigo-400">5</strong> (<code className="text-foreground">⌊(Cash / 5) × 100⌋ / 100</code>) and buys fractional shares of each stock for that computed dollar amount.</li>
-                                    <li><strong className="text-foreground">Robinhood MCP Fractional Protocol:</strong> Formats fractional share quantities up to 6 decimal places and routes fractional orders as <code className="text-foreground">market</code> orders during <code className="text-foreground">regular_hours</code>.</li>
+                                    <li><strong className="text-foreground">Two-Pass Dynamic Integer Sizing (Default):</strong> Calculates base integer allocation per candidate (<code className="text-foreground">floor(base_budget / price)</code>) and redistributes unallocated residual cash to top setups within concentration caps.</li>
+                                    <li><strong className="text-foreground">$2,000 Full Fractional Rule:</strong> When Fractional Sizing is active and deployable cash covers $2,000 per stock (<code className="text-foreground">≥ $2,000 × N</code> for N qualified tickers), buys exactly <strong className="text-emerald-400">$2,000.00</strong> of fractional shares (<code className="text-foreground">round(2000 / price, 6)</code>) for each stock.</li>
+                                    <li><strong className="text-foreground">Available ÷ N Fallback Rule:</strong> If available cash is below <code className="text-foreground">$2,000 × N</code>, divides available amount equally by the <strong className="text-indigo-400">number of tickers to buy (N)</strong> (<code className="text-foreground">⌊(Cash / N) × 100⌋ / 100</code>) and buys fractional shares of each stock for that computed dollar amount.</li>
+                                    <li><strong className="text-foreground">Robinhood MCP Execution Protocol:</strong> Formats fractional share quantities up to 6 decimal places and routes fractional orders as <code className="text-foreground">market</code> orders during <code className="text-foreground">regular_hours</code>.</li>
                                 </ul>
                             </div>
                         </div>
@@ -1320,7 +1321,7 @@ export function StrategyGlossary() {
                                     <DollarSign className="w-4 h-4" /> Daily Spend Limit
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Maximum daily capital cap ($10,000 default to support 5 × $2,000 fractional stock positions). Accumulates daily spend and rejects BUY orders exceeding the cap. Resets at midnight.
+                                    Maximum daily capital cap ($5,000 default). Accumulates daily spend and rejects BUY orders that exceed the cap. Resets automatically at midnight.
                                 </p>
                             </div>
 
@@ -1329,16 +1330,16 @@ export function StrategyGlossary() {
                                     <Shield className="w-4 h-4" /> Max Position Cap
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Enforces a single-position allocation ceiling (25.0% default to accommodate 5 equal-weight 20% fractional positions). Prevents portfolio over-concentration.
+                                    Enforces a single-position allocation ceiling (15.0% default). Prevents portfolio over-concentration in any single stock or option.
                                 </p>
                             </div>
 
                             <div className="p-3.5 rounded-xl bg-card border border-purple-500/30 space-y-1.5 text-xs">
                                 <div className="font-bold text-purple-400 flex items-center gap-1.5">
-                                    <RotateCcw className="w-4 h-4" /> State &amp; Token Sync
+                                    <RotateCcw className="w-4 h-4" /> State Persistence
                                 </div>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Persists sandbox state to <code className="text-foreground">rh_sandbox_state.json</code>, audit logs to <code className="text-foreground">ledger.jsonl</code>, and automatically syncs refreshed OAuth 2.1 MCP tokens.
+                                    All holdings, option contracts, and order history are persisted to <code className="text-foreground">rh_sandbox_state.json</code>, retaining complete audit logs across restarts.
                                 </p>
                             </div>
                         </div>
@@ -1910,7 +1911,7 @@ export function StrategyGlossary() {
             (item.id === 'backtest-30d-strategy3' && "30-Day Strategy 3 Backtesting Model Historical Simulation Universe Selection Trades ROI Timeline Shift 2:50 PM".toLowerCase().includes(query)) ||
             (item.id === 'options-backtest' && "Options Strategy Backtesting Black-Scholes Call Premium Strike Expiry Intraday Relative Hold Baseline P&L Leverage Theta Volatility".toLowerCase().includes(query)) ||
             (item.id === 'options-alpha-rank' && "Options Alpha Rank Stage 1 Stage 2 Bullish Tickers Call Option Greeks Efficiency Delta Theta Ratio Daily Decay DTE 30 45 Bid Ask Liquidity".toLowerCase().includes(query)) ||
-            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls Fractional Shares 2000 Divide by 5 v20261115".toLowerCase().includes(query))
+            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls Fractional Shares Two-Pass Integer Sizing 2000 Divide by 5 v20261115 v20261123 v20261124 Two-Phase 11:00 AM Morning Sell".toLowerCase().includes(query))
         );
     });
 

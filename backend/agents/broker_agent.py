@@ -17,6 +17,7 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 from trading.factory import get_trading_client
+from trading import state, ledger
 
 logger = logging.getLogger("BrokerAgent")
 
@@ -28,6 +29,142 @@ class BrokerAgent:
         self.client = get_trading_client()
         logger.info(f"{self.name} initialized with {getattr(self.client, 'environment', 'UNKNOWN')} connection.")
 
+    def execute_morning_sell(self, trigger_source: str = "SCHEDULED_11AM") -> Dict[str, Any]:
+        """
+        Executes Morning Sell Phase @ 11:00 AM EST:
+        Liquidates currently held shares brought in yesterday's (or previous) market sessions.
+        CRITICAL RULE: Irrespective of Operating Mode (Approval or Auto), selling is automatic
+        without waiting for user approval.
+        - LIVE_APPROVAL: Directly uses LiveExecutionGateway(mode="LIVE_APPROVAL") to execute live SELLs.
+        - LIVE_AUTONOMOUS: Uses LiveExecutionGateway(mode="LIVE_AUTONOMOUS") to execute live SELLs.
+        - LIVE_SHADOW: Uses ShadowClient to record shadow SELLs.
+        - SANDBOX: Uses SandboxClient to simulate SELLs.
+        """
+        start_time = datetime.datetime.now()
+        current_mode = state.get_mode()
+
+        if state.kill_switch_active():
+            logger.warning("[MORNING SELL] Execution blocked: Emergency Kill Switch is engaged.")
+            return {
+                "success": False,
+                "error": "Emergency Kill Switch is engaged.",
+                "phase": "MORNING_SELL",
+                "overall_status": "BLOCKED_KILL_SWITCH"
+            }
+
+        # Resolve trading client: in LIVE_APPROVAL or LIVE_AUTONOMOUS, use LiveExecutionGateway
+        if current_mode in ("LIVE_APPROVAL", "LIVE_AUTONOMOUS"):
+            from trading.live_gateway import LiveExecutionGateway
+            exec_client = LiveExecutionGateway(mode=current_mode)
+        elif current_mode == "LIVE_SHADOW":
+            from trading.shadow_client import ShadowClient
+            exec_client = ShadowClient()
+        else:
+            from trading.sandbox_client import SandboxClient
+            exec_client = SandboxClient()
+
+        logger.info(f"[{self.name}] Initiating Morning Sell Phase @ 11:00 AM EST (Mode: {current_mode}, Trigger: {trigger_source})...")
+
+        # 1. Fetch current portfolio
+        portfolio = exec_client.get_portfolio()
+        holdings = portfolio.get("holdings", [])
+        active_holdings = [
+            h for h in holdings 
+            if float(h.get("quantity", h.get("total_quantity", 0))) > 0
+        ]
+
+        if not active_holdings:
+            logger.info(f"[{self.name}] No active share holdings found to liquidate in morning session.")
+            return {
+                "success": True,
+                "phase": "MORNING_SELL",
+                "trading_mode": current_mode,
+                "trigger_source": trigger_source,
+                "execution_timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S EST"),
+                "holdings_count": 0,
+                "liquidated_holdings": [],
+                "total_proceeds": 0.0,
+                "overall_status": "NO_HOLDINGS_TO_LIQUIDATE",
+                "summary": "Morning Sell completed: No currently held shares in portfolio."
+            }
+
+        executed_sells = []
+        total_proceeds = 0.0
+
+        for h in active_holdings:
+            sym = h["symbol"]
+            qty = float(h.get("quantity", h.get("total_quantity", 0)))
+            price = float(h.get("current_price", h.get("avg_price", h.get("avg_buy_price", 0.0))))
+            
+            # Fetch fresh quote if price is missing or zero
+            if price <= 0:
+                try:
+                    q = exec_client.get_quote(sym)
+                    price = float(q.get("last", q.get("bid", q.get("ask", 0.0))))
+                except Exception as qe:
+                    logger.debug(f"Could not fetch fresh quote for {sym}: {qe}")
+
+            # Check if fractional share quantity
+            is_fractional = not round(qty, 6).is_integer()
+            order_type_to_use = "market" if is_fractional else "limit"
+
+            kwargs: Dict[str, Any] = {}
+            if current_mode in ("LIVE_APPROVAL", "LIVE_AUTONOMOUS"):
+                kwargs["order_type"] = order_type_to_use
+                kwargs["market_hours"] = "regular_hours"
+
+            sell_res = exec_client.place_stock_order(
+                symbol=sym,
+                action="SELL",
+                quantity=qty,
+                price=price,
+                **kwargs
+            )
+
+            success = bool(sell_res.get("success"))
+            estimated_proceeds = round(qty * price, 2)
+            if success:
+                total_proceeds = round(total_proceeds + estimated_proceeds, 2)
+
+            executed_sells.append({
+                "symbol": sym,
+                "action": "SELL",
+                "quantity": qty,
+                "price": price,
+                "estimated_proceeds": estimated_proceeds,
+                "status": "FILLED" if success else "FAILED",
+                "mcp_response": sell_res.get("message") or sell_res.get("error") or str(sell_res)
+            })
+
+        duration = round((datetime.datetime.now() - start_time).total_seconds(), 2)
+        summary_msg = f"Morning Sell @ 11:00 AM EST completed: Liquidated {len(executed_sells)} holdings for ${total_proceeds:,.2f} total proceeds."
+        logger.info(f"[{self.name}] {summary_msg} (Duration: {duration}s)")
+
+        # Log to audit ledger
+        ledger.get_ledger().append(
+            ledger.EV_RUN,
+            phase="MORNING_SELL",
+            mode=current_mode,
+            trigger=trigger_source,
+            duration_sec=duration,
+            sells_count=len(executed_sells),
+            total_proceeds=total_proceeds
+        )
+
+        return {
+            "success": True,
+            "phase": "MORNING_SELL",
+            "trading_mode": current_mode,
+            "trigger_source": trigger_source,
+            "execution_timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S EST"),
+            "duration_sec": duration,
+            "holdings_count": len(active_holdings),
+            "liquidated_holdings": executed_sells,
+            "total_proceeds": total_proceeds,
+            "overall_status": "SUCCESSFUL_EXECUTION",
+            "summary": summary_msg
+        }
+
     def evaluate_and_rebalance(self, backtest_output: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processes incoming Backtester recommendations, performs portfolio comparative analysis,
@@ -35,7 +172,10 @@ class BrokerAgent:
         based on optimal dynamic capital allocation across qualified candidates.
         """
         start_time = datetime.datetime.now()
-        logger.info(f"[{self.name}] Initiating portfolio comparative analysis & execution pipeline...")
+        current_mode = state.get_mode()
+        # Dynamically reload trading client to reflect active runtime trading mode
+        self.client = get_trading_client()
+        logger.info(f"[{self.name}] Initiating portfolio comparative analysis & execution pipeline ({getattr(self.client, 'environment', 'UNKNOWN')})...")
 
         # 1. Fetch current portfolio state via Robinhood MCP / Client
         initial_portfolio = self.client.get_portfolio()
@@ -83,8 +223,14 @@ class BrokerAgent:
         executed_sells = []
         actual_liquidation_proceeds = 0.0
 
+        # Irrespective of Operating Mode (Approval or Auto), selling is automatic without waiting for approval
+        sell_client = self.client
+        if current_mode == "LIVE_APPROVAL" and sell_decisions:
+            from trading.live_gateway import LiveExecutionGateway
+            sell_client = LiveExecutionGateway(mode="LIVE_APPROVAL")
+
         for s in sell_decisions:
-            res = self.client.place_stock_order(
+            res = sell_client.place_stock_order(
                 symbol=s["symbol"],
                 action="SELL",
                 quantity=s["quantity"],
@@ -112,20 +258,19 @@ class BrokerAgent:
         available_cash = max(float(post_sell_portfolio.get("cash_available", 0.0)), effective_buying_power)
 
         guardrails = post_sell_portfolio.get("guardrails", {})
-        daily_spend_limit = max(float(guardrails.get("daily_spend_limit", 10000.0)), 10000.0)
+        daily_spend_limit = float(guardrails.get("daily_spend_limit", 5000.0))
         today_spend_total = float(guardrails.get("today_spend_total", 0.0))
-        remaining_daily_budget = max(
-            float(guardrails.get("remaining_daily_budget", max(0.0, daily_spend_limit - today_spend_total))),
-            max(0.0, daily_spend_limit - today_spend_total),
-        )
+        remaining_daily_budget = float(guardrails.get("remaining_daily_budget", max(0.0, daily_spend_limit - today_spend_total)))
         position_cap_pct = float(guardrails.get("position_cap_pct", 25.0))
         total_equity = float(post_sell_portfolio.get("total_equity", available_cash))
         if total_equity <= 0:
             total_equity = available_cash
 
-        # For 5-stock fractional portfolios, ensure single-position cap allows at least 25% of equity (or $2,000)
-        effective_cap_pct = max(position_cap_pct, 25.0)
-        max_pos_cap_dollars = max(total_equity * (effective_cap_pct / 100.0), 2000.0 if available_cash >= 10000.0 else 0.0)
+        # For retail / small accounts (under $3,000) or 5-stock portfolios, ensure position cap accommodates portfolio sizing
+        effective_cap_pct = position_cap_pct
+        if total_equity > 0 and total_equity < 3000.0 and effective_cap_pct < 25.0:
+            effective_cap_pct = 25.0
+        max_pos_cap_dollars = total_equity * (effective_cap_pct / 100.0)
 
         # Track existing market values for position cap checks
         existing_holdings_val = {
@@ -137,9 +282,7 @@ class BrokerAgent:
             existing_holdings_val.pop(s["symbol"], None)
 
         # 5. Phase 2 Execution: Determine and Dispatch BUY Orders for Stocks & Options
-        # Fractional share sizing rule:
-        # - Buy $2,000 worth of each stock if account has enough available cash (>= $10,000 for 5 stocks, or >= $2,000 * count).
-        # - Otherwise divide available amount by 5 and buy fractional shares for the computed amount.
+        # Uses dynamic portfolio-aware capital allocation across qualified candidates and adaptively sizes.
         executed_buys_stock = []
         executed_buys_options = []
 
@@ -155,37 +298,93 @@ class BrokerAgent:
         ]
         num_candidates = len(buy_candidates)
 
-        # Determine per-stock dollar budget:
-        # $2,000 per stock if deployable_capital covers $2,000 for each stock (e.g. >= $10,000 for 5 stocks),
-        # otherwise divide available amount by 5.
-        required_for_full_2k = 2000.0 * max(num_candidates, 5)
-        if deployable_capital >= required_for_full_2k or (num_candidates > 0 and deployable_capital >= 2000.0 * num_candidates and deployable_capital >= 10000.0):
-            per_stock_budget = 2000.0
-        else:
-            # Divide available amount by 5 (floored to nearest cent so 5 orders never exceed deployable_capital)
-            per_stock_budget = math.floor((deployable_capital / 5.0) * 100.0) / 100.0
+        # Ensure single-position cap accommodates equal-weight allocation across the N tickers to buy
+        if num_candidates > 0:
+            equal_weight_cap_pct = min(100.0, (100.0 / num_candidates) + 1.0)
+            if effective_cap_pct < equal_weight_cap_pct:
+                effective_cap_pct = equal_weight_cap_pct
+            max_pos_cap_dollars = total_equity * (effective_cap_pct / 100.0)
 
-        planned_shares: Dict[str, float] = {}
+        # Check active sizing mode ('INTEGER' [default] vs 'FRACTIONAL')
+        sizing_mode = state.get_sizing_mode() if hasattr(state, "get_sizing_mode") else "INTEGER"
+        planned_shares: Dict[str, Any] = {}
         planned_budgets: Dict[str, float] = {}
         unallocated_cash = deployable_capital
 
-        for r in buy_candidates:
-            sym = r["symbol"]
-            price = float(r["current_price"])
-            sym_curr_val = existing_holdings_val.get(sym, 0.0)
-            avail_cap = max(0.0, max_pos_cap_dollars - sym_curr_val)
-            target_budget = min(per_stock_budget, unallocated_cash, avail_cap if avail_cap > 0 else per_stock_budget)
-
-            if target_budget > 0 and price > 0:
-                shs = round(target_budget / price, 6)
-                cost = round(target_budget, 2)
-                if shs > 0 and cost <= unallocated_cash + 0.01:
-                    planned_shares[sym] = shs
-                    planned_budgets[sym] = min(cost, round(unallocated_cash, 2))
-                    unallocated_cash = round(max(0.0, unallocated_cash - planned_budgets[sym]), 2)
+        if sizing_mode == "FRACTIONAL":
+            # Fractional share sizing rule:
+            # - Allocates $2,000 per stock if deployable funds >= $2,000 * N (number of tickers to buy).
+            # - Otherwise divides available amount equally by N tickers (floored to nearest cent).
+            # - Sizing: round(budget / price, 6).
+            # - Routes orders as type='market' during regular_hours.
+            if num_candidates > 0:
+                required_for_full_2k = 2000.0 * num_candidates
+                if deployable_capital >= required_for_full_2k:
+                    per_stock_budget = 2000.0
+                else:
+                    per_stock_budget = math.floor((deployable_capital / num_candidates) * 100.0) / 100.0
             else:
-                planned_shares[sym] = 0.0
-                planned_budgets[sym] = 0.0
+                per_stock_budget = 0.0
+
+            for r in buy_candidates:
+                sym = r["symbol"]
+                price = float(r["current_price"])
+                sym_curr_val = existing_holdings_val.get(sym, 0.0)
+                avail_cap = max(0.0, max_pos_cap_dollars - sym_curr_val)
+                target_budget = min(per_stock_budget, unallocated_cash, avail_cap if avail_cap > 0 else per_stock_budget)
+
+                if target_budget > 0 and price > 0:
+                    shs = round(target_budget / price, 6)
+                    cost = round(target_budget, 2)
+                    if shs > 0 and cost <= unallocated_cash + 0.01:
+                        planned_shares[sym] = shs
+                        planned_budgets[sym] = min(cost, round(unallocated_cash, 2))
+                        unallocated_cash = round(max(0.0, unallocated_cash - planned_budgets[sym]), 2)
+                else:
+                    planned_shares[sym] = 0.0
+                    planned_budgets[sym] = 0.0
+        else:
+            # Multi-Pass Optimal Integer Share Sizing across deployable capital (Default)
+            planned_shares = {r["symbol"]: 0 for r in buy_candidates}
+            base_budget_per_stock = (deployable_capital / num_candidates) if num_candidates > 0 else 0.0
+
+            # Pass 1: Base allocation up to base_budget_per_stock
+            for r in buy_candidates:
+                sym = r["symbol"]
+                price = float(r["current_price"])
+                sym_curr_val = existing_holdings_val.get(sym, 0.0)
+                avail_cap = max(0.0, max_pos_cap_dollars - sym_curr_val)
+                pos_cap = max(avail_cap, price)  # allow at least 1 share if within buying power
+                target_budget = min(base_budget_per_stock, pos_cap)
+
+                shs = math.floor(target_budget / price)
+                # If 1 share slightly exceeds base budget (e.g. higher-priced stock like PM), allow 1 share
+                # if within unallocated cash and safe single-position cap tolerance
+                if shs == 0 and price <= unallocated_cash and price <= (pos_cap * 1.15):
+                    shs = 1
+
+                cost = round(shs * price, 2)
+                if cost <= unallocated_cash:
+                    planned_shares[sym] = shs
+                    planned_budgets[sym] = cost
+                    unallocated_cash = round(unallocated_cash - cost, 2)
+
+            # Pass 2: Re-distribute residual unallocated cash to top-ranked candidates
+            for r in buy_candidates:
+                sym = r["symbol"]
+                price = float(r["current_price"])
+                sym_curr_val = existing_holdings_val.get(sym, 0.0)
+                avail_cap = max(0.0, max_pos_cap_dollars - sym_curr_val)
+                pos_cap = max(avail_cap, price)
+
+                while unallocated_cash >= price:
+                    next_cost = round((planned_shares[sym] + 1) * price, 2)
+                    if next_cost <= pos_cap or planned_shares[sym] == 0:
+                        planned_shares[sym] += 1
+                        unallocated_cash = round(unallocated_cash - price, 2)
+                        planned_budgets[sym] = round(planned_shares[sym] * price, 2)
+                    else:
+                        break
 
         is_live_env = "LIVE" in getattr(self.client, "environment", "").upper()
 
@@ -198,13 +397,23 @@ class BrokerAgent:
             stock_sig = r.get("stock_signal", {})
             opt_sig = r.get("option_signal", {})
 
-            # Sync recommendation's stock_signal display with the computed fractional target
-            r["stock_signal"] = {
-                "action": "BUY",
-                "target_price": round(price, 2),
-                "suggested_budget": round(per_stock_budget, 2),
-                "suggested_shares": round(per_stock_budget / price, 6) if price > 0 else 0.0
-            }
+            # Sync recommendation's stock_signal display with the computed target
+            shares_to_buy = planned_shares.get(symbol, 0)
+            stock_order_cost = planned_budgets.get(symbol, round(shares_to_buy * price, 2))
+            if sizing_mode == "FRACTIONAL":
+                r["stock_signal"] = {
+                    "action": "BUY",
+                    "target_price": round(price, 2),
+                    "suggested_budget": round(stock_order_cost, 2),
+                    "suggested_shares": float(shares_to_buy)
+                }
+            else:
+                r["stock_signal"] = {
+                    "action": "BUY",
+                    "target_price": round(price, 2),
+                    "suggested_budget": round(stock_order_cost, 2),
+                    "suggested_shares": int(shares_to_buy)
+                }
 
             # If symbol is already held in portfolio, skip per live position limit policy
             if symbol in retained_symbols:
@@ -222,16 +431,22 @@ class BrokerAgent:
                 })
                 continue
 
-            shares_to_buy = planned_shares.get(symbol, 0.0)
-            stock_order_cost = planned_budgets.get(symbol, round(shares_to_buy * price, 2))
+            is_fractional = (sizing_mode == "FRACTIONAL") and not float(shares_to_buy).is_integer()
+            order_type_to_use = "market" if is_fractional else "limit"
+            market_hours_to_use = "regular_hours" if is_fractional else "regular_hours"
 
             if shares_to_buy > 0 and stock_order_cost <= current_cash_pool + 0.01:
-                buy_res = self.client.place_stock_order(
-                    symbol=symbol,
-                    action="BUY",
-                    quantity=float(shares_to_buy),
-                    price=price
-                )
+                order_kwargs: Dict[str, Any] = {
+                    "symbol": symbol,
+                    "action": "BUY",
+                    "quantity": float(shares_to_buy),
+                    "price": price,
+                    "order_type": order_type_to_use,
+                    "market_hours": market_hours_to_use,
+                }
+                if getattr(self.client, "supports_position_cap_override", False):
+                    order_kwargs["position_cap_override_pct"] = effective_cap_pct
+                buy_res = self.client.place_stock_order(**order_kwargs)
 
                 if buy_res.get("success"):
                     current_cash_pool = round(max(0.0, current_cash_pool - stock_order_cost), 2)
@@ -433,6 +648,7 @@ class BrokerAgent:
             "agent_name": self.name,
             "timestamp": start_time.strftime("%Y-%m-%d %H:%M:%S EST"),
             "environment": getattr(self.client, "environment", "ROBINHOOD_MCP_SANDBOX"),
+            "sizing_mode": sizing_mode,
             "initial_cash": initial_cash,
             "liquidation_proceeds": round(actual_liquidation_proceeds, 2),
             "effective_buying_power": effective_buying_power,

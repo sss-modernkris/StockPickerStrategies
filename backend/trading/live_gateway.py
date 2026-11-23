@@ -39,6 +39,8 @@ def _unwrap_data(payload: Any) -> Any:
 class LiveExecutionGateway(TradingClient):
     """Firewall gateway enforcing all live safety rules before dispatching orders."""
 
+    supports_position_cap_override = True
+
     def __init__(self, mode: str = "LIVE_AUTONOMOUS", live_client: Optional[LiveMCPClient] = None):
         self.mode = mode
         self.client = live_client or get_live_client()
@@ -97,7 +99,10 @@ class LiveExecutionGateway(TradingClient):
         symbol: str,
         action: str,
         quantity: float,
-        price: float
+        price: float,
+        order_type: str = "limit",
+        market_hours: str = "regular_hours",
+        position_cap_override_pct: Optional[float] = None
     ) -> Dict[str, Any]:
         symbol = symbol.strip().upper()
         action = action.strip().upper()
@@ -209,7 +214,7 @@ class LiveExecutionGateway(TradingClient):
         else:
             logger.info(f"[GATEWAY] Market is closed. Bypassing live spread/deviation filters so order can queue in Robinhood.")
 
-        # --- Check 8: Limit Price Calculation with Buffer ---
+        # --- Check 8: Price & Order Type Calculation ---
         is_fractional = not round(quantity, 6).is_integer()
         buf_mult = self.settings.limit_buffer_pct / 100.0
         if not is_fractional and market_open and ask > 0 and bid > 0:
@@ -222,6 +227,10 @@ class LiveExecutionGateway(TradingClient):
 
         est_cost = round(quantity * limit_price, 2)
 
+        # Fractional share orders must be routed as type='market' and market_hours='regular_hours'
+        eff_order_type = "market" if is_fractional else order_type
+        eff_market_hours = "regular_hours" if is_fractional else market_hours
+
         # --- Check 5: BUY Budget, Position Cap & Daily Drawdown ---
         if action == "BUY":
             if est_cost > buying_power + 0.05:
@@ -230,18 +239,23 @@ class LiveExecutionGateway(TradingClient):
                 return {"success": False, "status": "REJECTED", "error": err}
 
             today_spent = self.ledger.today_spend_total()
-            effective_daily_limit = max(self.settings.daily_spend_limit, 10000.0)
-            rem_daily = max(0.0, effective_daily_limit - today_spent)
+            rem_daily = max(0.0, self.settings.daily_spend_limit - today_spent)
             if est_cost > rem_daily + 0.05:
-                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds remaining daily spend limit (${rem_daily:,.2f} out of ${effective_daily_limit:,.2f})."
+                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds remaining daily spend limit (${rem_daily:,.2f} out of ${self.settings.daily_spend_limit:,.2f})."
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
 
-            # Sizing cap: enforce single-position concentration limit (at least 25% for 5-stock fractional portfolios)
-            effective_cap_pct = max(self.settings.position_cap_pct, 25.0)
-            max_pos_dollars = max(total_equity * (effective_cap_pct / 100.0), limit_price, 2000.0 if buying_power >= 10000.0 else 0.0)
-            if est_cost > max_pos_dollars + 0.05:
-                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds {effective_cap_pct}% single-position cap (${max_pos_dollars:,.2f})."
+            # Sizing cap: enforce single-position concentration limit
+            effective_cap_pct = self.settings.position_cap_pct
+            if total_equity > 0 and total_equity < 3000.0 and effective_cap_pct < 25.0:
+                effective_cap_pct = 25.0
+            if position_cap_override_pct is not None:
+                effective_cap_pct = max(effective_cap_pct, min(100.0, float(position_cap_override_pct)))
+
+            max_pos_dollars = max(total_equity * (effective_cap_pct / 100.0), limit_price)
+            # Allow at least a single share order if within buying power
+            if quantity > 1 and est_cost > max_pos_dollars + 0.05:
+                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds {effective_cap_pct:.1f}% single-position cap (${max_pos_dollars:,.2f})."
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
 
@@ -319,6 +333,8 @@ class LiveExecutionGateway(TradingClient):
             action=action,
             quantity=quantity,
             price=limit_price,
+            order_type=eff_order_type,
+            market_hours=eff_market_hours,
             client_order_id=client_order_id
         )
 
