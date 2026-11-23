@@ -1228,7 +1228,7 @@ export function StrategyGlossary() {
             title: "Specialized AI Agents & Robinhood MCP Pipeline",
             badge: "Autonomous Agentic Trading & Fractional Sizing",
             description: "Institutional-grade dual-agent autonomous trading pipeline integrating the Backtester Agent, Broker Agent, and Robinhood Model Context Protocol (MCP) with flexible capital allocation (Default Two-Pass Dynamic Integer Sizing or precision Fractional Share Sizing up to 6 decimal places) and an institutional Risk Firewall.",
-            formula: "Two-Pass Integer: Pass 1 Base + Pass 2 Residual | Fractional: $2,000 (if Cash ≥ $10,000) else ⌊(Cash ÷ 5) × 100⌋ / 100 | Sizing: round(Budget ÷ Price, 6)",
+            formula: "Two-Pass Integer: Pass 1 Base + Pass 2 Residual | Fractional: $2,000 (if Cash ≥ $2,000 × N) else ⌊(Cash ÷ N) × 100⌋ / 100 | Sizing: round(Budget ÷ Price, 6)",
             customContent: (
                 <div className="space-y-6 mt-4 text-sm text-foreground">
                     {/* Architecture Overview */}
@@ -1292,8 +1292,8 @@ export function StrategyGlossary() {
                                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                                     <li><strong className="text-foreground">Comparative Liquidation:</strong> Positions falling out of top rankings are sold first so proceeds add to deployable buying power.</li>
                                     <li><strong className="text-foreground">Two-Pass Dynamic Integer Sizing (Default):</strong> Calculates base integer allocation per candidate (<code className="text-foreground">floor(base_budget / price)</code>) and redistributes unallocated residual cash to top setups within concentration caps.</li>
-                                    <li><strong className="text-foreground">$2,000 Full Fractional Rule:</strong> When Fractional Sizing is active and deployable cash covers $2,000 per stock (<code className="text-foreground">≥ $10,000</code> for 5 stocks), buys exactly <strong className="text-emerald-400">$2,000.00</strong> of fractional shares (<code className="text-foreground">round(2000 / price, 6)</code>) for each stock.</li>
-                                    <li><strong className="text-foreground">Available ÷ 5 Fallback Rule:</strong> If available cash is below $10,000, divides available amount equally by <strong className="text-indigo-400">5</strong> (<code className="text-foreground">⌊(Cash / 5) × 100⌋ / 100</code>) and buys fractional shares of each stock for that computed dollar amount.</li>
+                                    <li><strong className="text-foreground">$2,000 Full Fractional Rule:</strong> When Fractional Sizing is active and deployable cash covers $2,000 per stock (<code className="text-foreground">≥ $2,000 × N</code> for N qualified tickers), buys exactly <strong className="text-emerald-400">$2,000.00</strong> of fractional shares (<code className="text-foreground">round(2000 / price, 6)</code>) for each stock.</li>
+                                    <li><strong className="text-foreground">Available ÷ N Fallback Rule:</strong> If available cash is below <code className="text-foreground">$2,000 × N</code>, divides available amount equally by the <strong className="text-indigo-400">number of tickers to buy (N)</strong> (<code className="text-foreground">⌊(Cash / N) × 100⌋ / 100</code>) and buys fractional shares of each stock for that computed dollar amount.</li>
                                     <li><strong className="text-foreground">Robinhood MCP Execution Protocol:</strong> Formats fractional share quantities up to 6 decimal places and routes fractional orders as <code className="text-foreground">market</code> orders during <code className="text-foreground">regular_hours</code>.</li>
                                 </ul>
                             </div>

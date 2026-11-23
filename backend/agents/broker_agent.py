@@ -172,6 +172,7 @@ class BrokerAgent:
         based on optimal dynamic capital allocation across qualified candidates.
         """
         start_time = datetime.datetime.now()
+        current_mode = state.get_mode()
         # Dynamically reload trading client to reflect active runtime trading mode
         self.client = get_trading_client()
         logger.info(f"[{self.name}] Initiating portfolio comparative analysis & execution pipeline ({getattr(self.client, 'environment', 'UNKNOWN')})...")
@@ -297,8 +298,14 @@ class BrokerAgent:
         ]
         num_candidates = len(buy_candidates)
 
+        # Ensure single-position cap accommodates equal-weight allocation across the N tickers to buy
+        if num_candidates > 0:
+            equal_weight_cap_pct = min(100.0, (100.0 / num_candidates) + 1.0)
+            if effective_cap_pct < equal_weight_cap_pct:
+                effective_cap_pct = equal_weight_cap_pct
+            max_pos_cap_dollars = total_equity * (effective_cap_pct / 100.0)
+
         # Check active sizing mode ('INTEGER' [default] vs 'FRACTIONAL')
-        from trading import state
         sizing_mode = state.get_sizing_mode() if hasattr(state, "get_sizing_mode") else "INTEGER"
         planned_shares: Dict[str, Any] = {}
         planned_budgets: Dict[str, float] = {}
@@ -306,15 +313,18 @@ class BrokerAgent:
 
         if sizing_mode == "FRACTIONAL":
             # Fractional share sizing rule:
-            # - Allocates $2,000 per stock if funds >= $10,000 (or covers $2,000 for each candidate).
-            # - Otherwise divide available amount by 5 (floored to nearest cent).
+            # - Allocates $2,000 per stock if deployable funds >= $2,000 * N (number of tickers to buy).
+            # - Otherwise divides available amount equally by N tickers (floored to nearest cent).
             # - Sizing: round(budget / price, 6).
             # - Routes orders as type='market' during regular_hours.
-            required_for_full_2k = 2000.0 * max(num_candidates, 5)
-            if deployable_capital >= required_for_full_2k or (num_candidates > 0 and deployable_capital >= 2000.0 * num_candidates and deployable_capital >= 10000.0):
-                per_stock_budget = 2000.0
+            if num_candidates > 0:
+                required_for_full_2k = 2000.0 * num_candidates
+                if deployable_capital >= required_for_full_2k:
+                    per_stock_budget = 2000.0
+                else:
+                    per_stock_budget = math.floor((deployable_capital / num_candidates) * 100.0) / 100.0
             else:
-                per_stock_budget = math.floor((deployable_capital / 5.0) * 100.0) / 100.0
+                per_stock_budget = 0.0
 
             for r in buy_candidates:
                 sym = r["symbol"]
@@ -426,14 +436,17 @@ class BrokerAgent:
             market_hours_to_use = "regular_hours" if is_fractional else "regular_hours"
 
             if shares_to_buy > 0 and stock_order_cost <= current_cash_pool + 0.01:
-                buy_res = self.client.place_stock_order(
-                    symbol=symbol,
-                    action="BUY",
-                    quantity=float(shares_to_buy),
-                    price=price,
-                    order_type=order_type_to_use,
-                    market_hours=market_hours_to_use
-                )
+                order_kwargs: Dict[str, Any] = {
+                    "symbol": symbol,
+                    "action": "BUY",
+                    "quantity": float(shares_to_buy),
+                    "price": price,
+                    "order_type": order_type_to_use,
+                    "market_hours": market_hours_to_use,
+                }
+                if getattr(self.client, "supports_position_cap_override", False):
+                    order_kwargs["position_cap_override_pct"] = effective_cap_pct
+                buy_res = self.client.place_stock_order(**order_kwargs)
 
                 if buy_res.get("success"):
                     current_cash_pool = round(max(0.0, current_cash_pool - stock_order_cost), 2)

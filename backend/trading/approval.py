@@ -199,19 +199,26 @@ def execute_approved_plan(actor: str = "user") -> Dict[str, Any]:
             "result": res
         })
 
-    # 2. Execute Stock Buys
-    for b in actions.get("buys_stock", []):
+    # 2. Execute Stock Buys (allow equal-weight position cap across the N active buy tickers)
+    active_buys = [b for b in actions.get("buys_stock", []) if float(b.get("quantity", 0)) > 0]
+    equal_cap_override = min(100.0, (100.0 / len(active_buys)) + 1.0) if active_buys else None
+    for b in active_buys:
         sym = b["symbol"]
         qty = float(b["quantity"])
         price = float(b["price"])
-        if qty > 0:
-            res = gateway.place_stock_order(symbol=sym, action="BUY", quantity=qty, price=price)
-            executed_buys.append({
-                "symbol": sym,
-                "action": "BUY",
-                "quantity": qty,
-                "result": res
-            })
+        res = gateway.place_stock_order(
+            symbol=sym,
+            action="BUY",
+            quantity=qty,
+            price=price,
+            position_cap_override_pct=equal_cap_override,
+        )
+        executed_buys.append({
+            "symbol": sym,
+            "action": "BUY",
+            "quantity": qty,
+            "result": res
+        })
 
     # Mark plan completed
     plan["status"] = "APPROVED_EXECUTED"

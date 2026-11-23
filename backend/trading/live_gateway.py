@@ -39,6 +39,8 @@ def _unwrap_data(payload: Any) -> Any:
 class LiveExecutionGateway(TradingClient):
     """Firewall gateway enforcing all live safety rules before dispatching orders."""
 
+    supports_position_cap_override = True
+
     def __init__(self, mode: str = "LIVE_AUTONOMOUS", live_client: Optional[LiveMCPClient] = None):
         self.mode = mode
         self.client = live_client or get_live_client()
@@ -99,7 +101,8 @@ class LiveExecutionGateway(TradingClient):
         quantity: float,
         price: float,
         order_type: str = "limit",
-        market_hours: str = "regular_hours"
+        market_hours: str = "regular_hours",
+        position_cap_override_pct: Optional[float] = None
     ) -> Dict[str, Any]:
         symbol = symbol.strip().upper()
         action = action.strip().upper()
@@ -230,14 +233,14 @@ class LiveExecutionGateway(TradingClient):
 
         # --- Check 5: BUY Budget, Position Cap & Daily Drawdown ---
         if action == "BUY":
-            if est_cost > buying_power:
+            if est_cost > buying_power + 0.05:
                 err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds live buying power (${buying_power:,.2f})."
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
 
             today_spent = self.ledger.today_spend_total()
             rem_daily = max(0.0, self.settings.daily_spend_limit - today_spent)
-            if est_cost > rem_daily:
+            if est_cost > rem_daily + 0.05:
                 err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds remaining daily spend limit (${rem_daily:,.2f} out of ${self.settings.daily_spend_limit:,.2f})."
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
@@ -245,13 +248,14 @@ class LiveExecutionGateway(TradingClient):
             # Sizing cap: enforce single-position concentration limit
             effective_cap_pct = self.settings.position_cap_pct
             if total_equity > 0 and total_equity < 3000.0 and effective_cap_pct < 25.0:
-                # On smaller retail accounts (under $3,000), integer share granularity requires at least 25% cap for 5-stock portfolios
                 effective_cap_pct = 25.0
+            if position_cap_override_pct is not None:
+                effective_cap_pct = max(effective_cap_pct, min(100.0, float(position_cap_override_pct)))
 
             max_pos_dollars = max(total_equity * (effective_cap_pct / 100.0), limit_price)
             # Allow at least a single share order if within buying power
-            if quantity > 1 and est_cost > max_pos_dollars:
-                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds {effective_cap_pct}% single-position cap (${max_pos_dollars:,.2f})."
+            if quantity > 1 and est_cost > max_pos_dollars + 0.05:
+                err = f"REJECTED: Order cost (${est_cost:,.2f}) exceeds {effective_cap_pct:.1f}% single-position cap (${max_pos_dollars:,.2f})."
                 self._log_decision(symbol, action, "REJECTED", err)
                 return {"success": False, "status": "REJECTED", "error": err}
 

@@ -354,7 +354,7 @@ export function BrokersPanel() {
         setSuccessMsg(
           mode === 'INTEGER'
             ? 'Switched to Two-Pass Dynamic Integer Sizing (Default).'
-            : 'Switched to Fractional Share Sizing ($2,000 / Available ÷ 5).'
+            : 'Switched to Fractional Share Sizing ($2,000 / Available ÷ N tickers).'
         );
         fetchPipelineStatus();
       } else {
@@ -1299,13 +1299,13 @@ export function BrokersPanel() {
                         ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' 
                         : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                     }`}>
-                      {sizingMode === 'INTEGER' ? 'Two-Pass Dynamic Integer (Default)' : 'Fractional ($2k / Avail÷5)'}
+                      {sizingMode === 'INTEGER' ? 'Two-Pass Dynamic Integer (Default)' : 'Fractional ($2k / Avail÷N)'}
                     </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {sizingMode === 'INTEGER'
                       ? 'Sizes whole integer shares with Two-Pass Dynamic Allocation and residual re-investment. Rebalances using limit orders.'
-                      : 'Allocates $2,000 per stock if funds ≥ $10,000, else Available ÷ 5. Precision round(budget / price, 6). Routes market orders during regular hours.'}
+                      : 'Allocates $2,000 per stock if funds ≥ $2,000 × N tickers, else Available ÷ N tickers. Precision round(budget / price, 6). Routes market orders during regular hours.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1333,9 +1333,9 @@ export function BrokersPanel() {
                         ? 'bg-emerald-600 text-white hover:bg-emerald-500 font-bold shadow-md shadow-emerald-600/20'
                         : 'bg-black/40 text-muted-foreground hover:text-white border border-white/10'
                     }`}
-                    title="Fractional Share Sizing ($2,000/stock or Available ÷ 5, market orders)"
+                    title="Fractional Share Sizing ($2,000/stock or Available ÷ N tickers, market orders)"
                   >
-                    ✂️ Fractional ($2k / Avail÷5)
+                    ✂️ Fractional ($2k / Avail÷N)
                   </Button>
                 </div>
               </div>
