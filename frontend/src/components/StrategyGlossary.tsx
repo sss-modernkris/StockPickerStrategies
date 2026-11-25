@@ -1911,7 +1911,7 @@ export function StrategyGlossary() {
             (item.id === 'backtest-30d-strategy3' && "30-Day Strategy 3 Backtesting Model Historical Simulation Universe Selection Trades ROI Timeline Shift 2:50 PM".toLowerCase().includes(query)) ||
             (item.id === 'options-backtest' && "Options Strategy Backtesting Black-Scholes Call Premium Strike Expiry Intraday Relative Hold Baseline P&L Leverage Theta Volatility".toLowerCase().includes(query)) ||
             (item.id === 'options-alpha-rank' && "Options Alpha Rank Stage 1 Stage 2 Bullish Tickers Call Option Greeks Efficiency Delta Theta Ratio Daily Decay DTE 30 45 Bid Ask Liquidity".toLowerCase().includes(query)) ||
-            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls Fractional Shares Two-Pass Integer Sizing 2000 Divide by 5 v20261115 v20261123 v20261124 Two-Phase 11:00 AM Morning Sell".toLowerCase().includes(query))
+            (item.id === 'ai-agents-pipeline' && "Backtester Agent Broker Agent Robinhood MCP Model Context Protocol Sandbox Automated 2:00 PM EST Rebalance Stock Option Calls Fractional Shares Two-Pass Integer Sizing 2000 Divide by N v20261115 v20261123 v20261124 v20261125 Two-Phase 11:00 AM Morning Sell".toLowerCase().includes(query))
         );
     });
 

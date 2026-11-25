@@ -2,7 +2,22 @@
 
 This document maintains a chronological record of architectural updates, feature rollouts, branch merges, and refactoring milestones for the **Strategic Alpha Platform**.
 
-## 1. Release v20261124 - Two-Phase Automated Trading Pipeline (11:00 AM Morning Sell & 14:00 Afternoon Buy) & Dynamic Fractional Sizing
+## 1. Release v20261125 - Manual Ticker Entry in Execution Playground & Dynamic `Available ÷ N` Fractional Sizing
+
+### 🖥️ Brokers Execution Playground Manual Ticker Entry ([frontend/src/components/BrokersPanel.tsx](file:///C:/Users/moder/AntiGravity/StockPickerStrategies-Krishna-ST-20261123/frontend/src/components/BrokersPanel.tsx))
+- Added a manual ticker `<Input>` field with automatic uppercase formatting and a dedicated **Quote** button (`onBlur` / `Enter` auto-fetch) above the synchronized quick-select dropdown.
+- Normalized and validated custom ticker symbols in `handleRhTradeSubmit` and `handleRhTradePreview`, and added `step="any"` on the **Quantity** input for fractional-share testing.
+
+### 📊 Dynamic `Available ÷ N` Fractional Sizing & Afternoon Buy Fixes ([backend/agents/broker_agent.py](file:///C:/Users/moder/AntiGravity/StockPickerStrategies-Krishna-ST-20261123/backend/agents/broker_agent.py), [backend/trading/live_gateway.py](file:///C:/Users/moder/AntiGravity/StockPickerStrategies-Krishna-ST-20261123/backend/trading/live_gateway.py), [backend/trading/approval.py](file:///C:/Users/moder/AntiGravity/StockPickerStrategies-Krishna-ST-20261123/backend/trading/approval.py))
+- Fixed `current_mode` `NameError` and shadowed local `state` `UnboundLocalError` in `BrokerAgent.evaluate_and_rebalance()`.
+- Replaced hardcoded divisor `5` with dynamic `num_candidates` ($N$) and aligned equal-weight single-position caps ($100/N\%$) across `BrokerAgent`, `LiveExecutionGateway`, and `ApprovalManager`.
+
+### 🏷️ Version Synchronization (`v20261125`)
+- Synchronized version tags across `README.md`, `frontend/src/app/page.tsx`, `frontend/src/components/TickerSidebar.tsx`, `frontend/src/components/StrategyGlossary.tsx`, `20261125-Changes.md`, and `docs/changes.md`.
+
+---
+
+## 2. Release v20261124 - Two-Phase Automated Trading Pipeline (11:00 AM Morning Sell & 14:00 Afternoon Buy) & Dynamic Fractional Sizing
 
 ### ⏰ Two-Phase Daily Trading Pipeline (11:00 AM Morning Sell & 14:00 EST Afternoon Buy) ([backend/agents/pipeline.py](file:///d:/AI/StockPickerStrategies/backend/agents/pipeline.py), [backend/agents/broker_agent.py](file:///d:/AI/StockPickerStrategies/backend/agents/broker_agent.py))
 - **Phase 1: Automatic Morning Sell Trigger @ 11:00 AM EST**:

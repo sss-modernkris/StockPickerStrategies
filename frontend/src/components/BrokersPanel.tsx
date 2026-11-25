@@ -574,6 +574,12 @@ export function BrokersPanel() {
     setTradeError(null);
     setTradeSuccess(null);
 
+    const normalizedTicker = tradeTicker.trim().toUpperCase();
+    if (!normalizedTicker) {
+      setTradeError("Please enter or select a valid ticker symbol.");
+      return;
+    }
+
     const qty = parseFloat(tradeQty);
     const price = parseFloat(tradePrice);
     if (isNaN(qty) || qty <= 0) {
@@ -587,7 +593,7 @@ export function BrokersPanel() {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/rh/order?ticker=${tradeTicker}&action=${tradeAction}&quantity=${qty}&price=${price}`,
+        `${API_BASE_URL}/api/rh/order?ticker=${encodeURIComponent(normalizedTicker)}&action=${tradeAction}&quantity=${qty}&price=${price}`,
         { method: 'POST' }
       );
 
@@ -613,6 +619,12 @@ export function BrokersPanel() {
     setTradeSuccess(null);
     setTradePreviewData(null);
 
+    const normalizedTicker = tradeTicker.trim().toUpperCase();
+    if (!normalizedTicker) {
+      setTradeError("Please enter or select a valid ticker symbol.");
+      return;
+    }
+
     const qty = parseFloat(tradeQty);
     const price = parseFloat(tradePrice);
     if (isNaN(qty) || qty <= 0) {
@@ -627,7 +639,7 @@ export function BrokersPanel() {
     try {
       setTradePreviewing(true);
       const res = await fetch(
-        `${API_BASE_URL}/api/rh/order?ticker=${tradeTicker}&action=${tradeAction}&quantity=${qty}&price=${price}&preview=true`,
+        `${API_BASE_URL}/api/rh/order?ticker=${encodeURIComponent(normalizedTicker)}&action=${tradeAction}&quantity=${qty}&price=${price}&preview=true`,
         { method: 'POST' }
       );
 
@@ -1869,11 +1881,54 @@ export function BrokersPanel() {
                           {priceLoading ? "Fetching quote..." : `Price: $${tradePrice}`}
                         </span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          placeholder="Type ticker (e.g. PLTR, AMD)"
+                          value={tradeTicker}
+                          onChange={(e) => setTradeTicker(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                          onBlur={() => {
+                            const sym = tradeTicker.trim().toUpperCase();
+                            if (sym) fetchTickerPrice(sym);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const sym = tradeTicker.trim().toUpperCase();
+                              if (sym) fetchTickerPrice(sym);
+                            }
+                          }}
+                          className="bg-black/45 border-white/10 rounded-md text-white h-9 text-xs font-mono font-semibold uppercase"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => fetchTickerPrice(tradeTicker.trim().toUpperCase())}
+                          disabled={priceLoading || !tradeTicker.trim()}
+                          className="h-9 px-3 text-[11px] bg-black/45 border-white/10 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 shrink-0"
+                          title="Fetch live quote for typed ticker"
+                        >
+                          {priceLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Quote'}
+                        </Button>
+                      </div>
                       <select 
-                        value={tradeTicker}
-                        onChange={(e) => handleTickerChange(e.target.value)}
+                        value={
+                          [
+                            ...(pipelineReport?.stage_1_backtester.ranked_recommendations?.map((r) => r.symbol) || []),
+                            ...(rhData?.holdings?.map((h) => h.symbol) || []),
+                            'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'AVGO',
+                            'BMY', 'DOW', 'NOW', 'DXCM', 'VZ', 'F', 'JPM', 'SPY', 'QQQ'
+                          ].includes(tradeTicker)
+                            ? tradeTicker
+                            : ''
+                        }
+                        onChange={(e) => {
+                          if (e.target.value) handleTickerChange(e.target.value);
+                        }}
                         className="w-full bg-black/45 border-white/10 rounded-md h-9 text-xs text-white px-2 focus:border-emerald-500/50 font-medium"
                       >
+                        <option value="">— Or select from quick list —</option>
                         {/* Recommendations from Stage 1 if available */}
                         {pipelineReport?.stage_1_backtester.ranked_recommendations && pipelineReport.stage_1_backtester.ranked_recommendations.length > 0 && (
                           <optgroup label="Stage 1 Recommendations">
@@ -1949,6 +2004,7 @@ export function BrokersPanel() {
                         <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</label>
                         <Input
                           type="number"
+                          step="any"
                           placeholder="10"
                           value={tradeQty}
                           onChange={(e) => setTradeQty(e.target.value)}
