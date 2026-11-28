@@ -259,6 +259,32 @@ def get_rh_data():
     client = get_trading_client()
     return client.get_portfolio()
 
+@app.get("/api/rh/activity-dashboard")
+def get_rh_activity_dashboard(starting_cash: float = 500.0):
+    from trading.factory import get_trading_client
+    from services.agentic_analytics import compute_agentic_dashboard, fetch_all_live_filled_orders
+
+    client = get_trading_client()
+    portfolio = client.get_portfolio()
+    orders = portfolio.get("orders") or []
+
+    # In Live modes, paginate get_equity_orders(state='filled') so full trade history is captured
+    env_name = str(portfolio.get("environment", "")).upper()
+    account_id = str(portfolio.get("account_id", "")).strip()
+    if "LIVE" in env_name and account_id and account_id != "UNKNOWN":
+        live_client = getattr(client, "client", None)
+        if live_client is None and hasattr(client, "call_tool"):
+            live_client = client
+        if live_client is not None and hasattr(live_client, "call_tool"):
+            try:
+                paginated_orders = fetch_all_live_filled_orders(live_client, account_id)
+                if paginated_orders:
+                    orders = paginated_orders
+            except Exception as e:
+                logger.warning(f"Failed to paginate live filled orders, falling back to portfolio orders: {e}")
+
+    return compute_agentic_dashboard(portfolio=portfolio, orders=orders, starting_cash=starting_cash)
+
 @app.post("/api/rh/order")
 def place_rh_order(ticker: str, action: str, quantity: float, price: float, preview: bool = False):
     from trading import state

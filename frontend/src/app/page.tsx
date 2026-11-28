@@ -13,13 +13,14 @@ import { NormalizedComparePanel } from '@/components/NormalizedComparePanel';
 import { AdvancedChartsPanel } from '@/components/AdvancedChartsPanel';
 import { PaperStudyPanel } from '@/components/PaperStudyPanel';
 import { BrokersPanel } from '@/components/BrokersPanel';
+import { AgenticActivityDashboard } from '@/components/AgenticActivityDashboard';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { BxTrenderPanel } from '@/components/BxTrenderPanel';
 import { TopTickersPanel } from '@/components/TopTickersPanel';
 import { VolatilityCalculatorPanel } from '@/components/VolatilityCalculatorPanel';
 import { RawTechOptionPanel } from '@/components/RawTechOptionPanel';
 import { TickerAnalysis } from '@/lib/types';
-import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText, Percent, Layers } from 'lucide-react';
+import { Loader2, LayoutGrid, TableProperties, Database, BookOpen, LineChart, TrendingUp, BarChart2, ClipboardList, Landmark, FileText, Percent, Layers, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -27,7 +28,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<Record<string, TickerAnalysis>>({});
-  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'analysis' | 'bx' | 'top-tickers' | 'volatility' | 'raw-tech-option'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'table' | 'technical' | 'raw-data' | 'glossary' | 'normalized-compare' | 'advanced-charts' | 'paper-study' | 'brokers' | 'agentic-dashboard' | 'analysis' | 'bx' | 'top-tickers' | 'volatility' | 'raw-tech-option'>('dashboard');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,6 +176,7 @@ export default function Dashboard() {
                   {viewMode === 'glossary' && 'Methodology & Glossary'}
                   {viewMode === 'paper-study' && 'Paper Trading Log'}
                   {viewMode === 'brokers' && 'Broker Management'}
+                  {viewMode === 'agentic-dashboard' && 'Agentic Activity Dashboard'}
                   {viewMode === 'analysis' && 'Portfolio Technical Analysis'}
                   {viewMode === 'bx' && `${currentData.symbol} BX Trender Analysis`}
                   {viewMode === 'volatility' && `${currentData.symbol} IV & 20D Historical Volatility`}
@@ -190,6 +192,7 @@ export default function Dashboard() {
                   {viewMode === 'glossary' && 'Learn how the 10 quantitative strategies and ML engine operate'}
                   {viewMode === 'paper-study' && 'Log simulated stock transactions and review your trading history'}
                   {viewMode === 'brokers' && 'Manage Robinhood Agentic AI live execution and portfolio rebalancing'}
+                  {viewMode === 'agentic-dashboard' && 'Account balances, winning percentage, realized P/L over time, and per-symbol performance from the Agentic Activity Ledger'}
                   {viewMode === 'analysis' && 'Willy VWAP dynamics, 2.0 ATR volatility boundaries, and high-precision visual summaries.'}
                   {viewMode === 'bx' && 'Dual-momentum oscillator calculations, short-term spreads, long-term background histograms, and automated crossover logs.'}
                   {viewMode === 'volatility' && 'Invert Black-Scholes backward from Call option premium to extract Implied Volatility, compute 20d Historical Volatility, and Option Greeks.'}
@@ -231,6 +234,9 @@ export default function Dashboard() {
                 </Button>
                 <Button variant={viewMode === 'brokers' ? 'secondary' : 'ghost'} onClick={() => setViewMode('brokers')} size="sm" className="rounded-md">
                   <Landmark className="w-4 h-4 mr-2" /> Brokers
+                </Button>
+                <Button variant={viewMode === 'agentic-dashboard' ? 'secondary' : 'ghost'} onClick={() => setViewMode('agentic-dashboard')} size="sm" className="rounded-md text-emerald-400 hover:text-emerald-300">
+                  <Activity className="w-4 h-4 mr-2 text-emerald-400" /> Agentic Dashboard
                 </Button>
                 <Button variant={viewMode === 'analysis' ? 'secondary' : 'ghost'} onClick={() => setViewMode('analysis')} size="sm" className="rounded-md">
                   <FileText className="w-4 h-4 mr-2" /> Analysis
@@ -338,6 +344,12 @@ export default function Dashboard() {
             {viewMode === 'brokers' && (
               <div className="mt-2">
                 <BrokersPanel />
+              </div>
+            )}
+
+            {viewMode === 'agentic-dashboard' && (
+              <div className="mt-2">
+                <AgenticActivityDashboard />
               </div>
             )}
 

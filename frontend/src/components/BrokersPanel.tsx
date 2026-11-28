@@ -211,6 +211,8 @@ export function BrokersPanel() {
   const [rhMcpUrl, setRhMcpUrl] = useState('https://agent.robinhood.com/mcp/trading');
   const [rhSimulate, setRhSimulate] = useState(true);
   const [rhLoading, setRhLoading] = useState(false);
+  const [accountRefreshing, setAccountRefreshing] = useState(false);
+  const [lastAccountSync, setLastAccountSync] = useState<string | null>(null);
   
   // Guardrail Controls State
   const [rhEnvironment, setRhEnvironment] = useState<string>('SANDBOX');
@@ -535,13 +537,39 @@ export function BrokersPanel() {
 
   const fetchRhData = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/rh/data`);
+      const res = await fetch(`${API_BASE_URL}/api/rh/data?_t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setRhData(data);
+        setLastAccountSync(new Date().toLocaleTimeString());
+        return data;
       }
+      return null;
     } catch (err) {
       logger.error("Failed to fetch Robinhood portfolio data", err);
+      return null;
+    }
+  };
+
+  const handleRefreshAccountData = async () => {
+    try {
+      setAccountRefreshing(true);
+      setError(null);
+      const [data] = await Promise.all([
+        fetchRhData(),
+        checkRhConfig()
+      ]);
+      if (!data) {
+        setError("Failed to refresh account balances and active holdings.");
+      } else if (data.error) {
+        setError(`Account refresh returned an error: ${data.error}`);
+      } else {
+        setSuccessMsg("Account balances and active holdings refreshed from live account.");
+      }
+    } catch (err) {
+      setError("Network error while refreshing account balances and holdings.");
+    } finally {
+      setAccountRefreshing(false);
     }
   };
 
@@ -1570,6 +1598,30 @@ export function BrokersPanel() {
             </div>
           )}
 
+          {/* Account Balances & Active Holdings Header with On-Demand Refresh */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-sm font-bold text-white tracking-tight">Account Balances &amp; Active Holdings</h3>
+              {lastAccountSync && (
+                <span className="text-[10px] font-mono text-muted-foreground px-2 py-0.5 rounded bg-white/5 border border-white/10">
+                  Last synced: {lastAccountSync}
+                </span>
+              )}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleRefreshAccountData}
+              disabled={accountRefreshing}
+              className="h-8 px-3 text-xs font-semibold bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20 hover:text-emerald-200 flex items-center gap-1.5 w-fit"
+              title="Fetch latest cash available, equity, and active stock holdings directly from your account"
+            >
+              <RefreshCcw className={`w-3.5 h-3.5 ${accountRefreshing ? 'animate-spin' : ''}`} />
+              {accountRefreshing ? 'Refreshing Account...' : 'Refresh Balances & Holdings'}
+            </Button>
+          </div>
+
           {rhData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-3 duration-300">
               <Card className="bg-gradient-to-br from-emerald-500/5 to-transparent border-white/5 shadow-lg relative overflow-hidden">
@@ -1651,6 +1703,18 @@ export function BrokersPanel() {
                       <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-white/5 text-white border border-white/10 font-semibold">
                         {(rhData.holdings || []).length} Held
                       </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRefreshAccountData}
+                        disabled={accountRefreshing}
+                        className="h-7 px-2 text-[11px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 flex items-center gap-1"
+                        title="Refresh active holdings and account balances"
+                      >
+                        <RefreshCcw className={`w-3 h-3 ${accountRefreshing ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
                       {rhData.queued_orders && rhData.queued_orders.length > 0 && (
                         <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1">
                           <Clock className="w-3 h-3 animate-pulse" />
